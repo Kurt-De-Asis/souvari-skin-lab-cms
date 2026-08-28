@@ -137,7 +137,7 @@ This starts both:
 |------|-------|----------|
 | Admin | admin@iave.local | password123 |
 | Staff | maria.santos@iave.local | password123 |
-| Customer | juan.dela cruz@email.com | password123 |
+| Customer | juan.delacruz@email.com | password123 |
 
 ---
 
