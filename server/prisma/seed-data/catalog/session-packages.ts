@@ -1,0 +1,68 @@
+import { SectionDef } from '../types';
+import { vipNm } from '../helpers';
+
+const sessionData: [string, string, number, number, number][] = [
+  ['Carbon Laser 7 Session', 'carbon-laser-7-session', 3500, 4550, 31500],
+  ['Pico Laser 7 Session', 'pico-laser-7-session', 2100, 2660, 18900],
+  ['Skin Renewal 7 Session', 'skin-renewal-7-session', 2100, 2450, 18900],
+  ['Acne Clear 7 Session', 'acne-clear-7-session', 2450, 2800, 22050],
+  ['Rejuran 7 Session', 'rejuran-7-session', 2450, 3150, 22050],
+  ['Glow Facial 7 Session', 'glow-facial-7-session', 2100, 2450, 18900],
+  ['Microdermabrasion 7 Session', 'microdermabrasion-7-session', 1750, 2100, 15750],
+  ['RF Face 7 Session', 'rf-face-7-session', 1750, 2800, 15750],
+  ['RF Body 7 Session', 'rf-body-7-session', 2450, 3500, 22050],
+  ['Skin Booster 7 Session', 'skin-booster-7-session', 3500, 4900, 31500],
+  ['Underarm Laser 7 Session', 'underarm-laser-7-session', 1400, 2100, 12600],
+  ['Underarm Whitening 7 Session', 'underarm-whitening-7-session', 1750, 2450, 15750],
+  ['Full Arms Whitening 7 Session', 'full-arms-whitening-7-session', 3500, 4200, 31500],
+  ['Full Legs Whitening 7 Session', 'full-legs-whitening-7-session', 5600, 7000, 50400],
+  ['Full Body Whitening 7 Session', 'full-body-whitening-7-session', 10500, 12600, 94500],
+  ['Mesobotox 7 Session', 'mesobotox-7-session', 3150, 4200, 28350],
+  ['Dermapen 7 Session', 'dermapen-7-session', 2450, 3150, 22050],
+  ['Fat Freeze 7 Session', 'fat-freeze-7-session', 2450, 3500, 22050],
+  ['Inner Thigh Whitening 7 Session', 'inner-thigh-whitening-7-session', 3150, 4200, 28350],
+  ['Full Back Whitening 7 Session', 'full-back-whitening-7-session', 4200, 5600, 37800],
+  ['Chin Laser 7 Session', 'chin-laser-7-session', 1050, 1400, 9450],
+  ['Side Burns Laser 7 Session', 'side-burns-laser-7-session', 1050, 1400, 9450],
+  ['Upper Lip Laser 7 Session', 'upper-lip-laser-7-session', 1050, 1400, 9450],
+  ['Full Face Laser 7 Session', 'full-face-laser-7-session', 2800, 3500, 25200],
+  ['Full Belly Laser 7 Session', 'full-belly-laser-7-session', 2100, 3500, 18900],
+  ['Belly Line Laser 7 Session', 'belly-line-laser-7-session', 1050, 1400, 9450],
+  ['Crutch Area Laser 7 Session', 'crutch-area-laser-7-session', 2100, 2800, 18900],
+  ['Buttocks Laser 7 Session', 'buttocks-laser-7-session', 2800, 3500, 25200],
+  ['Half Arms Laser 7 Session', 'half-arms-laser-7-session', 2800, 4200, 25200],
+  ['Half Legs Laser 7 Session', 'half-legs-laser-7-session', 4200, 5600, 37800],
+  ['Bikini Laser 7 Session', 'bikini-laser-7-session', 3500, 4900, 31500],
+  ['Brazilian Laser 7 Session', 'brazilian-laser-7-session', 4900, 6300, 44100],
+  ['Nipple Laser 7 Session', 'nipple-laser-7-session', 1400, 2100, 12600],
+  ['Chin Lipo 7 Session', 'chin-lipo-7-session', 49000, 63000, 441000],
+  ['Eye Infra HIFU 7 Session', 'eye-infra-hifu-7-session', 2800, 3500, 25200],
+  ['Lower Face HIFU 7 Session', 'lower-face-hifu-7-session', 4200, 5600, 37800],
+  ['Upper Face HIFU 7 Session', 'upper-face-hifu-7-session', 4200, 5600, 37800],
+  ['Double Chin HIFU 7 Session', 'double-chin-hifu-7-session', 4200, 5600, 37800],
+  ['Full Face HIFU 7 Session', 'full-face-hifu-7-session', 8400, 10500, 75600],
+  ['Full Face + Neck HIFU 7 Session', 'full-face-neck-hifu-7-session', 9800, 12600, 88200],
+  ['Neck Lifting HIFU 7 Session', 'neck-lifting-hifu-7-session', 5600, 7000, 50400],
+  ['Neck Infra HIFU 7 Session', 'neck-infra-hifu-7-session', 2800, 3500, 25200],
+  ['Decolletage InfRA HIFU 7 Session', 'decolletage-infra-hifu-7-session', 2800, 3500, 25200],
+];
+
+const section: SectionDef = {
+  slug: 'session-packages',
+  name: '7-Session Packages',
+  display_order: 7,
+  services: sessionData.map(([name, slug, vip, nm, tenVip]) => ({
+    name,
+    slug,
+    category: 'package',
+    duration_minutes: 0,
+    prices: vipNm(vip, nm),
+    package: {
+      sessions_included: 7,
+      session_price: vip,
+      ten_session_price: tenVip,
+    },
+  })),
+};
+
+export default section;

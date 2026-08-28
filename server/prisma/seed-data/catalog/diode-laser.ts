@@ -1,0 +1,131 @@
+import { SectionDef } from '../types';
+import { vipNm } from '../helpers';
+
+const section: SectionDef = {
+  slug: 'diode-laser',
+  name: 'Diode Laser',
+  display_order: 4,
+  services: [
+    {
+      name: 'Chin',
+      slug: 'chin',
+      category: 'laser',
+      duration_minutes: 30,
+      prices: vipNm(1500, 2000),
+    },
+    {
+      name: 'Side Burns',
+      slug: 'side-burns',
+      category: 'laser',
+      duration_minutes: 30,
+      prices: vipNm(1500, 2000),
+    },
+    {
+      name: 'Underarm',
+      slug: 'underarm',
+      category: 'laser',
+      duration_minutes: 30,
+      prices: vipNm(2000, 3000),
+    },
+    {
+      name: 'Upper Lip',
+      slug: 'upper-lip',
+      category: 'laser',
+      duration_minutes: 30,
+      prices: vipNm(1500, 2000),
+    },
+    {
+      name: 'Full Face',
+      slug: 'full-face',
+      category: 'laser',
+      duration_minutes: 45,
+      prices: vipNm(4000, 5000),
+    },
+    {
+      name: 'Full Arms',
+      slug: 'full-arms',
+      category: 'laser',
+      duration_minutes: 45,
+      prices: vipNm(7000, 9000),
+    },
+    {
+      name: 'Half Arms',
+      slug: 'half-arms',
+      category: 'laser',
+      duration_minutes: 45,
+      prices: vipNm(4000, 6000),
+    },
+    {
+      name: 'Full Legs',
+      slug: 'full-legs',
+      category: 'laser',
+      duration_minutes: 60,
+      prices: vipNm(10000, 13000),
+    },
+    {
+      name: 'Half Legs',
+      slug: 'half-legs',
+      category: 'laser',
+      duration_minutes: 45,
+      prices: vipNm(6000, 8000),
+    },
+    {
+      name: 'Full Back',
+      slug: 'full-back',
+      category: 'laser',
+      duration_minutes: 60,
+      prices: vipNm(10000, 13000),
+    },
+    {
+      name: 'Full Belly',
+      slug: 'full-belly',
+      category: 'laser',
+      duration_minutes: 30,
+      prices: vipNm(3000, 5000),
+    },
+    {
+      name: 'Belly Line',
+      slug: 'belly-line',
+      category: 'laser',
+      duration_minutes: 30,
+      prices: vipNm(1500, 2000),
+    },
+    {
+      name: 'Nipple',
+      slug: 'nipple',
+      category: 'laser',
+      duration_minutes: 30,
+      prices: vipNm(2000, 3000),
+    },
+    {
+      name: 'Bikini',
+      slug: 'bikini',
+      category: 'laser',
+      duration_minutes: 45,
+      prices: vipNm(5000, 7000),
+    },
+    {
+      name: 'Brazilian',
+      slug: 'brazilian',
+      category: 'laser',
+      duration_minutes: 45,
+      prices: vipNm(7000, 9000),
+    },
+    {
+      name: 'Buttocks',
+      slug: 'buttocks',
+      category: 'laser',
+      duration_minutes: 30,
+      prices: vipNm(4000, 5000),
+    },
+    {
+      name: 'Crutch Area',
+      slug: 'crutch-area',
+      category: 'laser',
+      duration_minutes: 30,
+      prices: vipNm(3000, 4000),
+    },
+  ],
+};
+
+export default section;

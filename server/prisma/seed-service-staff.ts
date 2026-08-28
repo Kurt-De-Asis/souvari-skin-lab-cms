@@ -1,0 +1,64 @@
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+const NAIL_SPA_PATTERN = /nail|manicure|pedicure|polish|gel|tips|sculptured|cat eye|glazed|ombre|freestyle|poly art|glitter|3d|crystal|extension|hand spa|foot spa|paraffin|whitening \+ para|extra mask|extra scrub|extra massage|french tips|full set|velvet base|hand painted|encapsulated|chrome|lash|brow|microblading|microshading|lip blush|eyeliner|beauty mark|scalp micro|freckle tattoo|areola|scar camo|stretch mark/i;
+const CONSULT_PATTERN = /consultation/i;
+
+async function main() {
+  const staff = await prisma.staff.findMany({
+    where: { deleted_at: null },
+    select: { id: true, first_name: true, last_name: true, position: true },
+  });
+
+  const aestheticians = staff.filter((s) => s.position === 'aesthetician');
+  const therapist = staff.find((s) => s.position === 'therapist');
+  const manager = staff.find((s) => s.position === 'manager');
+
+  const services = await prisma.services.findMany({
+    where: { deleted_at: null, is_active: true },
+    select: { id: true, name: true, category: true },
+  });
+
+  const data: { service_id: number; staff_id: number }[] = [];
+  const seen = new Set<string>();
+
+  for (const svc of services) {
+    let assignees: number[] = [];
+
+    if (CONSULT_PATTERN.test(svc.name)) {
+      assignees = manager ? [manager.id] : [];
+    } else if (NAIL_SPA_PATTERN.test(svc.name)) {
+      assignees = [therapist?.id, ...aestheticians.slice(0, 2).map((s) => s.id)].filter(
+        (id): id is number => typeof id === 'number'
+      );
+    } else {
+      assignees = [...aestheticians.map((s) => s.id), manager?.id].filter(
+        (id): id is number => typeof id === 'number'
+      );
+    }
+
+    for (const staffId of assignees) {
+      const key = `${svc.id}-${staffId}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        data.push({ service_id: svc.id, staff_id: staffId });
+      }
+    }
+  }
+
+  const result = await prisma.service_staff.createMany({ data, skipDuplicates: true });
+  console.log(`Created ${result.count} service_staff assignments`);
+
+  const total = await prisma.service_staff.count();
+  console.log(`Total assignments now: ${total}`);
+
+  const orphanServices = await prisma.services.count({
+    where: { deleted_at: null, is_active: true, service_staff: { none: {} } },
+  });
+  console.log(`Active services with NO staff: ${orphanServices}`);
+}
+
+main()
+  .catch((e) => { console.error(e); process.exit(1); })
+  .finally(() => prisma.$disconnect());

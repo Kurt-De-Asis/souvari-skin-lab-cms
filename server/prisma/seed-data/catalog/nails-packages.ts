@@ -1,0 +1,93 @@
+import { SectionDef } from '../types';
+import { vipNm } from '../helpers';
+
+const section: SectionDef = {
+  slug: 'nail-packages',
+  name: 'Nail Packages',
+  display_order: 14,
+  services: [
+    {
+      name: 'Gel Manicure + Free Gel Pedicure',
+      slug: 'gel-manicure-free-gel-pedicure',
+      category: 'package',
+      description: 'Save more when booked together — Gel Manicure bundled with a Free Gel Pedicure.',
+      duration_minutes: 60,
+      inclusions: ['Gel Manicure', 'Free Gel Pedicure'],
+      prices: vipNm(450, 550),
+    },
+    {
+      name: 'Gel Manicure + Free Gel Nail Art',
+      slug: 'gel-manicure-free-gel-nail-art',
+      category: 'package',
+      description: 'Save more when booked together — Gel Manicure bundled with Free Gel Nail Art.',
+      duration_minutes: 60,
+      inclusions: ['Gel Manicure', 'Free Gel Nail Art'],
+      prices: vipNm(450, 550),
+    },
+    {
+      name: 'Gel Manicure + Extensions',
+      slug: 'gel-manicure-extensions',
+      category: 'package',
+      description: 'Save more when booked together — Gel Manicure paired with Extensions.',
+      duration_minutes: 90,
+      inclusions: ['Gel Manicure', 'Extensions'],
+      prices: vipNm(800, 950),
+    },
+    {
+      name: 'Gel Manicure + 3D Nail Art',
+      slug: 'gel-manicure-3d-nail-art',
+      category: 'package',
+      description: 'Save more when booked together — Gel Manicure paired with 3D Nail Art.',
+      duration_minutes: 60,
+      inclusions: ['Gel Manicure', '3D Nail Art'],
+      prices: vipNm(550, 650),
+    },
+    {
+      name: 'Gel Manicure + Gel Pedicure',
+      slug: 'gel-manicure-gel-pedicure',
+      category: 'package',
+      description: 'Save more when booked together — Gel Manicure paired with Gel Pedicure.',
+      duration_minutes: 90,
+      inclusions: ['Gel Manicure', 'Gel Pedicure'],
+      prices: vipNm(800, 950),
+    },
+    {
+      name: 'Gel Manicure + Gel Pedicure + Free Nail Art',
+      slug: 'gel-manicure-gel-pedicure-free-nail-art',
+      category: 'package',
+      description: 'Best-value bundle — Gel Manicure, Gel Pedicure, plus Free Nail Art.',
+      duration_minutes: 90,
+      inclusions: ['Gel Manicure', 'Gel Pedicure', 'Free Nail Art'],
+      prices: vipNm(900, 1050),
+    },
+    {
+      name: 'Gel Manicure + Gel Pedicure + Nail Art',
+      slug: 'gel-manicure-gel-pedicure-nail-art',
+      category: 'package',
+      description: 'Complete nail care bundle — Gel Manicure, Gel Pedicure, and Nail Art at a bundled rate.',
+      duration_minutes: 90,
+      inclusions: ['Gel Manicure', 'Gel Pedicure', 'Nail Art'],
+      prices: vipNm(1050, 1200),
+    },
+    {
+      name: 'Extensions + Gel Pedicure',
+      slug: 'extensions-gel-pedicure',
+      category: 'package',
+      description: 'Save more when booked together — Extensions paired with Gel Pedicure.',
+      duration_minutes: 90,
+      inclusions: ['Extensions', 'Gel Pedicure'],
+      prices: vipNm(1000, 1150),
+    },
+    {
+      name: 'Extensions + Nail Art + Gel Pedicure',
+      slug: 'extensions-nail-art-gel-pedicure',
+      category: 'package',
+      description: 'Full-service bundle — Extensions, Nail Art, and Gel Pedicure at a bundled rate.',
+      duration_minutes: 90,
+      inclusions: ['Extensions', 'Nail Art', 'Gel Pedicure'],
+      prices: vipNm(1100, 1250),
+    },
+  ],
+};
+
+export default section;

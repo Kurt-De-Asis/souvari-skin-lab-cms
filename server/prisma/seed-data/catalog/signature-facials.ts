@@ -1,0 +1,138 @@
+import { SectionDef } from '../types';
+import { vipNm } from '../helpers';
+
+const section: SectionDef = {
+  slug: 'signature-facials',
+  name: 'Signature Facials',
+  display_order: 1,
+  services: [
+    {
+      name: 'Skin Renewal Treatment',
+      slug: 'skin-renewal-treatment',
+      category: 'signature_facial',
+      duration_minutes: 45,
+      prices: vipNm(3000, 3500, { source_ref: 'PDF p.4 · Signature Facials' }),
+    },
+    {
+      name: 'Acne Clear Treatment',
+      slug: 'acne-clear-treatment',
+      category: 'signature_facial',
+      duration_minutes: 60,
+      prices: vipNm(3500, 4000, { source_ref: 'PDF p.4 · Signature Facials' }),
+    },
+    {
+      name: 'Botox Treatment',
+      slug: 'botox-treatment',
+      category: 'signature_facial',
+      duration_minutes: 45,
+      prices: vipNm(18000, 25000, { source_ref: 'PDF p.4 · Signature Facials' }),
+    },
+    {
+      name: 'Filler Treatment',
+      slug: 'filler-treatment',
+      category: 'signature_facial',
+      duration_minutes: 60,
+      prices: vipNm(18000, 25000, { source_ref: 'PDF p.4 · Signature Facials' }),
+    },
+    {
+      name: 'Skin Booster Treatment',
+      slug: 'skin-booster-treatment',
+      category: 'signature_facial',
+      duration_minutes: 30,
+      prices: vipNm(5000, 7000, { source_ref: 'PDF p.4 · Signature Facials' }),
+    },
+    {
+      name: 'Chin Lipolysis Treatment',
+      slug: 'chin-lipolysis-treatment',
+      category: 'signature_facial',
+      duration_minutes: 60,
+      prices: vipNm(70000, 90000, { source_ref: 'PDF p.4 · Signature Facials' }),
+    },
+    {
+      name: 'Derma Punch Treatment',
+      slug: 'derma-punch-treatment',
+      category: 'signature_facial',
+      duration_minutes: 45,
+      prices: vipNm(3500, 4500, { source_ref: 'PDF p.4 · Signature Facials' }),
+    },
+    {
+      name: 'Skin Revitalizer Treatment',
+      slug: 'skin-revitalizer-treatment',
+      category: 'signature_facial',
+      duration_minutes: 60,
+      prices: vipNm(7500, 10000, { source_ref: 'PDF p.4 · Signature Facials' }),
+    },
+    {
+      name: 'Mesobotox Treatment',
+      slug: 'mesobotox-treatment',
+      category: 'signature_facial',
+      duration_minutes: 45,
+      prices: vipNm(4500, 6000, { source_ref: 'PDF p.4 · Signature Facials' }),
+    },
+    {
+      name: 'Mesolipo Treatment',
+      slug: 'mesolipo-treatment',
+      category: 'signature_facial',
+      duration_minutes: 45,
+      prices: vipNm(3500, 5000, { source_ref: 'PDF p.4 · Signature Facials' }),
+    },
+    {
+      name: 'Lipo B Injection',
+      slug: 'lipo-b-injection',
+      category: 'signature_facial',
+      duration_minutes: 45,
+      prices: vipNm(2500, 3500, { source_ref: 'PDF p.4 · Signature Facials' }),
+    },
+    {
+      name: 'Fat Freeze Treatment',
+      slug: 'fat-freeze-treatment',
+      category: 'signature_facial',
+      duration_minutes: 45,
+      prices: vipNm(3500, 5000, { source_ref: 'PDF p.4 · Signature Facials' }),
+    },
+    {
+      name: 'RF Body Treatment',
+      slug: 'rf-body-treatment',
+      category: 'signature_facial',
+      duration_minutes: 60,
+      prices: vipNm(3500, 5000, { source_ref: 'PDF p.4 · Signature Facials' }),
+    },
+    {
+      name: 'RF Face Treatment',
+      slug: 'rf-face-treatment',
+      category: 'signature_facial',
+      duration_minutes: 30,
+      prices: vipNm(2500, 4000, { source_ref: 'PDF p.4 · Signature Facials' }),
+    },
+    {
+      name: 'Carbon Laser Treatment',
+      slug: 'carbon-laser-treatment',
+      category: 'signature_facial',
+      duration_minutes: 30,
+      prices: vipNm(5000, 6500, { source_ref: 'PDF p.4 · Signature Facials' }),
+    },
+    {
+      name: 'Pico Laser Treatment',
+      slug: 'pico-laser-treatment',
+      category: 'signature_facial',
+      duration_minutes: 30,
+      prices: vipNm(3000, 3800, { source_ref: 'PDF p.4 · Signature Facials' }),
+    },
+    {
+      name: 'Rejuran Treatment',
+      slug: 'rejuran-treatment',
+      category: 'signature_facial',
+      duration_minutes: 45,
+      prices: vipNm(3500, 4500, { source_ref: 'PDF p.4 · Signature Facials' }),
+    },
+    {
+      name: 'Vaginal Laser Treatment',
+      slug: 'vaginal-laser-treatment',
+      category: 'signature_facial',
+      duration_minutes: 30,
+      prices: vipNm(15000, 25000, { source_ref: 'PDF p.4 · Signature Facials' }),
+    },
+  ],
+};
+
+export default section;
