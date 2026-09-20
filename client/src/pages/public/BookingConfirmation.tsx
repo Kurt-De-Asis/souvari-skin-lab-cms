@@ -3,12 +3,14 @@ import { CheckCircle, Calendar, Clock } from 'lucide-react';
 import ChatbotWidget from '../../components/chatbot/ChatbotWidget';
 
 interface LocationState {
-  service?: { name: string; price: number; duration: number };
+  services: { name: string; price: number; duration: number }[];
   date?: string;
   time?: string;
   staff?: string;
   totalPrice?: number;
   totalDuration?: number;
+  membershipDiscount?: number;
+  membershipCode?: string;
 }
 
 function formatDate(dateStr: string): string {
@@ -29,40 +31,58 @@ export default function BookingConfirmation() {
   const location = useLocation();
   const state = (location.state || {}) as LocationState;
 
-  const hasData = state.service || state.date;
+  const hasData = (state.services && state.services.length) || state.date;
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-neutral-50">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="max-w-md mx-auto text-center">
           {/* Success Icon */}
-          <div className="w-16 h-16 rounded-full bg-neutral-900 flex items-center justify-center mx-auto mb-6">
+          <div className="w-16 h-16 bg-primary-500 flex items-center justify-center mx-auto mb-6 rounded-full">
             <CheckCircle size={32} className="text-white" />
           </div>
 
-          <h1 className="text-2xl font-semibold text-neutral-900">Appointment Confirmed</h1>
+          <h1 className="text-3xl font-sans font-semibold text-neutral-900">Appointment Confirmed</h1>
           <p className="text-sm text-neutral-500 mt-2">
             Your appointment has been successfully scheduled.
           </p>
 
           {/* Appointment Details */}
           {hasData && (
-            <div className="mt-8 p-6 rounded-xl border border-neutral-200 text-left">
-              {state.service && (
-                <div className="mb-4">
-                  <p className="text-xs text-neutral-400 uppercase tracking-wider">Service</p>
-                  <p className="text-sm font-medium text-neutral-900 mt-1">{state.service.name}</p>
+            <div className="mt-8 p-7 border border-neutral-200 bg-white text-left">
+              {state.services && state.services.length > 0 && (
+                <div className="mb-5">
+                  <p className="text-xs text-neutral-400 uppercase tracking-[0.2em]">
+                    {state.services.length > 1 ? 'Services' : 'Service'}
+                  </p>
+                  <ul className="mt-3 border-t border-neutral-200">
+                    {state.services.map((svc, idx) => (
+                      <li key={idx} className="flex justify-between items-center gap-3 py-3 border-b border-neutral-200">
+                        <span className="text-sm font-medium text-neutral-900">
+                          {svc.name}
+                          {svc.duration ? (
+                            <span className="block text-xs text-neutral-400 font-normal">
+                              {svc.duration} minutes
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="font-sans text-sm text-neutral-700 whitespace-nowrap">
+                          ₱{svc.price.toLocaleString()}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
               {state.date && (
                 <div className="flex items-center gap-2 mb-3">
-                  <Calendar size={14} className="text-neutral-400" />
+                  <Calendar size={14} className="text-primary-600" />
                   <span className="text-sm text-neutral-900">{formatDate(state.date)}</span>
                 </div>
               )}
               {state.time && (
                 <div className="flex items-center gap-2 mb-3">
-                  <Clock size={14} className="text-neutral-400" />
+                  <Clock size={14} className="text-primary-600" />
                   <span className="text-sm text-neutral-900">{formatTime(state.time)}</span>
                 </div>
               )}
@@ -70,9 +90,9 @@ export default function BookingConfirmation() {
                 <p className="text-sm text-neutral-500 mt-2">with {state.staff}</p>
               )}
               {state.totalPrice != null && (
-                <div className="border-t border-neutral-100 mt-4 pt-4 flex justify-between items-center">
+                <div className="border-t border-neutral-200 mt-5 pt-4 flex justify-between items-center">
                   <span className="text-sm font-medium text-neutral-900">Total</span>
-                  <span className="text-lg font-semibold text-neutral-900">₱{state.totalPrice.toLocaleString()}</span>
+                  <span className="font-sans text-xl font-semibold text-neutral-900">₱{state.totalPrice.toLocaleString()}</span>
                 </div>
               )}
             </div>
@@ -80,10 +100,10 @@ export default function BookingConfirmation() {
 
           {/* Actions */}
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-            <Link to="/customer/appointments" className="btn-primary px-6">
+            <Link to="/customer/appointments" className="btn-primary">
               View Appointment
             </Link>
-            <Link to="/" className="btn-secondary px-6">
+            <Link to="/" className="btn-secondary">
               Back to Home
             </Link>
           </div>

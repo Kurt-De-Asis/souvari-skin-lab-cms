@@ -12,10 +12,14 @@ export const posQuoteSchema = z.object({
   membership_code: z.string().optional(),
   items: z.array(posItemSchema).min(1).max(20),
   use_monthly_perk: z.boolean().optional(),
-  referral_credit_amount: z.number().min(0).optional(),
 });
 
 export const posCheckoutSchema = posQuoteSchema.extend({
-  payment_method: z.enum(['cash', 'credit_card', 'debit_card', 'bank_transfer', 'e_wallet', 'voucher']),
+  payment_method: z.enum(['cash', 'gcash', 'gotyme', 'rcbc', 'paid_on_us']),
   notes: z.string().optional(),
+  discount_pct: z.coerce.number().min(0).max(100).optional(),
+  discount_reason: z.string().nullable().optional(),
+  discount_applied_by: z.number().int().positive().nullable().optional(),
+  appointment_id: z.number().int().positive().nullable().optional(),
+  staff_id: z.number().int().positive().nullable().optional(),
 });

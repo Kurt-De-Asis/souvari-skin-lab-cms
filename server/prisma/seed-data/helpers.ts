@@ -41,6 +41,34 @@ export function waxRow(vip: number, femaleNm: number | null, maleNm: number | nu
   return rows;
 }
 
+export function lashTiers(vipSenior: number, vipGuru: number | null, nmSenior: number, nmGuru: number | null, opts?: Partial<PriceRowInput>): PriceRowInput[] {
+  const rows: PriceRowInput[] = [
+    { audience: 'vip', staff_tier: 'senior', amount: vipSenior, ...opts },
+    { audience: 'non_member', staff_tier: 'senior', amount: nmSenior, ...opts },
+  ];
+  if (vipGuru !== null) rows.push({ audience: 'vip', staff_tier: 'guru', amount: vipGuru, ...opts });
+  if (nmGuru !== null) rows.push({ audience: 'non_member', staff_tier: 'guru', amount: nmGuru, ...opts });
+  return rows;
+}
+
+export function waxVipNm4(vipFemale: number, vipMale: number | null, nmFemale: number, nmMale: number | null): PriceRowInput[] {
+  const rows: PriceRowInput[] = [
+    { audience: 'vip', gender_scope: 'female', amount: vipFemale },
+    { audience: 'non_member', gender_scope: 'female', amount: nmFemale },
+  ];
+  if (vipMale !== null) {
+    rows.push({ audience: 'vip', gender_scope: 'male', amount: vipMale });
+  } else {
+    rows.push({ audience: 'vip', gender_scope: 'male', amount: 0, is_available: false });
+  }
+  if (nmMale !== null) {
+    rows.push({ audience: 'non_member', gender_scope: 'male', amount: nmMale });
+  } else {
+    rows.push({ audience: 'non_member', gender_scope: 'male', amount: 0, is_available: false });
+  }
+  return rows;
+}
+
 export function staffTiers(technician: number, senior: number, guru: number, opts?: Partial<PriceRowInput>): PriceRowInput[] {
   return [
     { audience: 'regular', staff_tier: 'technician', amount: technician, ...opts },

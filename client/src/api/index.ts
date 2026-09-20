@@ -20,8 +20,14 @@ export const customersApi = {
   delete: (id: number) => api.delete(`/customers/${id}`),
 };
 
+export const contactApi = {
+  sendMessage: (data: { name: string; email: string; subject: string; message: string }) =>
+    api.post('/contact', data),
+};
+
 export const staffApi = {
   list: (params?: Record<string, string>) => api.get('/staff', { params }),
+  listPublic: () => api.get('/staff/public/team'),
   getById: (id: number) => api.get(`/staff/${id}`),
   create: (data: any) => api.post('/staff', data),
   update: (id: number, data: any) => api.put(`/staff/${id}`, data),
@@ -29,11 +35,14 @@ export const staffApi = {
   getSchedules: (id: number) => api.get(`/staff/${id}/schedules`),
   updateSchedules: (id: number, data: any) => api.put(`/staff/${id}/schedules`, data),
   getAvailability: (id: number, params: any) => api.get(`/staff/${id}/availability`, { params }),
+  assignService: (id: number, data: { service_id: number }) => api.post(`/staff/${id}/services`, data),
+  unassignService: (id: number, serviceId: number) => api.delete(`/staff/${id}/services/${serviceId}`),
 };
 
 export const servicesApi = {
   list: (params?: Record<string, string>) => api.get('/services', { params }),
   browse: (params?: Record<string, string>) => api.get('/services/browse', { params }),
+  browseById: (id: number) => api.get(`/services/browse/${id}`),
   getById: (id: number) => api.get(`/services/${id}`),
   create: (data: any) => api.post('/services', data),
   update: (id: number, data: any) => api.put(`/services/${id}`, data),
@@ -63,8 +72,9 @@ export const appointmentsApi = {
   getQuote: (serviceId: number) => api.get('/appointments/quote', { params: { service_id: String(serviceId) } }),
   getById: (id: number) => api.get(`/appointments/${id}`),
   create: (data: any) => api.post('/appointments', data),
+  createGroup: (data: any) => api.post('/appointments/group', data),
   updateStatus: (id: number, data: any) => api.patch(`/appointments/${id}/status`, data),
-  update: (id: number, data: any) => api.patch(`/appointments/${id}`, data),
+  update: (id: number, data: any) => api.put(`/appointments/${id}`, data),
 };
 
 export const transactionsApi = {
@@ -73,6 +83,11 @@ export const transactionsApi = {
   create: (data: any) => api.post('/transactions', data),
   void: (id: number, data?: any) => api.post(`/transactions/${id}/void`, data),
   refund: (id: number, data?: any) => api.post(`/transactions/${id}/refund`, data),
+};
+
+export const posApi = {
+  quote: (data: any) => api.post('/pos/quote', data),
+  checkout: (data: any) => api.post('/pos/checkout', data),
 };
 
 export const inventoryApi = {
@@ -103,6 +118,7 @@ export const analyticsApi = {
   getAppointments: (params?: any) => api.get('/analytics/appointments', { params }),
   getServices: (params?: any) => api.get('/analytics/services', { params }),
   getInventory: () => api.get('/analytics/inventory'),
+  getSummary: (params?: any) => api.get('/analytics/summary', { params }),
 };
 
 export const chatApi = {
@@ -126,7 +142,7 @@ export const membershipPlansApi = {
 
 export const membershipsApi = {
   getMe: () => api.get('/memberships/me'),
-  avail: (data: { plan_id: number; notes?: string }) => api.post('/memberships/avail', data),
+  avail: (data: { plan_id: number; notes?: string; payment_method?: string; payment_type?: string; amount_paid?: number }) => api.post('/memberships/avail', data),
   getById: (id: number) => api.get(`/memberships/${id}`),
   list: (params?: Record<string, string>) => api.get('/memberships', { params }),
   create: (data: any) => api.post('/memberships', data),
@@ -136,6 +152,7 @@ export const membershipsApi = {
 };
 
 export const loyaltyApi = {
+  getMe: () => api.get('/loyalty/me'),
   getProgress: (membershipId: number) => api.get(`/loyalty/progress/${membershipId}`),
   listMilestones: (params?: Record<string, string>) => api.get('/loyalty/milestones', { params }),
   createMilestone: (data: any) => api.post('/loyalty/milestones', data),
@@ -143,15 +160,6 @@ export const loyaltyApi = {
   deleteMilestone: (id: number) => api.delete(`/loyalty/milestones/${id}`),
   adjustSpend: (data: any) => api.post('/loyalty/adjust', data),
   recalculate: (membershipId: number) => api.post(`/loyalty/recalculate/${membershipId}`),
-};
-
-export const referralsApi = {
-  create: (data: any) => api.post('/referrals', data),
-  getMe: () => api.get('/referrals/me'),
-  getBalance: () => api.get('/referrals/balance'),
-  list: (params?: Record<string, string>) => api.get('/referrals/admin', { params }),
-  getById: (id: number) => api.get(`/referrals/admin/${id}`),
-  approve: (id: number, data: any) => api.put(`/referrals/admin/${id}/approve`, data),
 };
 
 export const monthlyPerksApi = {
@@ -170,27 +178,12 @@ export const membershipGiftsApi = {
   redeem: (id: number) => api.put(`/membership-gifts/admin/${id}/redeem`),
 };
 
-export const servicePricesApi = {
-  list: (params?: Record<string, string>) => api.get('/service-prices', { params }),
-  getMatrix: (params?: Record<string, string>) => api.get('/service-prices/matrix', { params }),
-  update: (id: number, data: any) => api.put(`/service-prices/${id}`, data),
-  bulkUpdate: (updates: any[]) => api.post('/service-prices/bulk-update', { updates }),
-};
-
 export const servicePackagesApi = {
   list: (params?: Record<string, string>) => api.get('/service-packages', { params }),
   getById: (id: number) => api.get(`/service-packages/${id}`),
   create: (data: any) => api.post('/service-packages', data),
   update: (id: number, data: any) => api.put(`/service-packages/${id}`, data),
   remove: (id: number) => api.delete(`/service-packages/${id}`),
-};
-
-export const membershipFamiliesApi = {
-  list: (params?: Record<string, string>) => api.get('/membership-families', { params }),
-  getById: (id: number) => api.get(`/membership-families/${id}`),
-  getByCode: (code: string) => api.get(`/membership-families/code/${code}`),
-  create: (data: any) => api.post('/membership-families', data),
-  update: (id: number, data: any) => api.put(`/membership-families/${id}`, data),
 };
 
 export const serviceCategoriesApi = {
@@ -217,4 +210,12 @@ export const serviceAddonsApi = {
   create: (data: any) => api.post('/service-addons', data),
   update: (id: number, data: any) => api.put(`/service-addons/${id}`, data),
   remove: (id: number) => api.delete(`/service-addons/${id}`),
+};
+
+export const reviewsApi = {
+  list: (params?: Record<string, string>) => api.get('/reviews', { params }),
+  getMine: () => api.get('/reviews/mine'),
+  getByAppointment: (appointmentId: number) => api.get(`/reviews/appointment/${appointmentId}`),
+  getServiceStats: (serviceId: number) => api.get(`/reviews/service/${serviceId}/stats`),
+  create: (data: { appointment_id: number; rating: number; feedback?: string }) => api.post('/reviews', data),
 };

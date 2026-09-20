@@ -23,8 +23,10 @@ export const listMovementsQuerySchema = z.object({
 
 export const createAdjustmentSchema = z.object({
   product_id: z.number().int().positive('Product ID is required'),
+  adjustment_type: z.enum(['add', 'deduct']).optional().default('add'),
   quantity: z.number().positive('Quantity must be positive'),
   unit_cost: z.number().min(0).nullable().optional(),
+  reason: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 

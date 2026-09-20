@@ -128,28 +128,28 @@ export default function Transactions() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-neutral-900">Transactions</h1>
+        <h1 className="text-2xl font-sans font-semibold text-neutral-900">Transactions</h1>
         <p className="text-sm text-neutral-500 mt-1">View transaction history and manage payments</p>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="card flex items-start gap-4">
-          <div className="p-3 rounded-xl bg-green-50 text-green-600">
+          <div className="p-3 rounded-md bg-green-50 text-green-600">
             <DollarSign size={20} />
           </div>
           <div>
             <p className="text-xs text-neutral-500 font-medium">Total Revenue</p>
-            <p className="text-2xl font-bold text-neutral-900 mt-0.5">{formatCurrency(summaryRevenue)}</p>
+            <p className="text-2xl font-sans font-semibold text-neutral-900 mt-0.5">{formatCurrency(summaryRevenue)}</p>
           </div>
         </div>
         <div className="card flex items-start gap-4">
-          <div className="p-3 rounded-xl bg-blue-50 text-blue-600">
+          <div className="p-3 rounded-md bg-blue-50 text-primary-700">
             <DollarSign size={20} />
           </div>
           <div>
             <p className="text-xs text-neutral-500 font-medium">Total Transactions</p>
-            <p className="text-2xl font-bold text-neutral-900 mt-0.5">{summaryCount}</p>
+            <p className="text-2xl font-sans font-semibold text-neutral-900 mt-0.5">{summaryCount}</p>
           </div>
         </div>
       </div>
@@ -212,14 +212,14 @@ export default function Transactions() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                  <th className="px-6 py-3 font-medium w-8" />
-                  <th className="px-6 py-3 font-medium">Date</th>
-                  <th className="px-6 py-3 font-medium">Reference #</th>
-                  <th className="px-6 py-3 font-medium">Customer</th>
-                  <th className="px-6 py-3 font-medium">Items</th>
-                  <th className="px-6 py-3 font-medium">Total</th>
-                  <th className="px-6 py-3 font-medium">Payment</th>
-                  <th className="px-6 py-3 font-medium text-right">Actions</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 w-8" />
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Date</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Reference #</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Customer</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Items</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Total</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Payment</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
@@ -250,7 +250,7 @@ export default function Transactions() {
                               <button
                                 onClick={() => setVoidModal(txn)}
                                 title="Void"
-                                className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-md transition"
                               >
                                 <Ban size={16} />
                               </button>
@@ -259,7 +259,7 @@ export default function Transactions() {
                               <button
                                 onClick={() => setRefundModal(txn)}
                                 title="Refund"
-                                className="p-2 text-neutral-500 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition"
+                                className="p-2 text-neutral-500 hover:text-orange-600 hover:bg-orange-50 rounded-md transition"
                               >
                                 <RotateCcw size={16} />
                               </button>
@@ -298,7 +298,7 @@ export default function Transactions() {
                               <p className="text-xs text-neutral-400">No item details available</p>
                             )}
                             {txn.notes && (
-                              <p className="text-xs text-neutral-500 mt-3 bg-white rounded-lg p-2 border border-neutral-100">
+                              <p className="text-xs text-neutral-500 mt-3 bg-white rounded-md p-2 border border-neutral-100">
                                 <span className="font-medium">Notes:</span> {txn.notes}
                               </p>
                             )}

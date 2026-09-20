@@ -112,6 +112,15 @@ export class StaffController {
       next(error);
     }
   }
+
+  async listPublic(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const staff = await staffService.findPublicTeam();
+      res.json({ success: true, data: staff });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const staffController = new StaffController();

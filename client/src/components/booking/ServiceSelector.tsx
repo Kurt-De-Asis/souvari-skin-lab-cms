@@ -1,4 +1,5 @@
 import { Clock, Crown } from 'lucide-react';
+import formatCategory from '../../utils/formatCategory';
 
 interface Service {
   id: number;
@@ -34,22 +35,22 @@ export default function ServiceSelector({
 
   return (
     <div>
-      <h2 className="text-lg font-semibold text-neutral-900 mb-1">Select Services</h2>
-      <p className="text-sm text-neutral-500 mb-5">Choose one or more services for your appointment.</p>
+      <h2 className="text-2xl font-sans font-semibold text-neutral-900 mb-1">Select Services</h2>
+      <p className="text-sm text-neutral-500 mb-6">Choose one or more services for your appointment.</p>
 
       {categories.length > 1 && (
-        <div className="flex flex-wrap gap-2 mb-5">
+        <div className="flex flex-wrap gap-x-6 gap-y-2 border-b border-neutral-200 mb-6">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => onCategoryChange(cat)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition ${
+              className={`pb-3 text-xs font-semibold uppercase tracking-[0.2em] border-b transition ${
                 activeCategory === cat
-                  ? 'bg-neutral-900 text-white'
-                  : 'bg-white text-neutral-500 border border-neutral-200 hover:border-neutral-300'
+                  ? 'border-primary-600 text-primary-700'
+                  : 'border-transparent text-neutral-400 hover:text-neutral-900'
               }`}
             >
-              {cat}
+              {formatCategory(cat)}
             </button>
           ))}
         </div>
@@ -63,18 +64,18 @@ export default function ServiceSelector({
             <button
               key={s.id}
               onClick={() => onToggleService(s)}
-              className={`w-full text-left p-4 rounded-xl border transition ${
+              className={`w-full text-left p-4 border transition ${
                 selected
-                  ? 'border-neutral-900 bg-neutral-50'
-                  : 'border-neutral-200 hover:border-neutral-300'
+                  ? 'border-primary-600 bg-white'
+                  : 'border-neutral-200 bg-white hover:border-neutral-300'
               }`}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <div
-                      className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition ${
-                        selected ? 'bg-neutral-900 border-neutral-900' : 'border-neutral-300'
+                      className={`w-4 h-4 border flex items-center justify-center flex-shrink-0 transition ${
+                        selected ? 'bg-primary-600 border-primary-600' : 'border-neutral-300'
                       }`}
                     >
                       {selected && (
@@ -85,7 +86,7 @@ export default function ServiceSelector({
                     </div>
                     <p className="text-sm font-medium text-neutral-900">{s.name}</p>
                     {showVipPrice && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-[10px] font-medium">
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-primary-50 text-primary-700 text-[10px] font-medium uppercase tracking-wide">
                         <Crown size={10} /> VIP
                       </span>
                     )}
@@ -97,13 +98,13 @@ export default function ServiceSelector({
                     <Clock size={11} />
                     <span>{s.duration} min</span>
                     <span className="mx-0.5">·</span>
-                    <span>{s.category}</span>
+                    <span>{formatCategory(s.category)}</span>
                   </div>
                 </div>
                 <div className="text-right">
                   {showVipPrice ? (
                     <>
-                      <span className="text-sm font-semibold text-amber-700 whitespace-nowrap">₱{s.vip_price!.toLocaleString()}</span>
+                      <span className="text-sm font-semibold text-primary-700 whitespace-nowrap">₱{s.vip_price!.toLocaleString()}</span>
                       <span className="block text-xs text-neutral-400 line-through">₱{s.price.toLocaleString()}</span>
                     </>
                   ) : (

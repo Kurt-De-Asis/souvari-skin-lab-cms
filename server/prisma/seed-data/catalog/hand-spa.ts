@@ -1,43 +1,16 @@
 import { SectionDef } from '../types';
 import { vipNm } from '../helpers';
 
-const HAND_SPA_INCLUSIONS = [
-  'Nail Shaping',
-  'Cuticle Cleaning',
-  'Exfoliation Scrub',
-  'Moisturizing Lotion',
-  'Hot Towel Wrap',
-];
+const SRC = 'PDF p.33-36 · Hand Spa Services';
 
 const section: SectionDef = {
   slug: 'hand-spa',
   name: 'Hand Spa',
   display_order: 15,
   services: [
-    {
-      name: 'Hand Spa',
-      slug: 'hand-spa',
-      category: 'other',
-      duration_minutes: 45,
-      inclusions: [...HAND_SPA_INCLUSIONS],
-      prices: vipNm(450, 550),
-    },
-    {
-      name: 'Hand Spa + Whitening',
-      slug: 'hand-spa-whitening',
-      category: 'other',
-      duration_minutes: 45,
-      inclusions: [...HAND_SPA_INCLUSIONS, 'Whitening Treatment'],
-      prices: vipNm(600, 700),
-    },
-    {
-      name: 'Hand Spa + Whitening + Para Film',
-      slug: 'hand-spa-whitening-para-film',
-      category: 'other',
-      duration_minutes: 45,
-      inclusions: [...HAND_SPA_INCLUSIONS, 'Whitening Treatment', 'Para Film Wrap'],
-      prices: vipNm(700, 800),
-    },
+    { name: 'Essential Hand Spa', slug: 'hs-essential', category: 'other', duration_minutes: 30, prices: vipNm(187, 249, { source_ref: SRC }) },
+    { name: 'Deluxe Hand Spa', slug: 'hs-deluxe', category: 'other', duration_minutes: 50, prices: vipNm(299, 399, { source_ref: SRC }) },
+    { name: 'Ultimate Luxe Hand Spa', slug: 'hs-ultimate-luxe', category: 'other', duration_minutes: 75, prices: vipNm(449, 599, { source_ref: SRC }) },
   ],
 };
 

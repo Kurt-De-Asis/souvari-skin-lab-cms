@@ -1,5 +1,20 @@
 import prisma from '../../config/database';
-import { RevenueQuery, AppointmentTrendsQuery } from './analytics.validation';
+import { RevenueQuery, AppointmentTrendsQuery, SummaryQuery } from './analytics.validation';
+
+const DAY_INDEX: Record<string, number> = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+};
+
+const toMinutes = (time: string): number => {
+  const [h, m] = time.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
 
 class AnalyticsService {
   async getDashboard() {
@@ -222,6 +237,200 @@ class AnalyticsService {
       total_value: totalValue,
       low_stock_count: lowStockCount,
       out_of_stock_count: outOfStockCount,
+    };
+  }
+
+  async getSummary(query: SummaryQuery) {
+    const { start_date, end_date } = query;
+
+    const start = start_date
+      ? new Date(start_date)
+      : new Date(new Date().setDate(new Date().getDate() - 30));
+    const end = end_date ? new Date(end_date + 'T23:59:59.000Z') : new Date();
+
+    const CANCELLED_LIKE = ['cancelled', 'no_show'];
+
+    const [transactions, appointments, staffRows] = await Promise.all([
+      prisma.transactions.findMany({
+        where: {
+          created_at: { gte: start, lte: end },
+          payment_status: 'paid',
+          deleted_at: null,
+        },
+        select: { id: true, total_amount: true, staff_id: true, customer_id: true },
+      }),
+      prisma.appointments.findMany({
+        where: {
+          appointment_date: { gte: start, lte: end },
+          deleted_at: null,
+        },
+        select: {
+          id: true,
+          customer_id: true,
+          staff_id: true,
+          status: true,
+          appointment_date: true,
+          start_time: true,
+          end_time: true,
+        },
+      }),
+      prisma.staff.findMany({
+        where: { status: 'active', deleted_at: null },
+        select: {
+          id: true,
+          first_name: true,
+          last_name: true,
+          avatar_url: true,
+          schedules: {
+            where: { is_active: true },
+            select: { day_of_week: true, start_time: true, end_time: true, break_start: true, break_end: true },
+          },
+        },
+      }),
+    ]);
+
+    const approvedBookings = appointments.filter((a) => !CANCELLED_LIKE.includes(a.status));
+    const bookedMap: Map<string, number> = new Map(); // date -> booked minutes
+    let bookedMinutes = 0;
+    for (const a of approvedBookings) {
+      const mins = Math.max(0, toMinutes(a.end_time || '00:00') - toMinutes(a.start_time || '00:00'));
+      bookedMinutes += mins;
+      const key = new Date(a.appointment_date).toISOString().split('T')[0];
+      bookedMap.set(key, (bookedMap.get(key) || 0) + mins);
+    }
+
+    // Working minutes: one map for totals per date, one per staff.
+    const schedPerStaff: Record<number, { day: number; start: number; end: number; breakStart?: number; breakEnd?: number }[]> = {};
+    for (const s of staffRows) {
+      const list = s.schedules
+        .filter((sc) => DAY_INDEX[sc.day_of_week] !== undefined)
+        .map((sc) => ({
+          day: DAY_INDEX[sc.day_of_week],
+          start: toMinutes(sc.start_time),
+          end: toMinutes(sc.end_time),
+          breakStart: sc.break_start ? toMinutes(sc.break_start) : undefined,
+          breakEnd: sc.break_end ? toMinutes(sc.break_end) : undefined,
+        }));
+      schedPerStaff[s.id] = list;
+    }
+
+    const workingMinOn = (dayIndex: number, sc: { day: number; start: number; end: number; breakStart?: number; breakEnd?: number }[]) => {
+      let total = 0;
+      for (const s of sc) {
+        if (s.day !== dayIndex) continue;
+        let span = s.end - s.start;
+        if (s.breakStart !== undefined && s.breakEnd !== undefined) span -= Math.max(0, s.breakEnd - s.breakStart);
+        total += Math.max(0, span);
+      }
+      return total;
+    };
+
+    // Build the ordered date keys for the range (pure YYYY-MM-DD strings, TZ-safe).
+    const dateKeys: string[] = [];
+    const firstKey = start.toISOString().split('T')[0];
+    const lastKey = end.toISOString().split('T')[0];
+    const cursor = new Date(firstKey + 'T00:00:00.000Z');
+    const stop = new Date(lastKey + 'T00:00:00.000Z');
+    while (cursor <= stop) {
+      dateKeys.push(cursor.toISOString().split('T')[0]);
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+
+    let workingMinutes = 0;
+    const staffWorkingMap: Record<number, number> = {};
+    const series: { date: string; rate: number }[] = [];
+    for (const key of dateKeys) {
+      const dayIndex = new Date(key + 'T12:00:00.000Z').getUTCDay();
+      let dayWorking = 0;
+      for (const s of staffRows) {
+        const w = workingMinOn(dayIndex, schedPerStaff[s.id] || []);
+        dayWorking += w;
+        staffWorkingMap[s.id] = (staffWorkingMap[s.id] || 0) + w;
+      }
+      workingMinutes += dayWorking;
+      const booked = bookedMap.get(key) || 0;
+      const rate = dayWorking > 0 && booked > 0 ? Math.min(100, Math.round((booked / dayWorking) * 100)) : 0;
+      series.push({ date: key, rate });
+    }
+
+    const unbookedMinutes = Math.max(0, workingMinutes - bookedMinutes);
+    const occupancyRate = workingMinutes > 0
+      ? Math.min(100, Math.round((bookedMinutes / workingMinutes) * 100))
+      : 0;
+
+    // Paid transaction totals
+    const totalRevenue = transactions.reduce((s, t) => s + Number(t.total_amount), 0);
+    const avgSale = transactions.length ? Math.round((totalRevenue / transactions.length) * 100) / 100 : 0;
+
+    // Patient acquisition (new vs returning)
+    const activeCustomers = [...new Set(appointments.map((a) => a.customer_id))];
+    let priorCustomerIds = new Set<number>();
+    if (activeCustomers.length > 0) {
+      const [priorAppt, priorTx] = await Promise.all([
+        prisma.appointments.groupBy({
+          by: ['customer_id'],
+          where: { customer_id: { in: activeCustomers }, appointment_date: { lt: start }, deleted_at: null },
+          _count: { _all: true },
+        }),
+        prisma.transactions.groupBy({
+          by: ['customer_id'],
+          where: { customer_id: { in: activeCustomers }, created_at: { lt: start }, payment_status: 'paid', deleted_at: null },
+          _count: { _all: true },
+        }),
+      ]);
+      priorCustomerIds = new Set([
+        ...priorAppt.map((p) => p.customer_id),
+        ...priorTx.map((p) => p.customer_id!),
+      ]);
+    }
+    const returningPatients = activeCustomers.filter((id) => priorCustomerIds.has(id)).length;
+    const newPatients = Math.max(0, activeCustomers.length - returningPatients);
+    const returningPatientRate = activeCustomers.length
+      ? Math.round((returningPatients / activeCustomers.length) * 100)
+      : 0;
+
+    // Per-staff performance
+    const staff = staffRows.map((s) => {
+      const sTransactions = transactions.filter((t) => t.staff_id === s.id);
+      const sBookings = appointments.filter((a) => a.staff_id === s.id);
+      const sApproved = sBookings.filter((a) => !CANCELLED_LIKE.includes(a.status));
+      const sBookedMinutes = sApproved.reduce((acc, a) => acc + Math.max(0, toMinutes(a.end_time || '00:00') - toMinutes(a.start_time || '00:00')), 0);
+      const sWorking = staffWorkingMap[s.id] || 0;
+      const sOccupancy = sWorking > 0 ? Math.min(100, Math.round((sBookedMinutes / sWorking) * 100)) : 0;
+      const sPatients = [...new Set(sBookings.map((a) => a.customer_id))];
+      const sReturning = sPatients.filter((id) => priorCustomerIds.has(id)).length;
+      return {
+        id: s.id,
+        full_name: `${s.first_name} ${s.last_name}`,
+        avatar_url: s.avatar_url,
+        revenue: Math.round(sTransactions.reduce((acc, t) => acc + Number(t.total_amount), 0) * 100) / 100,
+        bookings: sBookings.length,
+        occupancy_rate: sOccupancy,
+        patients: sPatients.length,
+        returning_patients: sReturning,
+      };
+    });
+
+    staff.sort((a, b) => b.revenue - a.revenue);
+
+    return {
+      transaction_count: transactions.length,
+      total_revenue: Math.round(totalRevenue * 100) / 100,
+      avg_sale: avgSale,
+      occupancy: {
+        rate: occupancyRate,
+        working_minutes: workingMinutes,
+        booked_minutes: bookedMinutes,
+        unbooked_minutes: unbookedMinutes,
+        series,
+      },
+      returning_patient_rate: returningPatientRate,
+      patients: {
+        active: activeCustomers.length,
+        new_patients: newPatients,
+        returning_patients: returningPatients,
+      },
+      staff,
     };
   }
 }

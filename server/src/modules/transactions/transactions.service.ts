@@ -8,6 +8,7 @@ import {
   RefundTransactionInput,
 } from './transactions.validation';
 import { Decimal } from '@prisma/client/runtime/library';
+import { notificationDispatch } from '../../services/notification-dispatch.service';
 
 export class TransactionService {
   private async generateTransactionNumber(): Promise<string> {
@@ -34,6 +35,7 @@ export class TransactionService {
 
   async createTransaction(data: CreateTransactionInput, userId: number) {
     const transactionNumber = await this.generateTransactionNumber();
+    let markedCompleted = false;
 
     const transaction = await prisma.$transaction(async (tx) => {
       for (const item of data.items) {
@@ -105,7 +107,10 @@ export class TransactionService {
         subtotal = subtotal.plus(lineTotal);
       }
 
-      const discountAmount = new Decimal((data.discount_amount ?? 0).toString());
+      let discountAmount = new Decimal((data.discount_amount ?? 0).toString());
+      if (data.discount_pct && discountAmount.isZero()) {
+        discountAmount = subtotal.times(new Decimal(data.discount_pct.toString()).div(100));
+      }
       const taxAmount = new Decimal((data.tax_amount ?? 0).toString());
       const totalAmount = subtotal.minus(discountAmount).plus(taxAmount);
 
@@ -118,6 +123,9 @@ export class TransactionService {
           type: data.type ?? 'sale',
           subtotal,
           discount_amount: discountAmount,
+          discount_pct: data.discount_pct ? new Decimal(data.discount_pct.toString()) : null,
+          discount_reason: data.discount_reason ?? null,
+          discount_applied_by: data.discount_applied_by ?? null,
           tax_amount: taxAmount,
           total_amount: totalAmount,
           payment_method: data.payment_method ?? null,
@@ -157,6 +165,7 @@ export class TransactionService {
         });
 
         if (appointment && appointment.status !== 'completed') {
+          markedCompleted = true;
           await tx.appointments.update({
             where: { id: data.appointment_id },
             data: { status: 'completed' },
@@ -171,6 +180,23 @@ export class TransactionService {
               reason: 'Service completed via transaction',
             },
           });
+
+          const existingRecord = await tx.treatment_records.findUnique({
+            where: { appointment_id: data.appointment_id },
+          });
+          if (!existingRecord) {
+            await tx.treatment_records.create({
+              data: {
+                appointment_id: data.appointment_id,
+                staff_id: appointment.staff_id,
+                customer_id: appointment.customer_id,
+                service_id: appointment.service_id,
+                treatment_date: appointment.appointment_date,
+                start_time: appointment.start_time ?? null,
+                end_time: appointment.end_time ?? null,
+              },
+            });
+          }
         }
 
         const serviceItems = data.items.filter((item) => item.service_id);
@@ -225,6 +251,55 @@ export class TransactionService {
         items: createdItems,
       };
     });
+
+    // Dispatch completion notification if appointment was marked completed
+    if (markedCompleted && data.appointment_id) {
+      try {
+        const appt = await prisma.appointments.findUnique({
+          where: { id: data.appointment_id },
+          include: {
+            customer: { select: { user_id: true, first_name: true, last_name: true } },
+            staff: { select: { user_id: true, first_name: true, last_name: true } },
+            service: { select: { name: true } },
+          },
+        });
+        if (appt) {
+          const customerUser = await prisma.users.findUnique({
+            where: { id: appt.customer.user_id },
+            select: { id: true, phone: true },
+          });
+          const staffUser = appt.staff
+            ? await prisma.users.findUnique({
+                where: { id: appt.staff.user_id },
+                select: { id: true, phone: true },
+              })
+            : null;
+          const adminUserIds = await notificationDispatch.getAdminUserIds();
+          const apptDate = new Date(appt.appointment_date).toLocaleDateString('en-PH', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          });
+          await notificationDispatch.dispatchAppointmentStatus({
+            appointmentId: appt.id,
+            oldStatus: 'in_progress',
+            newStatus: 'completed',
+            customerUserId: customerUser?.id ?? 0,
+            customerName: `${appt.customer.first_name} ${appt.customer.last_name}`,
+            customerPhone: customerUser?.phone ?? null,
+            staffUserId: staffUser?.id ?? null,
+            staffName: appt.staff ? `${appt.staff.first_name} ${appt.staff.last_name}` : '',
+            serviceName: appt.service.name,
+            appointmentDate: apptDate,
+            appointmentTime: appt.start_time ?? '',
+            cancellationReason: null,
+            adminUserIds,
+          });
+        }
+      } catch (err) {
+        // Notification failure should not block
+      }
+    }
 
     return transaction;
   }
@@ -308,7 +383,12 @@ export class TransactionService {
           staff: {
             select: { id: true, first_name: true, last_name: true },
           },
-          _count: { select: { items: true } },
+          items: {
+            include: {
+              product: { select: { id: true, name: true } },
+              service: { select: { id: true, name: true, price: true } },
+            },
+          },
         },
         orderBy,
         skip,

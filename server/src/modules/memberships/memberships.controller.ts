@@ -67,11 +67,10 @@ export class MembershipsController {
 
   async availPlan(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { plan_id, notes } = req.body;
+      const { plan_id, notes, payment_method, payment_type, amount_paid } = req.body;
       const membership = await membershipService.availPlan(
         req.user!.userId,
-        plan_id,
-        notes ?? null
+        { plan_id, notes, payment_method, payment_type, amount_paid }
       );
       res.status(201).json({
         success: true,
@@ -101,12 +100,39 @@ export class MembershipsController {
   async extend(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = parseInt(String(req.params.id), 10);
-      const { months, reason } = req.body;
-      const membership = await membershipService.extend(id, months, reason);
+      const { months, reason, payment_method, payment_type, amount_paid } = req.body;
+      const membership = await membershipService.extend(id, months, reason, payment_method, payment_type, amount_paid);
       res.json({
         success: true,
         message: 'Membership extended successfully',
         data: membership,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async recordPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      const result = await membershipService.recordPayment(id, req.body, req.user?.userId);
+      res.status(201).json({
+        success: true,
+        message: 'Payment recorded successfully',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async listPayments(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      const payments = await membershipService.listPayments(id);
+      res.json({
+        success: true,
+        data: payments,
       });
     } catch (error) {
       next(error);

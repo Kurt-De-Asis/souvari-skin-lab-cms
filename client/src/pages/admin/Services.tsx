@@ -81,7 +81,7 @@ export default function Services() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Services</h1>
+          <h1 className="text-2xl font-sans font-semibold text-neutral-900">Services</h1>
           <p className="text-sm text-neutral-500 mt-1">Manage your service offerings</p>
         </div>
         <button onClick={() => navigate('/admin/services/new')} className="btn-primary">
@@ -123,13 +123,13 @@ export default function Services() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                  <th className="px-6 py-3 font-medium">Name</th>
-                  <th className="px-6 py-3 font-medium">Category</th>
-                  <th className="px-6 py-3 font-medium">Type</th>
-                  <th className="px-6 py-3 font-medium">Price</th>
-                  <th className="px-6 py-3 font-medium">Duration</th>
-                  <th className="px-6 py-3 font-medium">Status</th>
-                  <th className="px-6 py-3 font-medium text-right">Actions</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Name</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Category</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Type</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Price</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Duration</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Status</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
@@ -146,7 +146,7 @@ export default function Services() {
                         <button
                           onClick={() => navigate(`/admin/services/${s.id}/edit`)}
                           title="Edit"
-                          className="p-2 text-neutral-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition"
+                          className="p-2 text-neutral-500 hover:text-primary-600 hover:bg-primary-50 rounded-md transition"
                         >
                           <Pencil size={16} />
                         </button>
@@ -154,7 +154,7 @@ export default function Services() {
                           <button
                             onClick={() => handleArchive(s)}
                             title="Archive"
-                            className="p-2 text-neutral-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition text-xs"
+                            className="p-2 text-neutral-500 hover:text-amber-600 hover:bg-amber-50 rounded-md transition text-xs"
                           >
                             Archive
                           </button>

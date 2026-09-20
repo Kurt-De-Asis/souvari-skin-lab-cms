@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Clock, User, Check, ChevronRight, ChevronLeft, Scissors, Search } from 'lucide-react';
+import { Calendar, Clock, Check, ChevronRight, ChevronLeft, Scissors, Search } from 'lucide-react';
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
-import { servicesApi, appointmentsApi } from '@/api';
+import { servicesApi, appointmentsApi, settingsApi } from '@/api';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 
 interface Service {
@@ -16,16 +16,24 @@ interface Service {
   staff?: any[];
 }
 
-interface StaffMember {
-  id: number;
-  first_name: string;
-  last_name: string;
-  position?: string;
-}
-
 interface TimeSlot {
   time: string;
+  end?: string;
   available: boolean;
+  staff_id: number;
+  staff_name?: string;
+}
+
+function formatTime(time: string): string {
+  const [hours, minutes] = time.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const displayHour = hours % 12 || 12;
+  return `${displayHour}:${String(minutes).padStart(2, '0')} ${period}`;
+}
+
+function initials(name: string): string {
+  const [first = '', last = ''] = name.split(' ');
+  return `${first[0] ?? ''}${last[0] ?? ''}`.toUpperCase();
 }
 
 export default function BookAppointment() {
@@ -35,17 +43,35 @@ export default function BookAppointment() {
   const [services, setServices] = useState<Service[]>([]);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
-  const [staffList, setStaffList] = useState<StaffMember[]>([]);
-  const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
-  const [slots, setSlots] = useState<TimeSlot[]>([]);
-  const [selectedSlot, setSelectedSlot] = useState('');
+  const [allSlots, setAllSlots] = useState<TimeSlot[]>([]);
+  const [selectedStaffId, setSelectedStaffId] = useState(0);
+  const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
+  const [closedWeekdays, setClosedWeekdays] = useState<string[]>([]);
+  const [closedDayError, setClosedDayError] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [quote, setQuote] = useState<any>(null);
 
   useEffect(() => {
-    if (step === 5 && selectedService) {
+    const fetchOperatingDays = async () => {
+      try {
+        const { data } = await settingsApi.getPublic();
+        const days = Array.isArray(data.data?.business_days) ? data.data.business_days : (Array.isArray(data?.business_days) ? data.business_days : null);
+        if (Array.isArray(days)) {
+          const weekdayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+          const openSet = new Set(days.map((d: string) => String(d).toLowerCase()));
+          setClosedWeekdays(weekdayNames.filter((d) => !openSet.has(d)));
+        }
+      } catch {
+        // silent
+      }
+    };
+    fetchOperatingDays();
+  }, []);
+
+  useEffect(() => {
+    if (step === 4 && selectedService) {
       appointmentsApi
         .getQuote(selectedService.id)
         .then(({ data }) => setQuote(data.data || null))
@@ -78,50 +104,52 @@ export default function BookAppointment() {
   }, []);
 
   useEffect(() => {
-    if (selectedService) {
-      setStaffList(selectedService.staff || []);
-      if (selectedService.staff?.length === 1) {
-        setSelectedStaff(selectedService.staff[0]);
-      }
-    }
-  }, [selectedService]);
-
-  useEffect(() => {
-    if (selectedStaff && selectedDate) {
+    if (selectedService && selectedDate && step === 3) {
       fetchSlots();
     }
-  }, [selectedStaff, selectedDate]);
+  }, [selectedDate, step]);
 
   const fetchSlots = async () => {
-    if (!selectedStaff || !selectedDate) return;
+    if (!selectedService || !selectedDate) return;
     setLoadingSlots(true);
-    setSelectedSlot('');
+    setSelectedSlot(null);
+    setSelectedStaffId(0);
     try {
       const { data } = await appointmentsApi.getAvailability({
-        staff_id: selectedStaff.id,
+        service_id: selectedService.id,
         date: selectedDate,
-        service_id: selectedService?.id,
       });
       const available = data.data?.available_slots || data.data?.slots || data.data || [];
-      setSlots(Array.isArray(available) ? available.map((s: string) => ({ time: s, available: true })) : []);
+      const mapped = Array.isArray(available)
+        ? available.map((s: any) => ({
+            time: s.start,
+            end: s.end,
+            available: true,
+            staff_id: s.staff_id,
+            staff_name: s.staff_name || '',
+          }))
+        : [];
+
+      setAllSlots(mapped);
     } catch {
       toast.error('Failed to load available times');
-      setSlots([]);
+      setAllSlots([]);
     } finally {
       setLoadingSlots(false);
     }
   };
 
   const handleBook = async () => {
-    if (!selectedService || !selectedDate || !selectedSlot || !selectedStaff || !user?.customer) return;
+    if (!selectedService || !selectedDate || !selectedSlot || !user?.customer) return;
     setSubmitting(true);
     try {
       await appointmentsApi.create({
         service_id: selectedService.id,
-        staff_id: selectedStaff.id,
         appointment_date: selectedDate,
-        start_time: selectedSlot,
+        start_time: selectedSlot.time,
+        end_time: selectedSlot.end,
         customer_id: user.customer.id,
+        staff_id: selectedSlot.staff_id,
       });
       toast.success('Appointment booked successfully!');
       navigate('/customer/appointments');
@@ -135,6 +163,13 @@ export default function BookAppointment() {
   const minDate = dayjs().add(1, 'day').format('YYYY-MM-DD');
   const maxDate = dayjs().add(30, 'day').format('YYYY-MM-DD');
 
+  const isClosedDay = (date: string) => {
+    if (!date || closedWeekdays.length === 0) return false;
+    const weekdayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const weekday = weekdayNames[dayjs(date).day()];
+    return closedWeekdays.includes(weekday);
+  };
+
   const [serviceSearch, setServiceSearch] = useState('');
   const filteredServices = useMemo(() => {
     if (!serviceSearch.trim()) return services;
@@ -146,19 +181,31 @@ export default function BookAppointment() {
     );
   }, [services, serviceSearch]);
 
+  const availableStaff = useMemo(() => {
+    const seen = new Map<number, string>();
+    for (const s of allSlots) {
+      if (s.staff_id && !seen.has(s.staff_id)) seen.set(s.staff_id, s.staff_name ?? '');
+    }
+    return [...seen.entries()].map(([id, name]) => ({ id, name }));
+  }, [allSlots]);
+
+  const slots = useMemo(() => {
+    if (!selectedStaffId) return allSlots;
+    return allSlots.filter((s) => s.staff_id === selectedStaffId);
+  }, [allSlots, selectedStaffId]);
+
   const steps = [
     { num: 1, label: 'Service' },
     { num: 2, label: 'Date' },
-    { num: 3, label: 'Staff' },
-    { num: 4, label: 'Time' },
-    { num: 5, label: 'Confirm' },
+    { num: 3, label: 'Time' },
+    { num: 4, label: 'Confirm' },
   ];
 
   if (loading) return <LoadingSpinner fullScreen />;
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-neutral-900">Book an Appointment</h1>
+      <h1 className="text-2xl font-sans font-semibold text-neutral-900">Book an Appointment</h1>
 
       <div className="flex items-center justify-between">
         {steps.map((s, i) => (
@@ -204,7 +251,7 @@ export default function BookAppointment() {
                 <button
                   key={svc.id}
                   onClick={() => { setSelectedService(svc); setStep(2); }}
-                  className={`text-left p-4 rounded-xl border-2 transition ${
+                  className={`text-left p-4 rounded-md border-2 transition ${
                     selectedService?.id === svc.id
                       ? 'border-primary-500 bg-primary-50'
                       : 'border-neutral-200 hover:border-primary-300 hover:bg-neutral-50'
@@ -232,16 +279,37 @@ export default function BookAppointment() {
             <input
               type="date"
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
+              onChange={(e) => {
+                setSelectedDate(e.target.value);
+                setClosedDayError('');
+              }}
               min={minDate}
               max={maxDate}
               className="input-field"
             />
+            {closedDayError && (
+              <p className="text-sm text-red-600">{closedDayError}</p>
+            )}
+            {selectedDate && isClosedDay(selectedDate) && !closedDayError && (
+              <p className="text-sm text-red-600">
+                The clinic is closed on {dayjs(selectedDate).format('dddd')}. Please choose an operating day.
+              </p>
+            )}
             <div className="flex justify-between">
               <button onClick={() => setStep(1)} className="btn-secondary">
                 <ChevronLeft size={16} /> Back
               </button>
-              <button onClick={() => selectedDate && setStep(3)} disabled={!selectedDate} className="btn-primary">
+              <button
+                onClick={() => {
+                  if (isClosedDay(selectedDate)) {
+                    setClosedDayError('The clinic is closed on this day. Please choose an operating day.');
+                    return;
+                  }
+                  if (selectedDate) setStep(3);
+                }}
+                disabled={!selectedDate}
+                className="btn-primary"
+              >
                 Next <ChevronRight size={16} />
               </button>
             </div>
@@ -251,43 +319,90 @@ export default function BookAppointment() {
         {step === 3 && (
           <div className="space-y-4">
             <h2 className="text-lg font-semibold text-neutral-900 flex items-center gap-2">
-              <User size={18} /> Select Staff
+              <Clock size={18} /> Select Specialist &amp; Time
             </h2>
             <p className="text-sm text-neutral-500">
               {selectedService?.name} on {dayjs(selectedDate).format('MMMM D, YYYY')}
             </p>
-            {staffList.length === 0 ? (
-              <p className="text-neutral-500 text-sm">No staff available for this service. Please contact us.</p>
+            {loadingSlots ? (
+              <LoadingSpinner />
+            ) : allSlots.length === 0 ? (
+              <p className="text-neutral-500 text-sm">No available time slots for this date.</p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {staffList.map((s: any) => {
-                  const member = s.staff || s;
-                  return (
+              <>
+                {availableStaff.length > 1 && (
+                  <div>
+                    <p className="text-xs font-medium text-neutral-500 mb-2">Choose your specialist</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => { setSelectedStaffId(0); setSelectedSlot(null); }}
+                        className={`px-3 py-2 rounded-md border text-sm font-medium transition ${
+                          !selectedStaffId
+                            ? 'bg-neutral-900 border-neutral-900 text-white'
+                            : 'bg-white border-neutral-200 text-neutral-900 hover:border-neutral-300'
+                        }`}
+                      >
+                        All specialists
+                      </button>
+                      {availableStaff.map((st) => (
+                        <button
+                          key={st.id}
+                          onClick={() => { setSelectedStaffId(st.id); setSelectedSlot(null); }}
+                          className={`inline-flex items-center gap-2 px-3 py-2 rounded-md border text-sm font-medium transition ${
+                            selectedStaffId === st.id
+                              ? 'bg-neutral-900 border-neutral-900 text-white'
+                              : 'bg-white border-neutral-200 text-neutral-900 hover:border-neutral-300'
+                          }`}
+                        >
+                          <span className="w-5 h-5 rounded-full bg-white/20 text-[10px] flex items-center justify-center">
+                            {initials(st.name)}
+                          </span>
+                          {st.name}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-neutral-400 mt-2">
+                      {selectedStaffId
+                        ? `Showing slots for ${availableStaff.find((x) => x.id === selectedStaffId)?.name}.`
+                        : 'Showing slots for all available specialists.'}
+                    </p>
+                  </div>
+                )}
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {slots.map((slot) => (
                     <button
-                      key={member.id}
-                      onClick={() => { setSelectedStaff(member); setStep(4); }}
-                      className={`text-left p-4 rounded-xl border-2 transition ${
-                        selectedStaff?.id === member.id
-                          ? 'border-primary-500 bg-primary-50'
-                          : 'border-neutral-200 hover:border-primary-300 hover:bg-neutral-50'
+                      key={`${slot.time}-${slot.staff_id}`}
+                      disabled={!slot.available}
+                      onClick={() => { setSelectedSlot(slot); setStep(4); }}
+                      className={`py-2 px-3 rounded-md text-sm font-medium transition ${
+                        !slot.available
+                          ? 'bg-neutral-100 text-neutral-400 cursor-not-allowed'
+                          : selectedSlot?.time === slot.time && selectedSlot?.staff_id === slot.staff_id
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-white border border-neutral-200 text-neutral-700 hover:border-primary-400 hover:bg-primary-50'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-semibold">
-                          {member.first_name?.[0]}{member.last_name?.[0]}
-                        </div>
-                        <div>
-                          <p className="font-medium text-neutral-900">{member.first_name} {member.last_name}</p>
-                          {member.position && <p className="text-xs text-neutral-500">{member.position}</p>}
-                        </div>
-                      </div>
+                      {slot.time}
+                      {slot.staff_name && (
+                        <span className={`block text-[10px] font-normal mt-0.5 truncate ${
+                          !slot.available ? 'text-neutral-400'
+                            : selectedSlot?.time === slot.time && selectedSlot?.staff_id === slot.staff_id
+                              ? 'text-primary-100'
+                              : 'text-neutral-400'
+                        }`}>
+                          {slot.staff_name}
+                        </span>
+                      )}
                     </button>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              </>
             )}
             <div className="flex justify-between">
-              <button onClick={() => setStep(2)} className="btn-secondary">
+              <button onClick={() => {
+                setSelectedStaffId(0);
+                setStep(2);
+              }} className="btn-secondary">
                 <ChevronLeft size={16} /> Back
               </button>
             </div>
@@ -296,48 +411,8 @@ export default function BookAppointment() {
 
         {step === 4 && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-neutral-900 flex items-center gap-2">
-              <Clock size={18} /> Select Time
-            </h2>
-            <p className="text-sm text-neutral-500">
-              {selectedService?.name} with {selectedStaff?.first_name} {selectedStaff?.last_name} on {dayjs(selectedDate).format('MMMM D, YYYY')}
-            </p>
-            {loadingSlots ? (
-              <LoadingSpinner />
-            ) : slots.length === 0 ? (
-              <p className="text-neutral-500 text-sm">No available time slots for this date.</p>
-            ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                {slots.map((slot) => (
-                  <button
-                    key={slot.time}
-                    disabled={!slot.available}
-                    onClick={() => { setSelectedSlot(slot.time); setStep(5); }}
-                    className={`py-2 px-3 rounded-lg text-sm font-medium transition ${
-                      !slot.available
-                        ? 'bg-neutral-100 text-neutral-400 cursor-not-allowed'
-                        : selectedSlot === slot.time
-                          ? 'bg-primary-600 text-white'
-                          : 'bg-white border border-neutral-200 text-neutral-700 hover:border-primary-400 hover:bg-primary-50'
-                    }`}
-                  >
-                    {slot.time}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="flex justify-between">
-              <button onClick={() => setStep(3)} className="btn-secondary">
-                <ChevronLeft size={16} /> Back
-              </button>
-            </div>
-          </div>
-        )}
-
-        {step === 5 && (
-          <div className="space-y-4">
             <h2 className="text-lg font-semibold text-neutral-900">Confirm Booking</h2>
-            <div className="bg-neutral-50 rounded-xl p-4 space-y-2 text-sm">
+            <div className="bg-neutral-50 rounded-md p-4 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-neutral-500">Service</span>
                 <span className="font-medium text-neutral-900">{selectedService?.name}</span>
@@ -348,11 +423,11 @@ export default function BookAppointment() {
               </div>
               <div className="flex justify-between">
                 <span className="text-neutral-500">Time</span>
-                <span className="font-medium text-neutral-900">{selectedSlot}</span>
+                <span className="font-medium text-neutral-900">{selectedSlot ? formatTime(selectedSlot.time) : ''}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-neutral-500">Staff</span>
-                <span className="font-medium text-neutral-900">{selectedStaff?.first_name} {selectedStaff?.last_name}</span>
+                <span className="font-medium text-neutral-900">{selectedSlot?.staff_name || 'Specialist'}</span>
               </div>
               {quote ? (
                 <>
@@ -387,7 +462,7 @@ export default function BookAppointment() {
               )}
             </div>
             <div className="flex justify-between">
-              <button onClick={() => setStep(4)} className="btn-secondary">
+              <button onClick={() => setStep(3)} className="btn-secondary">
                 <ChevronLeft size={16} /> Back
               </button>
               <button onClick={handleBook} disabled={submitting} className="btn-primary">

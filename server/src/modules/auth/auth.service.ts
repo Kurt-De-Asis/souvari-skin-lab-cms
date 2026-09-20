@@ -28,7 +28,9 @@ export class AuthService {
           },
         },
       },
-      include: { customer: true },
+      include: {
+        customer: true,
+      },
     });
 
     const tokenPayload: TokenPayload = { userId: user.id, email: user.email, role: user.role };
@@ -50,7 +52,10 @@ export class AuthService {
   async login(data: LoginInput) {
     const user = await prisma.users.findUnique({
       where: { email: data.email },
-      include: { customer: true, staff: true },
+      include: {
+        customer: true,
+        staff: true,
+      },
     });
 
     if (!user || user.deleted_at) {

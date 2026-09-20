@@ -10,13 +10,14 @@ export const listTreatmentRecordsQuerySchema = z.object({
 });
 
 export const createTreatmentRecordSchema = z.object({
-  appointment_id: z.number().int().positive('Appointment ID is required'),
+  appointment_id: z.number().int().positive().optional(),
+  customer_id: z.number().int().positive('Customer ID is required'),
+  treatment_date: z.string().optional(),
   notes: z.string().nullable().optional(),
   recommendations: z.string().nullable().optional(),
   side_effects: z.string().nullable().optional(),
   before_photo: z.string().max(500).nullable().optional(),
   after_photo: z.string().max(500).nullable().optional(),
-  satisfaction_rating: z.number().int().min(1).max(5).nullable().optional(),
 });
 
 export const updateTreatmentRecordSchema = z.object({
@@ -25,7 +26,6 @@ export const updateTreatmentRecordSchema = z.object({
   side_effects: z.string().nullable().optional(),
   before_photo: z.string().max(500).nullable().optional(),
   after_photo: z.string().max(500).nullable().optional(),
-  satisfaction_rating: z.number().int().min(1).max(5).nullable().optional(),
 });
 
 export const treatmentRecordIdParamSchema = z.object({

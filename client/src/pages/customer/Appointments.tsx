@@ -85,14 +85,14 @@ export default function Appointments() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-2xl font-bold text-neutral-900">My Appointments</h1>
+        <h1 className="text-2xl font-sans font-semibold text-neutral-900">My Appointments</h1>
         <div className="flex items-center gap-2">
           <Filter size={16} className="text-neutral-400" />
           {filters.map((f) => (
             <button
               key={f.value}
               onClick={() => setFilter(f.value)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
                 filter === f.value
                   ? 'bg-primary-600 text-white'
                   : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'
@@ -118,12 +118,12 @@ export default function Appointments() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-neutral-50 text-left text-neutral-500">
-                    <th className="px-6 py-3 font-medium">Date</th>
-                    <th className="px-6 py-3 font-medium">Time</th>
-                    <th className="px-6 py-3 font-medium">Service</th>
-                    <th className="px-6 py-3 font-medium">Staff</th>
-                    <th className="px-6 py-3 font-medium">Status</th>
-                    <th className="px-6 py-3 font-medium text-right">Actions</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Date</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Time</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Service</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Staff</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Status</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
@@ -143,6 +143,7 @@ export default function Appointments() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-neutral-900 font-medium">
                         {apt.service?.name || apt.service_name || '--'}
+                        {apt.services && apt.services.length > 1 ? ` +${apt.services.length - 1}` : ''}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2 text-neutral-700">
@@ -157,7 +158,7 @@ export default function Appointments() {
                         {isUpcoming(apt) && apt.status !== 'cancelled' && (
                           <button
                             onClick={() => setCancelModal(apt)}
-                            className="text-red-500 hover:text-red-700 p-1 rounded-lg hover:bg-red-50 transition"
+                            className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50 transition"
                             title="Cancel appointment"
                           >
                             <Trash2 size={16} />

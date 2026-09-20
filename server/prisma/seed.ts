@@ -38,7 +38,7 @@ async function main() {
 
   // System Settings
   const settings = [
-    { setting_key: 'clinic_name', setting_value: '"IAVE Beauty & Co."', description: 'Clinic display name' },
+    { setting_key: 'clinic_name', setting_value: '"Souvari Skin Lab"', description: 'Clinic display name' },
     { setting_key: 'clinic_phone', setting_value: '"+63 917 123 4567"', description: 'Clinic contact phone' },
     { setting_key: 'clinic_email', setting_value: '"info@iavebeauty.com"', description: 'Clinic email' },
     { setting_key: 'clinic_address', setting_value: '"123 Beauty Ave, Makati City, Metro Manila, Philippines"', description: 'Clinic address' },
@@ -192,6 +192,8 @@ async function main() {
     { name: 'Numbing Cream', sku: 'PRD-00016', unit: ProductUnit.bottle, unit_cost: 300, unit_price: 0, current_stock: 18, minimum_stock: 5, product_category_id: categories[1].id, is_retail: false, is_consumable: true },
     { name: 'Antiseptic Solution', sku: 'PRD-00017', unit: ProductUnit.bottle, unit_cost: 150, unit_price: 0, current_stock: 30, minimum_stock: 8, product_category_id: categories[3].id, is_retail: false, is_consumable: true },
     { name: 'Jade Roller Set', sku: 'PRD-00018', unit: ProductUnit.piece, unit_cost: 500, unit_price: 1200, current_stock: 3, minimum_stock: 5, product_category_id: categories[4].id, is_retail: true, is_consumable: false },
+    { name: 'Bump Eraiser (Aftercare for Hot Waxing)', sku: 'PRD-00019', unit: ProductUnit.bottle, unit_cost: 100, unit_price: 250, current_stock: 50, minimum_stock: 10, product_category_id: categories[4].id, is_retail: true, is_consumable: false },
+    { name: 'Post Healing Cream (Aftercare for Warts/Skin Tag Removal)', sku: 'PRD-00020', unit: ProductUnit.bottle, unit_cost: 60, unit_price: 150, current_stock: 50, minimum_stock: 10, product_category_id: categories[4].id, is_retail: true, is_consumable: false },
   ];
 
   const products = [];
@@ -364,7 +366,6 @@ async function main() {
           end_time: appt.end_time,
           notes: 'Treatment completed successfully. Patient tolerated the procedure well.',
           recommendations: 'Follow post-treatment care instructions. Avoid direct sun exposure for 48 hours.',
-          satisfaction_rating: Math.floor(Math.random() * 2) + 4, // 4-5
         },
       });
     } catch {}
@@ -396,7 +397,7 @@ async function main() {
         subtotal,
         tax_amount: tax,
         total_amount: total,
-        payment_method: randomItem(['cash', 'cash', 'credit_card', 'e_wallet']),
+        payment_method: randomItem(['cash', 'cash', 'gcash', 'paid_on_us']),
         payment_status: 'paid',
         paid_at: appt.appointment_date,
         items: {
@@ -438,7 +439,7 @@ async function main() {
       data: {
         user_id: user.id,
         type: 'system',
-        title: 'Welcome to IAVE Beauty & Co.',
+        title: 'Welcome to Souvari Skin Lab',
         message: 'Thank you for registering! Explore our services and book your first appointment.',
       },
     });

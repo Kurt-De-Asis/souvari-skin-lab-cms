@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { Search, Plus, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { customersApi } from '@/api';
-import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import { customersApi, staffApi } from '@/api';
 import EmptyState from '@/components/shared/EmptyState';
 import Pagination from '@/components/ui/Pagination';
 import StatusBadge from '@/components/ui/StatusBadge';
+import { TableSkeleton } from '@/components/ui/Skeleton';
 import Modal from '@/components/ui/Modal';
+import CustomerDetailDrawer from '@/components/admin/CustomerDetailDrawer';
 
 interface Customer {
   id: number;
@@ -16,6 +17,8 @@ interface Customer {
   gender: string;
   date_of_birth?: string;
   address?: string;
+  preferred_staff_id?: number | null;
+  preferred_staff?: { id: number; first_name: string; last_name: string } | null;
   user?: { id: number; email: string; phone: string; status: string };
 }
 
@@ -28,6 +31,7 @@ interface CustomerForm {
   gender: string;
   date_of_birth?: string;
   address?: string;
+  preferred_staff_id?: number | null;
 }
 
 export default function Customers() {
@@ -42,6 +46,8 @@ export default function Customers() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [staffList, setStaffList] = useState<Array<{ id: number; first_name: string; last_name: string }>>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<CustomerForm>();
 
@@ -71,9 +77,15 @@ export default function Customers() {
 
   useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
 
+  useEffect(() => {
+    staffApi.list({ limit: '100' }).then(({ data }) => {
+      setStaffList(data.data?.data || []);
+    }).catch(() => {});
+  }, []);
+
   const openAddModal = () => {
     setEditingCustomer(null);
-    reset({ first_name: '', last_name: '', email: '', password: '', phone: '', gender: 'male', date_of_birth: '', address: '' });
+    reset({ first_name: '', last_name: '', email: '', password: '', phone: '', gender: 'male', date_of_birth: '', address: '', preferred_staff_id: null });
     setModalOpen(true);
   };
 
@@ -87,6 +99,7 @@ export default function Customers() {
       gender: c.gender,
       date_of_birth: c.date_of_birth || '',
       address: c.address || '',
+      preferred_staff_id: c.preferred_staff_id ?? null,
     });
     setModalOpen(true);
   };
@@ -94,11 +107,15 @@ export default function Customers() {
   const onSubmit = async (values: CustomerForm) => {
     setSubmitting(true);
     try {
+      const payload = {
+        ...values,
+        preferred_staff_id: values.preferred_staff_id ? Number(values.preferred_staff_id) : null,
+      };
       if (editingCustomer) {
-        await customersApi.update(editingCustomer.id, values);
+        await customersApi.update(editingCustomer.id, payload);
         toast.success('Customer updated');
       } else {
-        await customersApi.create({ ...values, password: values.password || 'password123' });
+        await customersApi.create({ ...payload, password: payload.password || 'password123' });
         toast.success('Customer created');
       }
       setModalOpen(false);
@@ -126,7 +143,7 @@ export default function Customers() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Customers</h1>
+          <h1 className="text-2xl font-sans font-semibold text-neutral-900">Customers</h1>
           <p className="text-sm text-neutral-500 mt-1">Manage your customer base</p>
         </div>
         <button onClick={openAddModal} className="btn-primary">
@@ -136,23 +153,23 @@ export default function Customers() {
       </div>
 
       {/* Search */}
-      <div className="card pb-0">
-        <div className="relative max-w-sm">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-          <input
-            type="text"
-            placeholder="Search by name or email..."
-            className="input-field pl-10"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+      <div className="relative max-w-sm">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+        <input
+          type="text"
+          placeholder="Search by name or email..."
+          className="input-field pl-10"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
       </div>
 
       {/* Table */}
       <div className="card overflow-hidden !p-0">
         {loading ? (
-          <LoadingSpinner fullScreen={false} />
+          <div className="px-6 py-8">
+            <TableSkeleton rows={8} cols={6} />
+          </div>
         ) : customers.length === 0 ? (
           <EmptyState title="No customers found" description="Try adjusting your search or add a new customer." />
         ) : (
@@ -160,19 +177,25 @@ export default function Customers() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                  <th className="px-6 py-3 font-medium">Name</th>
-                  <th className="px-6 py-3 font-medium">Email</th>
-                  <th className="px-6 py-3 font-medium">Phone</th>
-                  <th className="px-6 py-3 font-medium">Gender</th>
-                  <th className="px-6 py-3 font-medium">Status</th>
-                  <th className="px-6 py-3 font-medium text-right">Actions</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Name</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Email</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Phone</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Gender</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Status</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {customers.map((c) => (
                   <tr key={c.id} className="hover:bg-neutral-50/50">
-                    <td className="px-6 py-4 font-medium text-neutral-900">
-                      {c.first_name} {c.last_name}
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => setSelectedCustomer(c)}
+                        className="font-medium text-neutral-900 hover:text-primary-600 transition text-left"
+                        title="View customer details"
+                      >
+                        {c.first_name} {c.last_name}
+                      </button>
                     </td>
                     <td className="px-6 py-4 text-neutral-600">{c.user?.email || '—'}</td>
                     <td className="px-6 py-4 text-neutral-600">{c.user?.phone || '—'}</td>
@@ -180,10 +203,10 @@ export default function Customers() {
                     <td className="px-6 py-4"><StatusBadge status={c.user?.status || 'active'} /></td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => openEditModal(c)} className="p-2 text-neutral-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
+                        <button onClick={() => openEditModal(c)} className="p-2 text-neutral-500 hover:text-primary-600 hover:bg-primary-50 rounded-md transition">
                           <Pencil size={16} />
                         </button>
-                        <button onClick={() => setDeleteId(c.id)} className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition">
+                        <button onClick={() => setDeleteId(c.id)} className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-md transition">
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -204,7 +227,7 @@ export default function Customers() {
       {/* Add/Edit Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingCustomer ? 'Edit Customer' : 'Add Customer'}>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">First Name</label>
               <input className="input-field" placeholder="First name" {...register('first_name', { required: 'Required' })} />
@@ -228,7 +251,7 @@ export default function Customers() {
               {errors.password && <p className="text-xs text-red-600 mt-1">{errors.password.message}</p>}
             </div>
           )}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Phone</label>
               <input className="input-field" placeholder="Phone number" {...register('phone')} />
@@ -250,6 +273,15 @@ export default function Customers() {
             <label className="label">Address</label>
             <input className="input-field" placeholder="Address" {...register('address')} />
           </div>
+          <div>
+            <label className="label">Preferred Staff</label>
+            <select className="select-field" {...register('preferred_staff_id')}>
+              <option value="">None</option>
+              {staffList.map((s) => (
+                <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
+              ))}
+            </select>
+          </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setModalOpen(false)} className="btn-secondary">Cancel</button>
             <button type="submit" disabled={submitting} className="btn-primary">
@@ -269,6 +301,13 @@ export default function Customers() {
           <button onClick={handleDelete} className="btn-danger">Delete</button>
         </div>
       </Modal>
+
+      {/* Customer Detail Drawer */}
+      <CustomerDetailDrawer
+        open={selectedCustomer !== null}
+        onClose={() => setSelectedCustomer(null)}
+        customer={selectedCustomer}
+      />
     </div>
   );
 }

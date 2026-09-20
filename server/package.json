@@ -11,8 +11,10 @@
     "db:seed": "npx prisma db seed",
     "db:seed:catalog": "ts-node --project tsconfig.seed.json prisma/seed-catalog.ts",
     "db:seed:memberships": "ts-node --project tsconfig.seed.json prisma/seed-memberships.ts",
+    "db:seed:loyalty": "ts-node --project tsconfig.seed.json prisma/seed-loyalty.ts",
     "db:seed:all": "npx prisma db seed && ts-node --project tsconfig.seed.json prisma/seed-catalog.ts && ts-node --project tsconfig.seed.json prisma/seed-memberships.ts",
     "db:seed:employees": "ts-node --project tsconfig.seed.json prisma/seed-employees.ts",
+    "db:seed:service-staff": "ts-node --project tsconfig.seed.json prisma/seed-service-staff.ts",
     "db:studio": "npx prisma studio",
     "db:reset": "npx prisma migrate reset"
   },
@@ -29,6 +31,7 @@
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^10.0.1",
     "openai": "^4.73.0",
     "winston": "^3.17.0",
     "zod": "^3.24.0"
@@ -40,6 +43,7 @@
     "@types/express": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.10.0",
+    "@types/nodemailer": "^8.0.1",
     "nodemon": "^3.1.0",
     "prisma": "^5.22.0",
     "ts-node": "^10.9.2",

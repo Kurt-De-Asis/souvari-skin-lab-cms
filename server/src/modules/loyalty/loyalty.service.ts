@@ -26,14 +26,66 @@ export class LoyaltyService {
       throw new AppError('Loyalty progress not found for this membership', 404);
     }
 
-    const planType = membership.plan.duration_months <= 6 ? 'six_month' : 'twelve_month';
+    const planType = membership.plan.tier as any;
 
     const milestones = await prisma.loyalty_milestones.findMany({
       where: {
-        plan_type: planType as any,
+        plan_type: planType,
         is_active: true,
       },
       orderBy: { spend_threshold: 'asc' },
+    });
+
+    const recentLogs = await prisma.membership_activity_logs.findMany({
+      where: { membership_id: membershipId },
+      orderBy: { created_at: 'desc' },
+      take: 8,
+    });
+
+    const recentActivity = recentLogs.map((log) => {
+      let parsed: any = {};
+      try {
+        parsed = JSON.parse(log.details ?? '{}');
+      } catch {
+        parsed = {};
+      }
+
+      let type = 'activity';
+      if (log.action === 'perk_used' || log.action === 'perk_reset') type = 'perk';
+      else if (log.action === 'loyalty_spend_adjusted') type = 'spend';
+      else if (log.action.includes('referral')) type = 'referral';
+      else if (log.action === 'membership_availed' || log.action === 'availed') type = 'membership';
+
+      let amount: number | null = null;
+      if (log.action === 'loyalty_spend_adjusted' && parsed.amount != null) {
+        amount = Number(parsed.amount);
+      } else if (parsed.discount_amount != null) {
+        amount = Number(parsed.discount_amount);
+      } else if (parsed.amount != null) {
+        amount = Number(parsed.amount);
+      } else if (parsed.credit_amount != null) {
+        amount = Number(parsed.credit_amount);
+      } else if (parsed.months_added != null) {
+        amount = Number(parsed.months_added);
+      }
+
+      const descriptionMap: Record<string, string> = {
+        membership_availed: 'Your membership was activated',
+        availed: 'Your membership was activated',
+        extended: 'Membership extended',
+        perk_used: 'Monthly perk redeemed',
+        perk_reset: 'Monthly perk reset',
+        loyalty_spend_adjusted: 'Qualifying spend updated',
+      };
+      const description = descriptionMap[log.action] ?? (log.action ? log.action.replace(/_/g, ' ') : 'Activity');
+
+      return {
+        id: log.id,
+        type,
+        description,
+        amount,
+        created_at: log.created_at,
+      };
     });
 
     return {
@@ -50,6 +102,7 @@ export class LoyaltyService {
         updated_at: progress.updated_at,
       },
       milestones,
+      recent_activity: recentActivity,
     };
   }
 
@@ -174,7 +227,6 @@ export class LoyaltyService {
       return updated;
     });
 
-    const planType = membership.plan.duration_months <= 6 ? 'six_month' : 'twelve_month';
     const highestReward = await this.checkMilestoneRewards(membershipId);
 
     await prisma.loyalty_progress.update({
@@ -270,11 +322,11 @@ export class LoyaltyService {
       throw new AppError('Loyalty progress not found', 404);
     }
 
-    const planType = membership.plan.duration_months <= 6 ? 'six_month' : 'twelve_month';
+    const planType = membership.plan.tier as any;
 
     const milestones = await prisma.loyalty_milestones.findMany({
       where: {
-        plan_type: planType as any,
+        plan_type: planType,
         is_active: true,
       },
       orderBy: { spend_threshold: 'desc' },

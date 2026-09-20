@@ -15,6 +15,7 @@
     "db:reset": "cd server && npx prisma migrate reset"
   },
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.1.0",
+    "playwright-chromium": "^1.62.1"
   }
 }

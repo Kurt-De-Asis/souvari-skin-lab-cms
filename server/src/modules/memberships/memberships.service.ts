@@ -1,3 +1,4 @@
+import { Decimal } from '@prisma/client/runtime/library';
 import prisma from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { getPaginationParams, createPaginatedResult, PaginatedResult } from '../../utils/pagination';
@@ -6,6 +7,8 @@ import {
   UpdateMembershipStatusInput,
   ExtendMembershipInput,
   MembershipQuery,
+  MembershipPaymentInput,
+  AvailMembershipInput,
 } from './memberships.validation';
 
 const customerInclude = {
@@ -143,7 +146,14 @@ export class MembershipService {
         status: 'active',
       },
       include: {
-        plan: true,
+        plan: {
+          include: {
+            benefits: {
+              where: { is_active: true },
+              orderBy: { sort_order: 'asc' },
+            },
+          },
+        },
         loyalty_progress: true,
         monthly_perks: {
           orderBy: { year_month: 'desc' },
@@ -184,7 +194,7 @@ export class MembershipService {
     return membership;
   }
 
-  async availPlan(userId: number, planId: number, notes?: string | null) {
+  async availPlan(userId: number, data: AvailMembershipInput) {
     const customer = await prisma.customers.findUnique({
       where: { user_id: userId },
     });
@@ -193,9 +203,13 @@ export class MembershipService {
       throw new AppError('Customer profile not found', 404);
     }
 
-    const membership = await this.create({ customer_id: customer.id, plan_id: planId, notes });
+    const membership = await this.create({ customer_id: customer.id, ...data });
 
-    return this.activate(membership.id);
+    // If fully paid, it's already active; otherwise stays pending
+    if (membership.status === 'pending' && membership.payment_status === 'paid') {
+      return this.activate(membership.id);
+    }
+    return membership;
   }
 
   private async activate(id: number) {
@@ -215,7 +229,7 @@ export class MembershipService {
     });
   }
 
-  async create(data: CreateMembershipInput) {
+  async create(data: CreateMembershipInput, userId?: number) {
     const customer = await prisma.customers.findUnique({
       where: { id: data.customer_id },
     });
@@ -250,15 +264,42 @@ export class MembershipService {
 
     const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
+    // Determine price: use promo_price if available, otherwise regular_price
+    const planPrice = Number(plan.promo_price ?? plan.regular_price ?? 0);
+    const amountPaid = data.amount_paid ?? 0;
+    const paymentMethod = data.payment_method ?? 'cash';
+    const paymentType = data.payment_type ?? (amountPaid >= planPrice ? 'FULL' : 'DOWN_PAYMENT');
+
+    // Compute payment status and membership status
+    let paymentStatus: 'pending' | 'partial' | 'paid' = 'pending';
+    let membershipStatus: 'pending' | 'active' = 'pending';
+    let balance = planPrice - amountPaid;
+
+    if (amountPaid >= planPrice) {
+      paymentStatus = 'paid';
+      membershipStatus = 'active';
+      balance = 0;
+    } else if (amountPaid > 0) {
+      paymentStatus = 'partial';
+      membershipStatus = 'pending';
+    } else {
+      paymentStatus = 'pending';
+      membershipStatus = 'pending';
+    }
+
     const membership = await prisma.$transaction(async (tx) => {
       const newMembership = await tx.memberships.create({
         data: {
           customer_id: data.customer_id,
           plan_id: data.plan_id,
           code,
-          status: 'pending',
+          status: membershipStatus,
           start_date: now,
           end_date: endDate,
+          price: planPrice,
+          amount_paid: amountPaid,
+          balance,
+          payment_status: paymentStatus,
           notes: data.notes ?? null,
         },
         include: {
@@ -278,6 +319,21 @@ export class MembershipService {
           plan: true,
         },
       });
+
+      // Record initial payment if any
+      if (amountPaid > 0) {
+        await tx.membership_payments.create({
+          data: {
+            membership_id: newMembership.id,
+            amount: amountPaid,
+            payment_method: paymentMethod,
+            payment_type: paymentType as any,
+            installment_no: paymentType === 'INSTALLMENT' ? 1 : null,
+            received_by: userId ?? null,
+            notes: data.notes ?? `Initial ${paymentType.toLowerCase().replace('_', ' ')} payment`,
+          },
+        });
+      }
 
       await tx.loyalty_progress.create({
         data: {
@@ -344,7 +400,7 @@ export class MembershipService {
     return membership;
   }
 
-  async extend(id: number, months: number, reason?: string | null) {
+  async extend(id: number, months: number, reason?: string | null, payment_method?: string, payment_type?: string, amount_paid?: number) {
     const existing = await prisma.memberships.findUnique({ where: { id } });
 
     if (!existing) {
@@ -358,39 +414,76 @@ export class MembershipService {
     const newEndDate = new Date(existing.end_date);
     newEndDate.setMonth(newEndDate.getMonth() + months);
 
-    const membership = await prisma.memberships.update({
-      where: { id },
-      data: { end_date: newEndDate },
-      include: {
-        customer: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                phone: true,
-                role: true,
-                status: true,
+    // Handle extension payment if provided
+    const plan = await prisma.membership_plans.findUnique({ where: { id: existing.plan_id } });
+    const extensionPrice = Number(plan?.promo_price ?? plan?.regular_price ?? 0) * (months / (plan?.duration_months ?? 1));
+    const paid = amount_paid ?? 0;
+
+    let newAmountPaid = Number(existing.amount_paid) + paid;
+    let newBalance = Number(existing.price ?? 0) + extensionPrice - newAmountPaid;
+    let newPaymentStatus = existing.payment_status;
+    let newMembershipStatus = existing.status;
+
+    if (newAmountPaid >= Number(existing.price ?? 0) + extensionPrice) {
+      newPaymentStatus = 'paid';
+      newMembershipStatus = 'active';
+      newBalance = 0;
+    } else if (newAmountPaid > 0) {
+      newPaymentStatus = 'partial';
+    }
+
+    const membership = await prisma.$transaction(async (tx) => {
+      const updated = await tx.memberships.update({
+        where: { id },
+        data: {
+          end_date: newEndDate,
+          price: Number(existing.price ?? 0) + extensionPrice,
+          amount_paid: newAmountPaid,
+          balance: newBalance,
+          payment_status: newPaymentStatus,
+          status: newMembershipStatus,
+        },
+        include: {
+          customer: {
+            include: {
+              user: {
+                select: { id: true, email: true, phone: true, role: true, status: true },
               },
             },
           },
+          plan: true,
         },
-        plan: true,
-      },
-    });
+      });
 
-    await prisma.membership_activity_logs.create({
-      data: {
-        membership_id: id,
-        action: 'extended',
-        details: JSON.stringify({
-          months_added: months,
-          old_end_date: existing.end_date,
-          new_end_date: newEndDate,
-          reason: reason ?? null,
-        }),
-        performed_by: null,
-      },
+      if (paid > 0) {
+        await tx.membership_payments.create({
+          data: {
+            membership_id: id,
+            amount: paid,
+            payment_method: (payment_method as any) ?? 'cash',
+            payment_type: (payment_type as any) ?? 'FULL',
+            installment_no: null,
+            notes: reason ?? `Extension payment (${months} months)`,
+          },
+        });
+      }
+
+      await tx.membership_activity_logs.create({
+        data: {
+          membership_id: id,
+          action: 'extended',
+          details: JSON.stringify({
+            months_added: months,
+            old_end_date: existing.end_date,
+            new_end_date: newEndDate,
+            reason: reason ?? null,
+            payment: paid > 0 ? { amount: paid, method: payment_method } : null,
+          }),
+          performed_by: null,
+        },
+      });
+
+      return updated;
     });
 
     return membership;
@@ -428,6 +521,79 @@ export class MembershipService {
     }
 
     return membership;
+  }
+
+  async recordPayment(membershipId: number, data: MembershipPaymentInput, userId?: number) {
+    const membership = await prisma.memberships.findUnique({
+      where: { id: membershipId },
+      include: { plan: true },
+    });
+
+    if (!membership) {
+      throw new AppError('Membership not found', 404);
+    }
+
+    const newAmountPaid = Number(membership.amount_paid) + data.amount;
+    const newBalance = Number(membership.price ?? 0) - newAmountPaid;
+
+    let newPaymentStatus = membership.payment_status;
+    let newMembershipStatus = membership.status;
+
+    if (newAmountPaid >= Number(membership.price ?? 0)) {
+      newPaymentStatus = 'paid';
+      newMembershipStatus = 'active';
+    } else if (newAmountPaid > 0) {
+      newPaymentStatus = 'partial';
+    }
+
+    return prisma.$transaction(async (tx) => {
+      const payment = await tx.membership_payments.create({
+        data: {
+          membership_id: membershipId,
+          amount: data.amount,
+          payment_method: data.payment_method,
+          payment_type: data.payment_type as any,
+          installment_no: data.installment_no ?? null,
+          received_by: userId ?? null,
+          notes: data.notes ?? null,
+        },
+      });
+
+      const updatedMembership = await tx.memberships.update({
+        where: { id: membershipId },
+        data: {
+          amount_paid: newAmountPaid,
+          balance: newBalance,
+          payment_status: newPaymentStatus,
+          status: newMembershipStatus,
+        },
+      });
+
+      if (newMembershipStatus === 'active' && membership.status !== 'active') {
+        await tx.membership_activity_logs.create({
+          data: {
+            membership_id: membershipId,
+            action: 'activated_via_payment',
+            details: JSON.stringify({ fully_paid: true }),
+            performed_by: userId ?? null,
+          },
+        });
+      }
+
+      return { payment, membership: updatedMembership };
+    });
+  }
+
+  async listPayments(membershipId: number) {
+    return prisma.membership_payments.findMany({
+      where: { membership_id: membershipId },
+      orderBy: { created_at: 'desc' },
+      include: {
+        receiver: {
+          select: { id: true, first_name: true, last_name: true },
+        },
+      },
+    });
   }
 }
 

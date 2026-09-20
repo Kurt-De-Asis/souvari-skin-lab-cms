@@ -8,6 +8,7 @@ import EmptyState from '@/components/shared/EmptyState';
 import Pagination from '@/components/ui/Pagination';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Modal from '@/components/ui/Modal';
+import formatPaymentMethod from '@/utils/formatPaymentMethod';
 
 interface Membership {
   id: number;
@@ -25,10 +26,16 @@ interface Membership {
 interface AssignForm {
   customer_id: number;
   plan_id: number;
+  payment_method: string;
+  payment_type: string;
+  amount_paid: number;
 }
 
 interface ExtendForm {
   months: number;
+  payment_method: string;
+  payment_type: string;
+  amount_paid: number;
 }
 
 export default function Memberships() {
@@ -47,8 +54,22 @@ export default function Memberships() {
 
   const [customers, setCustomers] = useState<any[]>([]);
   const [plans, setPlans] = useState<any[]>([]);
+  const [selectedPlanPrice, setSelectedPlanPrice] = useState(0);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<AssignForm>();
+  const PAYMENT_METHODS = ['cash', 'gcash', 'gotyme', 'rcbc', 'paid_on_us'];
+  const PAYMENT_TYPES = ['FULL', 'DOWN_PAYMENT'];
+
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<AssignForm>({
+    defaultValues: { customer_id: 0, plan_id: 0, payment_method: 'cash', payment_type: 'FULL', amount_paid: 0 },
+  });
+
+  const selectedPlanId = watch('plan_id');
+
+  useEffect(() => {
+    const plan = plans.find((p: any) => p.id === Number(selectedPlanId));
+    const price = Number(plan?.promo_price ?? plan?.regular_price ?? 0);
+    setSelectedPlanPrice(price);
+  }, [selectedPlanId, plans]);
   const { register: registerExtend, handleSubmit: handleSubmitExtend, reset: resetExtend, formState: { errors: extendErrors } } = useForm<ExtendForm>();
 
   useEffect(() => {
@@ -79,7 +100,8 @@ export default function Memberships() {
   useEffect(() => { fetchMemberships(); }, [fetchMemberships]);
 
   const openAssignModal = async () => {
-    reset({ customer_id: 0, plan_id: 0 });
+    reset({ customer_id: 0, plan_id: 0, payment_method: 'cash', payment_type: 'FULL', amount_paid: 0 });
+    setSelectedPlanPrice(0);
     try {
       const [custRes, planRes] = await Promise.all([
         customersApi.list({ limit: '200' }),
@@ -146,7 +168,7 @@ export default function Memberships() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Memberships</h1>
+          <h1 className="text-2xl font-sans font-semibold text-neutral-900">Memberships</h1>
           <p className="text-sm text-neutral-500 mt-1">Manage customer memberships</p>
         </div>
         <button onClick={openAssignModal} className="btn-primary">
@@ -187,14 +209,14 @@ export default function Memberships() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                  <th className="px-6 py-3 font-medium">Customer</th>
-                  <th className="px-6 py-3 font-medium">Plan</th>
-                  <th className="px-6 py-3 font-medium">Code</th>
-                  <th className="px-6 py-3 font-medium">Status</th>
-                  <th className="px-6 py-3 font-medium">Start</th>
-                  <th className="px-6 py-3 font-medium">End</th>
-                  <th className="px-6 py-3 font-medium">Spending</th>
-                  <th className="px-6 py-3 font-medium text-right">Actions</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Customer</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Plan</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Code</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Status</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Start</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">End</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Spending</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
@@ -247,27 +269,62 @@ export default function Memberships() {
       </div>
 
       {/* Assign Modal */}
-      <Modal open={assignModalOpen} onClose={() => setAssignModalOpen(false)} title="Assign Membership">
+      <Modal open={assignModalOpen} onClose={() => setAssignModalOpen(false)} title="Assign Membership" maxWidth="max-w-xl">
         <form onSubmit={handleSubmit(onAssign)} className="space-y-4">
-          <div>
-            <label className="label">Customer</label>
-            <select className="select-field" {...register('customer_id', { required: 'Required', valueAsNumber: true })}>
-              <option value="">Select customer</option>
-              {customers.map((c: any) => (
-                <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
-              ))}
-            </select>
-            {errors.customer_id && <p className="text-xs text-red-600 mt-1">{errors.customer_id.message}</p>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label">Customer</label>
+              <select className="select-field" {...register('customer_id', { required: 'Required', valueAsNumber: true })}>
+                <option value="">Select customer</option>
+                {customers.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
+                ))}
+              </select>
+              {errors.customer_id && <p className="text-xs text-red-600 mt-1">{errors.customer_id.message}</p>}
+            </div>
+            <div>
+              <label className="label">Plan</label>
+              <select className="select-field" {...register('plan_id', { required: 'Required', valueAsNumber: true })}>
+                <option value="">Select plan</option>
+                {plans.map((p: any) => (
+                  <option key={p.id} value={p.id}>{p.name} — {p.tier}</option>
+                ))}
+              </select>
+              {errors.plan_id && <p className="text-xs text-red-600 mt-1">{errors.plan_id.message}</p>}
+            </div>
           </div>
           <div>
-            <label className="label">Plan</label>
-            <select className="select-field" {...register('plan_id', { required: 'Required', valueAsNumber: true })}>
-              <option value="">Select plan</option>
-              {plans.map((p: any) => (
-                <option key={p.id} value={p.id}>{p.name} — {p.tier}</option>
-              ))}
-            </select>
-            {errors.plan_id && <p className="text-xs text-red-600 mt-1">{errors.plan_id.message}</p>}
+            <label className="label">Plan Price</label>
+            <input type="text" className="input-field" value={`₱${selectedPlanPrice.toLocaleString()}`} readOnly />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="label">Payment Method</label>
+              <select className="select-field" {...register('payment_method')}>
+                {PAYMENT_METHODS.map(m => (
+                  <option key={m} value={m}>{formatPaymentMethod(m)}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Payment Type</label>
+              <select className="select-field" {...register('payment_type')}>
+                {PAYMENT_TYPES.map(t => (
+                  <option key={t} value={t}>{t.replace('_', ' ')}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Amount Paid</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max={selectedPlanPrice}
+                className="input-field"
+                {...register('amount_paid', { valueAsNumber: true })}
+              />
+            </div>
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setAssignModalOpen(false)} className="btn-secondary">Cancel</button>
@@ -292,12 +349,34 @@ export default function Memberships() {
       </Modal>
 
       {/* Extend Modal */}
-      <Modal open={extendModal.open} onClose={() => setExtendModal({ open: false, membership: null })} title="Extend Membership" maxWidth="max-w-sm">
+      <Modal open={extendModal.open} onClose={() => setExtendModal({ open: false, membership: null })} title="Extend Membership" maxWidth="max-w-md">
         <form onSubmit={handleSubmitExtend(onExtend)} className="space-y-4">
           <div>
             <label className="label">Extend by (months)</label>
             <input type="number" className="input-field" {...registerExtend('months', { required: 'Required', valueAsNumber: true, min: { value: 1, message: 'Min 1 month' } })} />
             {extendErrors.months && <p className="text-xs text-red-600 mt-1">{extendErrors.months.message}</p>}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="label">Payment Method</label>
+              <select className="select-field" {...registerExtend('payment_method')}>
+                {PAYMENT_METHODS.map(m => (
+                  <option key={m} value={m}>{formatPaymentMethod(m)}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Payment Type</label>
+              <select className="select-field" {...registerExtend('payment_type')}>
+                {PAYMENT_TYPES.map(t => (
+                  <option key={t} value={t}>{t.replace('_', ' ')}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Amount Paid</label>
+              <input type="number" step="0.01" min="0" className="input-field" {...registerExtend('amount_paid', { valueAsNumber: true })} />
+            </div>
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setExtendModal({ open: false, membership: null })} className="btn-secondary">Cancel</button>

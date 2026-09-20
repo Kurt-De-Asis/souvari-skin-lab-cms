@@ -1,44 +1,16 @@
 import { SectionDef } from '../types';
-import { nailArtPrices } from '../helpers';
+import { vipNm } from '../helpers';
+
+const SRC = 'PDF p.30 · Crystals / Rhinestones';
 
 const section: SectionDef = {
   slug: 'nail-crystals',
-  name: 'Nail Crystals',
+  name: 'Crystals & Rhinestones',
   display_order: 13,
   services: [
-    {
-      name: 'Small Crystal',
-      slug: 'small-crystal',
-      category: 'other',
-      duration_minutes: 10,
-      variants: [
-        { variant_key: 'per_piece', label: 'Per Piece' },
-        { variant_key: 'full_set', label: 'Full Set' },
-      ],
-      prices: nailArtPrices(10, 15, 120, 180),
-    },
-    {
-      name: 'Medium Crystal',
-      slug: 'medium-crystal',
-      category: 'other',
-      duration_minutes: 10,
-      variants: [
-        { variant_key: 'per_piece', label: 'Per Piece' },
-        { variant_key: 'full_set', label: 'Full Set' },
-      ],
-      prices: nailArtPrices(15, 20, 180, 240),
-    },
-    {
-      name: 'Big Crystal',
-      slug: 'big-crystal',
-      category: 'other',
-      duration_minutes: 10,
-      variants: [
-        { variant_key: 'per_piece', label: 'Per Piece' },
-        { variant_key: 'full_set', label: 'Full Set' },
-      ],
-      prices: nailArtPrices(20, 25, 240, 300),
-    },
+    { name: 'Small Crystal / Rhinestone – 3 pcs', slug: 'nc-small-crystal', category: 'other', duration_minutes: 10, prices: vipNm(7.5, 10, { source_ref: SRC }) },
+    { name: 'Medium Crystal / Rhinestone (Per Pc)', slug: 'nc-medium-crystal', category: 'other', duration_minutes: 10, prices: vipNm(34, 45, { source_ref: SRC }) },
+    { name: 'Large Crystal / Rhinestone (Per Pc)', slug: 'nc-large-crystal', category: 'other', duration_minutes: 15, prices: vipNm(112, 149, { source_ref: SRC }) },
   ],
 };
 

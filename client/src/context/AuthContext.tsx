@@ -5,7 +5,7 @@ interface User {
   id: number;
   email: string;
   role: 'admin' | 'staff' | 'customer';
-  customer?: { id: number; first_name: string; last_name: string } | null;
+  customer?: { id: number; first_name: string; last_name: string; preferred_staff_id?: number | null; preferred_staff?: { id: number; first_name: string; last_name: string } | null } | null;
   staff?: { id: number; first_name: string; last_name: string; position: string } | null;
 }
 

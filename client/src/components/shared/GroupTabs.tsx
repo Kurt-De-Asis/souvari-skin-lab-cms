@@ -12,13 +12,13 @@ interface GroupTabsProps {
 
 export default function GroupTabs({ groups, activeSlug, onSelect }: GroupTabsProps) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-x-6 gap-y-2 border-b border-neutral-200">
       <button
         onClick={() => onSelect(null)}
-        className={`px-3 py-1.5 text-sm font-medium rounded-full border transition-colors ${
+        className={`pb-3 text-xs font-semibold uppercase tracking-[0.2em] border-b transition ${
           activeSlug === null
-            ? 'bg-gray-900 text-white border-gray-900'
-            : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+            ? 'border-primary-500 text-primary-600'
+            : 'border-transparent text-neutral-400 hover:text-neutral-900'
         }`}
       >
         All
@@ -27,10 +27,10 @@ export default function GroupTabs({ groups, activeSlug, onSelect }: GroupTabsPro
         <button
           key={group.slug}
           onClick={() => onSelect(group.slug)}
-          className={`px-3 py-1.5 text-sm font-medium rounded-full border transition-colors ${
+          className={`pb-3 text-xs font-semibold uppercase tracking-[0.2em] border-b transition ${
             activeSlug === group.slug
-              ? 'bg-gray-900 text-white border-gray-900'
-              : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+              ? 'border-primary-500 text-primary-600'
+              : 'border-transparent text-neutral-400 hover:text-neutral-900'
           }`}
         >
           {group.label}

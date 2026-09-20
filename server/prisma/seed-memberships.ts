@@ -2,41 +2,6 @@ import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const families = [
-  {
-    code: 'VIP_ELITE_PLATINUM' as const,
-    name: 'VIP Elite Platinum',
-    tagline: 'The ultimate VIP experience',
-    description: 'Full access to all VIP privileges with exclusive platinum-tier benefits.',
-    eligible_categories: ['Facial Glow', 'Whitening', 'Lifting & Tightening', 'Laser', 'Permanent Makeup', 'Rejuvenation', 'Threading', 'Lash & Brow', 'Nails', 'Waxing', 'Body Treatments'],
-    display_order: 1,
-  },
-  {
-    code: 'VIP_RADIANT_SKIN' as const,
-    name: 'VIP Radiant Skin',
-    tagline: 'Glow from within',
-    description: 'Specialized membership for skin-focused treatments.',
-    eligible_categories: ['Facial Glow', 'Whitening', 'Lifting & Tightening', 'Laser', 'Permanent Makeup', 'Rejuvenation'],
-    display_order: 2,
-  },
-  {
-    code: 'VIP_LASH_NAIL' as const,
-    name: 'VIP Lash & Nail',
-    tagline: 'Beauty down to the details',
-    description: 'Dedicated membership for lash, brow, and nail services.',
-    eligible_categories: ['Nails', 'Lash & Brow'],
-    display_order: 3,
-  },
-  {
-    code: 'SILVER_ACCESS' as const,
-    name: 'Silver Access',
-    tagline: 'Start your journey',
-    description: 'Affordable entry-level membership with essential perks.',
-    eligible_categories: ['Threading', 'Lash & Brow', 'Nails', 'Waxing'],
-    display_order: 4,
-  },
-];
-
 const plansData = [
   // VIP Elite Platinum - Student
   { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Student', tier: 'ELITE', variant: 'student', term: 6, maxPersons: 1, regular: 1999, promo: 1999, advertisedDay: 333.17 },
@@ -114,8 +79,6 @@ const baseBenefits = [
   { name: 'Monthly Perk Credit', description: 'Monthly service credit (max value)', benefit_type: 'monthly_credit', config: { max_value: 300, min_spend: 800 }, sort_order: 4 },
   { name: 'VIP Events Access', description: 'Exclusive access to VIP events and previews', benefit_type: 'access', sort_order: 5 },
   { name: 'Birthday Treatment', description: 'Free birthday treatment', benefit_type: 'birthday', sort_order: 6 },
-  { name: 'Referral Credits', description: 'Earn credits for referrals', benefit_type: 'referral', config: { credit_amount: 500 }, sort_order: 7 },
-  { name: 'Double Referral Credits', description: '2x referral credits for referred members', benefit_type: 'referral', config: { multiplier: 2 }, sort_order: 8 },
   { name: 'Gold Raffle Entry', description: 'Automatic entry to gold raffle', benefit_type: 'raffle', sort_order: 9 },
   { name: 'Renewal Extension', description: '180-day extension on renewal threshold', benefit_type: 'renewal', config: { extension_days: 180 }, sort_order: 10 },
 ];
@@ -164,32 +127,19 @@ function getBenefitsForFamily(code: string) {
 async function main() {
   console.log('=== Membership Seed ===');
 
-  // Seed families
-  console.log('Seeding membership families...');
-  for (const f of families) {
-    await prisma.membership_families.upsert({
-      where: { code: f.code },
-      update: { name: f.name, tagline: f.tagline, description: f.description, eligible_categories: f.eligible_categories, display_order: f.display_order },
-      create: { ...f, eligible_categories: f.eligible_categories },
-    });
-  }
-  console.log(`  ${families.length} families seeded.`);
-
-  // Seed plans
+  // Seed plans (find-or-create so member/plan links survive re-runs)
   console.log('Seeding membership plans...');
   let planCount = 0;
   const planMap = new Map<string, number>();
 
   for (const p of plansData) {
-    const family = await prisma.membership_families.findUnique({ where: { code: p.familyCode as any } });
-    if (!family) throw new Error(`Family not found: ${p.familyCode}`);
-
     const computedDay = p.promo / (p.term * 30.44);
 
-    const plan = await prisma.membership_plans.upsert({
-      where: { id: planCount + 1000000 }, // force create
-      update: {},
-      create: {
+    const existing = await prisma.membership_plans.findFirst({
+      where: { name: p.name, tier: p.tier as any, variant_code: p.variant as any, term_months: p.term },
+    });
+    const plan = existing ?? (await prisma.membership_plans.create({
+      data: {
         name: p.name,
         tier: p.tier as any,
         duration_months: p.term,
@@ -197,7 +147,6 @@ async function main() {
         promo_price: p.promo,
         description: null,
         is_active: true,
-        family_id: family.id,
         variant_code: p.variant as any,
         term_months: p.term,
         max_persons: p.maxPersons,
@@ -205,25 +154,46 @@ async function main() {
         computed_per_day_price: Math.round(computedDay * 100) / 100,
         sort_order: planCount,
       },
-    });
+    }));
+    if (existing) {
+      await prisma.membership_plans.update({
+        where: { id: existing.id },
+        data: {
+          regular_price: p.regular,
+          promo_price: p.promo,
+          duration_months: p.term,
+          max_persons: p.maxPersons,
+          advertised_per_day_price: p.advertisedDay,
+          computed_per_day_price: Math.round(computedDay * 100) / 100,
+          is_active: true,
+          sort_order: planCount,
+        },
+      });
+    }
     planMap.set(`${p.familyCode}-${p.variant}-${p.term}`, plan.id);
     planCount++;
   }
   console.log(`  ${planCount} plans seeded.`);
 
-  // Seed benefits
+  // Seed benefits (reset then attach per plan, grouped by tier/family-code benefits)
   console.log('Seeding membership benefits...');
+  await prisma.membership_benefits.deleteMany({});
   let benefitCount = 0;
-  for (const f of families) {
-    const family = await prisma.membership_families.findUnique({ where: { code: f.code } });
-    if (!family) continue;
+  const seen = new Set<string>();
+  for (const p of plansData) {
+    const planId = planMap.get(`${p.familyCode}-${p.variant}-${p.term}`);
+    if (!planId) continue;
 
-    const benefits = getBenefitsForFamily(f.code);
+    const benefits = getBenefitsForFamily(p.familyCode);
     for (const b of benefits) {
+      const key = `${planId}:${b.name}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
       const bb = b as any;
       await prisma.membership_benefits.create({
         data: {
-          family_id: family.id,
+          membership_plan_id: planId,
           name: bb.name,
           description: bb.description,
           benefit_type: bb.benefit_type,
@@ -253,7 +223,7 @@ async function main() {
     await prisma.membership_installment_options.upsert({
       where: { plan_id_months: { plan_id: planId, months: 3 } },
       update: {},
-      create: { plan_id: planId, down_payment_pct: 30, months: 3, payment_method: 'credit_card', is_active: true },
+      create: { plan_id: planId, down_payment_pct: 30, months: 3, payment_method: 'cash', is_active: true },
     });
     installmentCount++;
 
@@ -261,40 +231,11 @@ async function main() {
     await prisma.membership_installment_options.upsert({
       where: { plan_id_months: { plan_id: planId, months: 6 } },
       update: {},
-      create: { plan_id: planId, down_payment_pct: 30, months: 6, payment_method: 'credit_card', is_active: true },
+      create: { plan_id: planId, down_payment_pct: 30, months: 6, payment_method: 'cash', is_active: true },
     });
     installmentCount++;
   }
   console.log(`  ${installmentCount} installment options seeded.`);
-
-  // Generate data issues for per-day discrepancies
-  console.log('Generating membership data issues...');
-  let issueCount = 0;
-  const allPlans = await prisma.membership_plans.findMany({ where: { is_active: true, family_id: { not: null } } });
-  for (const plan of allPlans) {
-    if (plan.advertised_per_day_price && plan.computed_per_day_price) {
-      const delta = Math.abs(plan.advertised_per_day_price.toNumber() - plan.computed_per_day_price.toNumber());
-      const pct = delta / plan.computed_per_day_price.toNumber();
-      if (pct > 0.01) {
-        await prisma.service_data_issues.create({
-          data: {
-            issue_type: 'pdf_mismatch',
-            severity: 'warning',
-            status: 'open',
-            title: `Per-day price discrepancy: ${plan.name}`,
-            details: {
-              advertised: plan.advertised_per_day_price.toNumber(),
-              computed: plan.computed_per_day_price.toNumber(),
-              delta_pct: Math.round(pct * 10000) / 100,
-              note: 'PDF per-day figure is not an arithmetic division of price / days',
-            },
-          },
-        });
-        issueCount++;
-      }
-    }
-  }
-  console.log(`  ${issueCount} data issues generated.`);
 
   console.log('=== Membership Seed Complete ===');
 }

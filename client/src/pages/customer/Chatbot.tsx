@@ -91,7 +91,7 @@ export default function Chatbot() {
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       <h1 className="text-xl font-semibold text-neutral-900 mb-4">AI Assistant</h1>
 
-      <div className="flex-1 flex flex-col overflow-hidden rounded-xl border border-neutral-200">
+      <div className="flex-1 flex flex-col overflow-hidden rounded-md border border-neutral-200">
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.map((msg) => (
             <div
@@ -106,7 +106,7 @@ export default function Chatbot() {
                     </div>
                   </div>
                 )}
-                <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
+                <div className={`px-3.5 py-2.5 rounded-md text-sm leading-relaxed ${
                   msg.role === 'user'
                     ? 'bg-neutral-900 text-white rounded-br-md'
                     : 'bg-neutral-100 text-neutral-900 rounded-bl-md'
@@ -124,7 +124,7 @@ export default function Chatbot() {
                   <Bot size={10} className="text-neutral-600" />
                 </div>
               </div>
-              <div className="px-3.5 py-3 rounded-2xl rounded-bl-md bg-neutral-100">
+              <div className="px-3.5 py-3 rounded-md rounded-bl-md bg-neutral-100">
                 <Loader2 size={14} className="animate-spin text-neutral-400" />
               </div>
             </div>
@@ -143,12 +143,12 @@ export default function Chatbot() {
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
               disabled={sending}
-              className="flex-1 px-3.5 py-2 text-sm rounded-lg border border-neutral-200 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900 disabled:opacity-50"
+              className="flex-1 px-3.5 py-2 text-sm rounded-md border border-neutral-200 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900 disabled:opacity-50"
             />
             <button
               onClick={handleSend}
               disabled={!input.trim() || sending}
-              className="p-2 rounded-lg bg-neutral-900 text-white hover:bg-neutral-800 transition disabled:opacity-50"
+              className="p-2 rounded-md bg-neutral-900 text-white hover:bg-neutral-800 transition disabled:opacity-50"
               aria-label="Send message"
             >
               {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}

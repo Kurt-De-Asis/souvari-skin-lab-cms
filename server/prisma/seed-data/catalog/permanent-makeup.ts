@@ -1,12 +1,10 @@
 import { PriceRowInput, SectionDef } from '../types';
-import { vipNm, vipNmRegular } from '../helpers';
+import { vipNmRegular } from '../helpers';
 
-const PMU_SOURCE_REF = 'PDF · PMU ambiguous 3-tier mapping';
+const SRC = 'PDF p.45-47 · Permanent Makeup by Kim Diauna (Regular Rate / VIP 1st Session / Non-MBR 1st Session)';
 
-function pmuThreeTier(vip: number, nm: number, regular: number): PriceRowInput[] {
-  const rows = vipNmRegular(vip, nm, regular);
-  rows[2] = { ...rows[2], needs_verification: true, source_ref: PMU_SOURCE_REF };
-  return rows;
+function pmu(regular: number, vip: number, nm: number): { prices: PriceRowInput[] } {
+  return { prices: vipNmRegular(vip, nm, regular, { source_ref: SRC }) };
 }
 
 const section: SectionDef = {
@@ -14,104 +12,23 @@ const section: SectionDef = {
   name: 'Permanent Makeup',
   display_order: 20,
   services: [
-    {
-      name: 'Microblading',
-      slug: 'microblading',
-      category: 'other',
-      duration_minutes: 120,
-      prices: pmuThreeTier(8000, 10000, 12000),
-    },
-    {
-      name: 'Microshading',
-      slug: 'microshading',
-      category: 'other',
-      duration_minutes: 120,
-      prices: pmuThreeTier(8000, 10000, 12000),
-    },
-    {
-      name: 'Combination Brows',
-      slug: 'combination-brows',
-      category: 'other',
-      duration_minutes: 120,
-      prices: pmuThreeTier(10000, 12000, 15000),
-    },
-    {
-      name: 'Powder Brows',
-      slug: 'powder-brows',
-      category: 'other',
-      duration_minutes: 120,
-      prices: pmuThreeTier(8000, 10000, 12000),
-    },
-    {
-      name: 'Nano Brows',
-      slug: 'nano-brows',
-      category: 'other',
-      duration_minutes: 120,
-      prices: pmuThreeTier(10000, 12000, 15000),
-    },
-    {
-      name: 'Lip Blush',
-      slug: 'lip-blush',
-      category: 'other',
-      duration_minutes: 120,
-      prices: pmuThreeTier(8000, 10000, 12000),
-    },
-    {
-      name: 'Eyeliner',
-      slug: 'eyeliner',
-      category: 'other',
-      duration_minutes: 120,
-      prices: pmuThreeTier(8000, 10000, 12000),
-    },
-    {
-      name: 'Beauty Mark',
-      slug: 'beauty-mark',
-      category: 'other',
-      duration_minutes: 60,
-      prices: pmuThreeTier(3000, 4000, 5000),
-    },
-    {
-      name: 'Scalp Micropigmentation',
-      slug: 'scalp-micropigmentation',
-      category: 'other',
-      duration_minutes: 180,
-      prices: pmuThreeTier(15000, 18000, 22000),
-    },
-    {
-      name: 'Scalp Micropigmentation Hairline',
-      slug: 'scalp-micropigmentation-hairline',
-      category: 'other',
-      duration_minutes: 180,
-      prices: pmuThreeTier(15000, 18000, 22000),
-    },
-    {
-      name: 'Freckle Tattoo',
-      slug: 'freckle-tattoo',
-      category: 'other',
-      duration_minutes: 60,
-      prices: pmuThreeTier(3000, 4000, 5000),
-    },
-    {
-      name: 'Areola Micropigmentation',
-      slug: 'areola-micropigmentation',
-      category: 'other',
-      duration_minutes: 120,
-      prices: vipNm(10000, 12000),
-    },
-    {
-      name: 'Scar Camouflage',
-      slug: 'scar-camouflage',
-      category: 'other',
-      duration_minutes: 120,
-      prices: vipNm(10000, 12000),
-    },
-    {
-      name: 'Stretch Mark Camouflage',
-      slug: 'stretch-mark-camouflage',
-      category: 'other',
-      duration_minutes: 180,
-      prices: vipNm(15000, 18000),
-    },
+    { name: 'Ombré Powder Brows', slug: 'pm-ombre-powder-brows', category: 'other', duration_minutes: 90, ...pmu(9519, 5099, 6799) },
+    { name: '6Ds Microblading', slug: 'pm-6ds-microblading', category: 'other', duration_minutes: 90, ...pmu(10219, 5474, 7299) },
+    { name: 'Premium Combi Brows', slug: 'pm-premium-combi-brows', category: 'other', duration_minutes: 90, ...pmu(11619, 6224, 8299) },
+    { name: 'Nano Machine Brows', slug: 'pm-nano-machine-brows', category: 'other', duration_minutes: 90, ...pmu(12319, 6599, 8799) },
+    { name: 'MicroWispy Brows', slug: 'pm-microwispy-brows', category: 'other', duration_minutes: 90, ...pmu(12879, 6899, 9199) },
+    { name: 'Full Lips Pigmentation', slug: 'pm-full-lips-pigmentation', category: 'other', duration_minutes: 90, ...pmu(13019, 6977, 9299) },
+    { name: 'Dark Lips Color Correction', slug: 'pm-dark-lips-color-correction', category: 'other', duration_minutes: 90, ...pmu(14700, 7875, 10500) },
+    { name: 'Classic Eyeliner Micropigmentation', slug: 'pm-classic-eyeliner', category: 'other', duration_minutes: 90, ...pmu(7419, 4493, 5990) },
+    { name: 'Winged Eyeliner Micropigmentation', slug: 'pm-winged-eyeliner', category: 'other', duration_minutes: 90, ...pmu(10219, 5624, 7499) },
+    { name: 'Dusty Eyeliner Micropigmentation', slug: 'pm-dusty-eyeliner', category: 'other', duration_minutes: 90, ...pmu(11619, 6374, 8499) },
+    { name: '2nd Session PMU Touch-up (6-8 weeks)', slug: 'pm-2nd-session-touchup', category: 'other', duration_minutes: 60, ...pmu(2799, 1499, 1999) },
+    { name: 'Semi-Annual Retouch Session (6-9 months)', slug: 'pm-semi-annual-retouch', category: 'other', duration_minutes: 60, ...pmu(4666, 2499, 3333) },
+    { name: 'PMU Yearly Retouch Session (10-12 months)', slug: 'pm-yearly-retouch', category: 'other', duration_minutes: 60, ...pmu(6533, 3499, 4665) },
+    { name: 'Extended Retouch Session (13-18 months)', slug: 'pm-extended-retouch', category: 'other', duration_minutes: 60, ...pmu(8400, 4499, 6000) },
+    { name: 'PMU Color Correction', slug: 'pm-color-correction', category: 'other', duration_minutes: 30, ...pmu(2425, 1299, 1732) },
+    { name: 'Tattoo Removal - Minimal Brows Tattoo', slug: 'pm-removal-minimal-brows', category: 'other', duration_minutes: 30, ...pmu(931, 499, 665) },
+    { name: 'Tattoo Removal - Full Brows Tattoo', slug: 'pm-removal-full-brows', category: 'other', duration_minutes: 30, ...pmu(3731, 1999, 2665) },
   ],
 };
 

@@ -167,7 +167,7 @@ export default function Loyalty() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Loyalty</h1>
+          <h1 className="text-2xl font-sans font-semibold text-neutral-900">Loyalty</h1>
           <p className="text-sm text-neutral-500 mt-1">Manage loyalty milestones and track customer progress</p>
         </div>
         <div className="flex gap-2">
@@ -211,11 +211,11 @@ export default function Loyalty() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                  <th className="px-6 py-3 font-medium">Plan Type</th>
-                  <th className="px-6 py-3 font-medium">Spend Threshold</th>
-                  <th className="px-6 py-3 font-medium">Reward %</th>
-                  <th className="px-6 py-3 font-medium">Status</th>
-                  <th className="px-6 py-3 font-medium text-right">Actions</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Plan Type</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Spend Threshold</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Reward %</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Status</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
@@ -227,10 +227,10 @@ export default function Loyalty() {
                     <td className="px-6 py-4"><StatusBadge status={m.is_active ? 'active' : 'inactive'} /></td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => openEditModal(m)} className="p-2 text-neutral-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
+                        <button onClick={() => openEditModal(m)} className="p-2 text-neutral-500 hover:text-primary-600 hover:bg-primary-50 rounded-md transition">
                           <Pencil size={16} />
                         </button>
-                        <button onClick={() => setDeleteId(m.id)} className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition">
+                        <button onClick={() => setDeleteId(m.id)} className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-md transition">
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -260,7 +260,7 @@ export default function Loyalty() {
               <option value="ELITE">Elite</option>
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Spend Threshold (₱)</label>
               <input type="number" step="0.01" className="input-field" {...register('spend_threshold', { required: 'Required', valueAsNumber: true })} />

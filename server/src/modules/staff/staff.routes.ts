@@ -14,6 +14,11 @@ import {
 
 const router = Router();
 
+router.get(
+  '/public/team',
+  staffController.listPublic
+);
+
 router.use(authenticate);
 
 router.get(

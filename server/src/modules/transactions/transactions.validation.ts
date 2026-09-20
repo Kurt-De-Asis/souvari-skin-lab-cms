@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 const transactionTypeEnum = z.enum(['sale', 'refund', 'adjustment']);
-const paymentMethodEnum = z.enum(['cash', 'credit_card', 'debit_card', 'bank_transfer', 'e_wallet', 'voucher']);
+const paymentMethodEnum = z.enum(['cash', 'gcash', 'gotyme', 'rcbc', 'paid_on_us']);
 const paymentStatusEnum = z.enum(['pending', 'paid', 'partial', 'refunded', 'voided']);
 
 const transactionItemSchema = z.object({
@@ -20,6 +20,9 @@ export const createTransactionSchema = z.object({
   appointment_id: z.number().int().positive().nullable().optional(),
   type: transactionTypeEnum.optional(),
   discount_amount: z.coerce.number().min(0).optional(),
+  discount_pct: z.coerce.number().min(0).max(100).optional(),
+  discount_reason: z.string().nullable().optional(),
+  discount_applied_by: z.number().int().positive().nullable().optional(),
   tax_amount: z.coerce.number().min(0).optional(),
   payment_method: paymentMethodEnum.nullable().optional(),
   payment_status: paymentStatusEnum.optional(),

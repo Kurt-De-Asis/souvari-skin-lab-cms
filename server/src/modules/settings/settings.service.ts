@@ -1,7 +1,15 @@
 import prisma from '../../config/database';
 import { UpdateSettingsInput } from './settings.validation';
 
-const PUBLIC_KEYS = ['clinic_name', 'clinic_hours', 'clinic_phone', 'clinic_address'];
+const PUBLIC_KEYS = [
+  'clinic_name',
+  'clinic_phone',
+  'clinic_email',
+  'clinic_address',
+  'business_days',
+  'business_hours_start',
+  'business_hours_end',
+];
 
 class SettingsService {
   async getAll() {

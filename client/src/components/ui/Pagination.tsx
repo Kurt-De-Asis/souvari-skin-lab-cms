@@ -22,10 +22,10 @@ export default function Pagination({ page, totalPages, total, onPageChange }: Pa
   }
 
   return (
-    <div className="flex items-center justify-between mt-4">
-      <p className="text-sm text-neutral-500">{total} total results</p>
-      <div className="flex items-center gap-1">
-        <button onClick={() => onPageChange(page - 1)} disabled={page <= 1} className="p-2 rounded-lg text-neutral-500 hover:bg-neutral-100 disabled:opacity-30">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-y-3 gap-x-4 mt-4">
+      <p className="text-sm text-neutral-500 order-2 sm:order-1">{total} total results</p>
+      <div className="flex items-center gap-1 order-1 sm:order-2 flex-wrap justify-center">
+        <button onClick={() => onPageChange(page - 1)} disabled={page <= 1} className="p-2 rounded-md border border-neutral-200 bg-white text-neutral-500 hover:bg-neutral-100 disabled:opacity-30">
           <ChevronLeft size={16} />
         </button>
         {pages.map((p, i) =>
@@ -35,13 +35,13 @@ export default function Pagination({ page, totalPages, total, onPageChange }: Pa
             <button
               key={p}
               onClick={() => onPageChange(p)}
-              className={`w-8 h-8 rounded-lg text-sm font-medium ${p === page ? 'bg-primary-600 text-white' : 'text-neutral-600 hover:bg-neutral-100'}`}
+              className={`w-9 h-9 rounded-md border text-sm font-medium ${p === page ? 'bg-primary-500 border-primary-500 text-white' : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-100'}`}
             >
               {p}
             </button>
           )
         )}
-        <button onClick={() => onPageChange(page + 1)} disabled={page >= totalPages} className="p-2 rounded-lg text-neutral-500 hover:bg-neutral-100 disabled:opacity-30">
+        <button onClick={() => onPageChange(page + 1)} disabled={page >= totalPages} className="p-2 rounded-md border border-neutral-200 bg-white text-neutral-500 hover:bg-neutral-100 disabled:opacity-30">
           <ChevronRight size={16} />
         </button>
       </div>

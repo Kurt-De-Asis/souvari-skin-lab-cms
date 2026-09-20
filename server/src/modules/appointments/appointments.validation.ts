@@ -12,12 +12,29 @@ const appointmentStatusEnum = z.enum([
 
 export const createAppointmentSchema = z.object({
   customer_id: z.number().int().positive('Customer ID is required'),
-  staff_id: z.number().int().positive('Staff ID is required'),
+  staff_id: z.number().int().positive('Staff ID is required').optional(),
   service_id: z.number().int().positive('Service ID is required'),
   appointment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
   start_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Start time must be in HH:MM format'),
   end_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'End time must be in HH:MM format').optional(),
+  membership_code: z.string().min(1).optional(),
   notes: z.string().nullable().optional(),
+});
+
+export const createGroupAppointmentSchema = z.object({
+  customer_id: z.number().int().positive('Customer ID is required'),
+  staff_id: z.number().int().positive('Staff ID is required').optional(),
+  service_ids: z.array(z.number().int().positive('Service ID is required')).min(1, 'At least one service is required'),
+  appointment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
+  start_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Start time must be in HH:MM format'),
+  membership_code: z.string().min(1).optional(),
+  notes: z.string().nullable().optional(),
+  payment: z
+    .object({
+      payment_method: z.enum(['cash', 'gcash', 'gotyme', 'rcbc', 'paid_on_us']),
+      amount_tendered: z.number().nonnegative().optional(),
+    })
+    .optional(),
 });
 
 export const updateAppointmentSchema = z.object({
@@ -28,6 +45,8 @@ export const updateAppointmentSchema = z.object({
   end_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   status: appointmentStatusEnum.optional(),
   cancellation_reason: z.string().nullable().optional(),
+  reschedule_reason: z.string().nullable().optional(),
+  membership_code: z.string().min(1).optional(),
   notes: z.string().nullable().optional(),
 });
 
@@ -54,6 +73,7 @@ export const updateStatusSchema = z.object({
 });
 
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>;
+export type CreateGroupAppointmentInput = z.infer<typeof createGroupAppointmentSchema>;
 export type UpdateAppointmentInput = z.infer<typeof updateAppointmentSchema>;
 export type ListAppointmentsQuery = z.infer<typeof listAppointmentsQuerySchema>;
 export type UpdateStatusInput = z.infer<typeof updateStatusSchema>;

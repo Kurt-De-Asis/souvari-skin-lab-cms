@@ -11,5 +11,11 @@ export const appointmentTrendsQuerySchema = z.object({
   end_date: z.string().optional(),
 });
 
+export const summaryQuerySchema = z.object({
+  start_date: z.string().optional(),
+  end_date: z.string().optional(),
+});
+
 export type RevenueQuery = z.infer<typeof revenueQuerySchema>;
 export type AppointmentTrendsQuery = z.infer<typeof appointmentTrendsQuerySchema>;
+export type SummaryQuery = z.infer<typeof summaryQuerySchema>;

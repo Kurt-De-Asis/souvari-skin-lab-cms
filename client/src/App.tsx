@@ -3,6 +3,7 @@ import { useAuth } from './context/AuthContext';
 import PublicLayout from './components/layout/PublicLayout';
 import DashboardLayout from './components/layout/DashboardLayout';
 import LoadingSpinner from './components/shared/LoadingSpinner';
+import ScrollToTop from './components/ScrollToTop';
 
 import Home from './pages/public/Home';
 import About from './pages/public/About';
@@ -18,13 +19,11 @@ import Register from './pages/auth/Register';
 import CustomerDashboard from './pages/customer/Dashboard';
 import CustomerAppointments from './pages/customer/Appointments';
 import CustomerBookAppointment from './pages/customer/BookAppointment';
-import CustomerHistory from './pages/customer/History';
 import CustomerTransactions from './pages/customer/Transactions';
 import CustomerNotifications from './pages/customer/Notifications';
 import CustomerProfile from './pages/customer/Profile';
 import CustomerChatbot from './pages/customer/Chatbot';
 import CustomerMembership from './pages/customer/Membership';
-import CustomerPlatinumPrivileges from './pages/customer/PlatinumPrivileges';
 
 import StaffDashboard from './pages/staff/Dashboard';
 import StaffAppointments from './pages/staff/Appointments';
@@ -34,6 +33,7 @@ import StaffNotifications from './pages/staff/Notifications';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminCustomers from './pages/admin/Customers';
 import AdminStaff from './pages/admin/Staff';
+import AdminShifts from './pages/admin/Shifts';
 import AdminServices from './pages/admin/Services';
 import AdminNewService from './pages/admin/NewService';
 import AdminProducts from './pages/admin/Products';
@@ -45,11 +45,7 @@ import AdminAnalytics from './pages/admin/Analytics';
 import AdminSettings from './pages/admin/Settings';
 import AdminMembershipPlans from './pages/admin/MembershipPlans';
 import AdminMemberships from './pages/admin/Memberships';
-import AdminReferrals from './pages/admin/Referrals';
-import AdminCatalog from './pages/admin/Catalog';
-import AdminPricingMatrix from './pages/admin/PricingMatrix';
 import AdminPackages from './pages/admin/Packages';
-import AdminMembershipFamilies from './pages/admin/MembershipFamilies';
 import AdminNotifications from './pages/admin/Notifications';
 
 import NotFound from './pages/errors/NotFound';
@@ -67,7 +63,9 @@ export default function App() {
   if (loading) return <LoadingSpinner fullScreen />;
 
   return (
-    <Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
       {/* Public */}
       <Route element={<PublicLayout />}>
         <Route path="/" element={<Home />} />
@@ -88,19 +86,18 @@ export default function App() {
         <Route index element={<CustomerDashboard />} />
         <Route path="appointments" element={<CustomerAppointments />} />
         <Route path="book" element={<CustomerBookAppointment />} />
-        <Route path="history" element={<CustomerHistory />} />
         <Route path="transactions" element={<CustomerTransactions />} />
         <Route path="notifications" element={<CustomerNotifications />} />
         <Route path="profile" element={<CustomerProfile />} />
         <Route path="chat" element={<CustomerChatbot />} />
         <Route path="membership" element={<CustomerMembership />} />
-        <Route path="privileges" element={<CustomerPlatinumPrivileges />} />
       </Route>
 
       {/* Staff */}
       <Route path="/staff" element={<ProtectedRoute allowedRoles={['staff']}><DashboardLayout role="staff" /></ProtectedRoute>}>
         <Route index element={<StaffDashboard />} />
         <Route path="appointments" element={<StaffAppointments />} />
+        <Route path="calendar" element={<AdminCalendar />} />
         <Route path="schedule" element={<StaffSchedule />} />
         <Route path="notifications" element={<StaffNotifications />} />
       </Route>
@@ -110,6 +107,7 @@ export default function App() {
         <Route index element={<AdminDashboard />} />
         <Route path="customers" element={<AdminCustomers />} />
         <Route path="staff" element={<AdminStaff />} />
+        <Route path="shifts" element={<AdminShifts />} />
         <Route path="services" element={<AdminServices />} />
         <Route path="services/new" element={<AdminNewService />} />
         <Route path="services/:id/edit" element={<AdminNewService />} />
@@ -122,15 +120,12 @@ export default function App() {
         <Route path="settings" element={<AdminSettings />} />
         <Route path="membership-plans" element={<AdminMembershipPlans />} />
         <Route path="memberships" element={<AdminMemberships />} />
-        <Route path="referrals" element={<AdminReferrals />} />
-        <Route path="catalog" element={<AdminCatalog />} />
-        <Route path="pricing-matrix" element={<AdminPricingMatrix />} />
         <Route path="packages" element={<AdminPackages />} />
-        <Route path="membership-families" element={<AdminMembershipFamilies />} />
         <Route path="notifications" element={<AdminNotifications />} />
       </Route>
 
       <Route path="*" element={<NotFound />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }

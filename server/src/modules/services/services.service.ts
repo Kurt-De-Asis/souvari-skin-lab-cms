@@ -16,6 +16,49 @@ import {
 } from './services.validation';
 
 class ServicesService {
+  private categoryLabel(category: string): string {
+    const labels: Record<string, string> = {
+      facial: 'Facial',
+      body: 'Body',
+      hair_removal: 'Hair Removal',
+      skin_rejuvenation: 'Skin Rejuvenation',
+      injection: 'Injection',
+      laser: 'Laser',
+      consultation: 'Consultation',
+      package: 'Package',
+      signature_facial: 'Signature Facial',
+      other: '',
+    };
+    return labels[category] ?? '';
+  }
+
+  private withFallbackDescription<T extends { description?: string | null; category?: string; name?: string; inclusions?: unknown }>(service: T): T {
+    if (service.description && service.description.trim() !== '') {
+      return service;
+    }
+    const label = this.categoryLabel(service.category ?? '');
+    const parts: string[] = [];
+    if (label) {
+      parts.push(`A professional ${label.toLowerCase()} treatment at SOUVARI Skin Lab.`);
+    } else {
+      parts.push(`A professional treatment offered at SOUVARI Skin Lab.`);
+    }
+    const inclusions = service.inclusions;
+    if (Array.isArray(inclusions) && inclusions.length > 0) {
+      const list = inclusions.filter((i): i is string => {
+        if (typeof i !== 'string' || i.trim() === '') return false;
+        // Skip entries that are just the service name itself
+        if (service.name && i.trim() === service.name.trim()) return false;
+        return true;
+      });
+      if (list.length > 0) {
+        parts.push(`Includes: ${list.join(', ')}.`);
+      } else if (inclusions.length > 1) {
+        parts.push(`Includes ${inclusions.length} sessions.`);
+      }
+    }
+    return { ...service, description: parts.join(' ') };
+  }
   async list(query: ServiceQueryInput): Promise<PaginatedResult<any>> {
     const { page, limit, skip } = getPaginationParams(query);
 
@@ -70,7 +113,7 @@ class ServicesService {
       ];
     }
 
-    const [data, total] = await Promise.all([
+    const [data, total, activeStaff] = await Promise.all([
       prisma.services.findMany({
         where,
         skip,
@@ -82,32 +125,78 @@ class ServicesService {
           description: true,
           category: true,
           price: true,
+          vip_price: true,
+          non_member_price: true,
           duration_minutes: true,
           image_url: true,
-          service_staff: {
-            include: {
-              staff: {
-                select: {
-                  id: true,
-                  first_name: true,
-                  last_name: true,
-                  position: true,
-                  avatar_url: true,
-                },
-              },
-            },
-          },
+          needs_verification: true,
+          inclusions: true,
         },
       }),
       prisma.services.count({ where }),
+      prisma.staff.findMany({
+        where: { deleted_at: null, status: 'active' },
+        select: {
+          id: true,
+          first_name: true,
+          last_name: true,
+          position: true,
+          avatar_url: true,
+        },
+      }),
     ]);
 
     const dataWithStaff = data.map((s: any) => ({
       ...s,
-      staff: s.service_staff?.map((ss: any) => ss.staff) || [],
-    }));
+      price: s.price ? Number(s.price) : null,
+      vip_price: s.vip_price ? Number(s.vip_price) : null,
+      non_member_price: s.non_member_price ? Number(s.non_member_price) : null,
+      staff: activeStaff,
+    })).map((s: any) => this.withFallbackDescription(s));;
 
     return createPaginatedResult(dataWithStaff, total, { page, limit, skip });
+  }
+
+  async getByIdPublic(id: number) {
+    const service = await prisma.services.findFirst({
+      where: { id, deleted_at: null, is_active: true, status: 'active' },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        category: true,
+        price: true,
+        vip_price: true,
+        non_member_price: true,
+        duration_minutes: true,
+        image_url: true,
+        needs_verification: true,
+        inclusions: true,
+      },
+    });
+
+    if (!service) {
+      throw new AppError('Service not found', 404);
+    }
+
+    const activeStaff = await prisma.staff.findMany({
+      where: { deleted_at: null, status: 'active' },
+      select: {
+        id: true,
+        first_name: true,
+        last_name: true,
+        position: true,
+        avatar_url: true,
+      },
+    });
+
+    return this.withFallbackDescription({
+      ...service,
+      price: service.price ? Number(service.price) : null,
+      vip_price: service.vip_price ? Number(service.vip_price) : null,
+      non_member_price: service.non_member_price ? Number(service.non_member_price) : null,
+      staff: activeStaff,
+    });
   }
 
   async getById(id: number) {

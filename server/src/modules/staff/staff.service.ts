@@ -1,5 +1,6 @@
 import prisma from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
+import { hashPassword } from '../../utils/password';
 import { getPaginationParams, createPaginatedResult, PaginatedResult } from '../../utils/pagination';
 import {
   CreateStaffInput,
@@ -19,6 +20,7 @@ const staffInclude = {
       status: true,
     },
   },
+  schedules: true,
   service_staff: {
     include: {
       service: {
@@ -64,6 +66,20 @@ export class StaffService {
     return createPaginatedResult(data, total, { page, limit, skip });
   }
 
+  async findPublicTeam() {
+    const staff = await prisma.staff.findMany({
+      where: { deleted_at: null, status: 'active' },
+      select: {
+        id: true,
+        first_name: true,
+        last_name: true,
+        position: true,
+      },
+      orderBy: { last_name: 'asc' },
+    });
+    return staff;
+  }
+
   async findById(id: number) {
     const staff = await prisma.staff.findFirst({
       where: { id, deleted_at: null },
@@ -78,30 +94,51 @@ export class StaffService {
   }
 
   async create(data: CreateStaffInput) {
-    const existingUser = await prisma.users.findUnique({ where: { id: data.user_id } });
+    // Link to an existing user (by id) OR create a new user from email + password.
+    let userId = data.user_id;
+    if (userId === undefined) {
+      if (!data.email || !data.password) {
+        throw new AppError('Provide an existing user_id or an email and password to create a staff account', 400);
+      }
+      const existingEmail = await prisma.users.findUnique({ where: { email: data.email } });
+      if (existingEmail) {
+        throw new AppError('Email already registered', 409);
+      }
+      const newUser = await prisma.users.create({
+        data: {
+          email: data.email,
+          phone: data.phone ?? null,
+          password_hash: await hashPassword(data.password),
+          role: 'staff',
+          status: 'active',
+        },
+      });
+      userId = newUser.id;
+    }
+
+    const existingUser = await prisma.users.findUnique({ where: { id: userId } });
     if (!existingUser) {
       throw new AppError('User not found', 404);
     }
 
-    const existingStaff = await prisma.staff.findUnique({ where: { user_id: data.user_id } });
+    const existingStaff = await prisma.staff.findUnique({ where: { user_id: userId } });
     if (existingStaff) {
       throw new AppError('Staff profile already exists for this user', 409);
     }
 
     await prisma.users.update({
-      where: { id: data.user_id },
+      where: { id: userId },
       data: { role: 'staff' },
     });
 
     const staff = await prisma.staff.create({
       data: {
-        user_id: data.user_id,
+        user_id: userId,
         first_name: data.first_name,
         last_name: data.last_name,
         position: data.position as any,
         job_title: data.job_title ?? null,
         permission_level: data.permission_level as any ?? 'medium',
-        rating: data.rating ?? null,
         status: data.status as any,
         hire_date: data.hire_date ? new Date(data.hire_date) : null,
         date_of_birth: data.date_of_birth ? new Date(data.date_of_birth) : null,
@@ -131,7 +168,6 @@ export class StaffService {
     if (data.position !== undefined) updateData.position = data.position;
     if (data.job_title !== undefined) updateData.job_title = data.job_title;
     if (data.permission_level !== undefined) updateData.permission_level = data.permission_level;
-    if (data.rating !== undefined) updateData.rating = data.rating;
     if (data.status !== undefined) updateData.status = data.status;
     if (data.gender !== undefined) updateData.gender = data.gender;
     if (data.address !== undefined) updateData.address = data.address;
@@ -139,10 +175,34 @@ export class StaffService {
     if (data.bio !== undefined) updateData.bio = data.bio;
     if (data.notes !== undefined) updateData.notes = data.notes;
 
-    const staff = await prisma.staff.update({
-      where: { id },
-      data: updateData,
-      include: staffInclude,
+    // Persist login credentials (email / phone / password) on the linked user.
+    const userUpdate: any = {};
+    if (data.email !== undefined || data.phone !== undefined || data.password !== undefined) {
+      const existingUser = await prisma.users.findUnique({ where: { id: existing.user_id } });
+      if (!existingUser) {
+        throw new AppError('Linked user account not found', 404);
+      }
+
+      if (data.email !== undefined && data.email !== existingUser.email) {
+        const taken = await prisma.users.findUnique({ where: { email: data.email } });
+        if (taken && taken.id !== existingUser.id) {
+          throw new AppError('Email already in use by another account', 409);
+        }
+        userUpdate.email = data.email;
+      }
+      if (data.phone !== undefined) userUpdate.phone = data.phone;
+      if (data.password !== undefined) userUpdate.password_hash = await hashPassword(data.password);
+    }
+
+    const staff = await prisma.$transaction(async (tx) => {
+      if (Object.keys(userUpdate).length > 0) {
+        await tx.users.update({ where: { id: existing.user_id }, data: userUpdate });
+      }
+      return tx.staff.update({
+        where: { id },
+        data: updateData,
+        include: staffInclude,
+      });
     });
 
     return staff;

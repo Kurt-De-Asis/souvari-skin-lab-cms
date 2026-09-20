@@ -17,13 +17,13 @@ import {
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
+import formatPaymentMethod from '../../utils/formatPaymentMethod';
 import { useAuth } from '@/context/AuthContext';
 import {
   membershipsApi,
   membershipPlansApi,
   loyaltyApi,
   monthlyPerksApi,
-  referralsApi,
   membershipGiftsApi,
 } from '@/api';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -52,6 +52,13 @@ export default function Membership() {
   const [plans, setPlans] = useState<any[]>([]);
   const [plansLoading, setPlansLoading] = useState(true);
   const [availingPlanId, setAvailingPlanId] = useState<number | null>(null);
+  const [availPaymentOpen, setAvailPaymentOpen] = useState(false);
+  const [availPaymentPlan, setAvailPaymentPlan] = useState<any>(null);
+  const [availSubmitting, setAvailSubmitting] = useState(false);
+  const [availPaymentMethod, setAvailPaymentMethod] = useState('cash');
+  const [availPaymentType, setAvailPaymentType] = useState<'FULL' | 'DOWN_PAYMENT'>('FULL');
+  const [availAmountPaid, setAvailAmountPaid] = useState(0);
+  const PAYMENT_METHODS = ['cash', 'gcash', 'gotyme', 'rcbc', 'paid_on_us'];
 
   useEffect(() => {
     const fetchPlans = async () => {
@@ -69,26 +76,42 @@ export default function Membership() {
   }, []);
 
   const handleAvailPlan = async (planId: number) => {
-    setAvailingPlanId(planId);
+    const plan = plans.find((p: any) => p.id === planId);
+    if (plan) {
+      setAvailPaymentPlan(plan);
+      setAvailAmountPaid(Number(plan.promo_price ?? plan.regular_price ?? 0));
+      setAvailPaymentOpen(true);
+    }
+  };
+
+  const handleAvailPaymentSubmit = async () => {
+    if (!availPaymentPlan) return;
+    setAvailSubmitting(true);
     try {
-      await membershipsApi.avail({ plan_id: planId });
-      toast.success('Membership availed! Welcome to Souvari.');
+      await membershipsApi.avail({
+        plan_id: availPaymentPlan.id,
+        payment_method: availPaymentMethod,
+        payment_type: availPaymentType,
+        amount_paid: availAmountPaid,
+      });
+      toast.success('Membership availed!');
+      setAvailPaymentOpen(false);
+      setAvailPaymentPlan(null);
       setMembership(null);
       setLoading(true);
       await fetchData();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to avail membership');
     } finally {
-      setAvailingPlanId(null);
+      setAvailSubmitting(false);
     }
   };
 
   const fetchData = useCallback(async () => {
     try {
-      const [memRes, perkRes, refRes, milestoneRes, giftRes] = await Promise.allSettled([
+      const [memRes, perkRes, milestoneRes, giftRes] = await Promise.allSettled([
         membershipsApi.getMe(),
         monthlyPerksApi.getMe(),
-        referralsApi.getBalance(),
         loyaltyApi.listMilestones(),
         membershipGiftsApi.getMe(),
       ]);
@@ -105,11 +128,6 @@ export default function Membership() {
       }
       if (perkRes.status === 'fulfilled') {
         setPerk(perkRes.value.data.data);
-      }
-      if (refRes.status === 'fulfilled') {
-        const refData = refRes.value.data.data;
-        setReferralBalance(refData?.balance || 0);
-        setReferralCode(refData?.code || refData?.referral_code || '');
       }
       if (milestoneRes.status === 'fulfilled') {
         const mData = milestoneRes.value.data.data;
@@ -167,8 +185,8 @@ export default function Membership() {
     }
     setSubmitting(true);
     try {
-      await referralsApi.create({ name: referralName.trim(), email: referralEmail.trim() });
-      toast.success('Referral sent!');
+      // TODO: implement referral API
+      toast.success('Referral feature coming soon!');
       setReferralModalOpen(false);
       setReferralName('');
       setReferralEmail('');
@@ -312,7 +330,8 @@ export default function Membership() {
   const loyaltyProgress = Math.min(100, (totalSpending / loyaltyTarget) * 100);
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
       <h1 className="text-2xl font-bold text-neutral-900">Membership</h1>
 
       {/* Membership Card */}
@@ -324,7 +343,7 @@ export default function Membership() {
           <div className="flex items-start justify-between mb-8">
             <div>
               <p className="text-neutral-400 text-xs uppercase tracking-widest mb-1">SOUVARI SKIN LAB</p>
-              <p className="font-display text-2xl font-semibold">{planName}</p>
+              <p className="font-sans text-2xl font-semibold">{planName}</p>
             </div>
             <div className="text-right">
               <StatusBadge status={membership.status || 'active'} />
@@ -734,5 +753,73 @@ export default function Membership() {
         </div>
       </Modal>
     </div>
+
+      {/* Avail Payment Modal */}
+      {availPaymentOpen && availPaymentPlan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="w-full max-w-md bg-white rounded-md shadow-xl">
+            <div className="p-4 border-b border-neutral-200">
+              <h2 className="text-lg font-semibold text-neutral-900">Avail Membership</h2>
+              <p className="text-sm text-neutral-500 mt-1">{availPaymentPlan.name}</p>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="bg-neutral-50 p-3 rounded-md">
+                <div className="flex justify-between text-sm">
+                  <span>Plan Price</span>
+                  <span className="font-semibold">₱{Number(availPaymentPlan.promo_price ?? availPaymentPlan.regular_price ?? 0).toLocaleString()}</span>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-neutral-700">Payment Type</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setAvailPaymentType('FULL'); setAvailAmountPaid(Number(availPaymentPlan.promo_price ?? availPaymentPlan.regular_price ?? 0)); }}
+                    className={`flex-1 py-2 px-3 text-sm rounded-md border transition ${availPaymentType === 'FULL' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 text-neutral-700 hover:border-primary-500'}`}
+                  >
+                    Full Payment
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAvailPaymentType('DOWN_PAYMENT'); setAvailAmountPaid(Math.round(Number(availPaymentPlan.promo_price ?? availPaymentPlan.regular_price ?? 0) * 0.3)); }}
+                    className={`flex-1 py-2 px-3 text-sm rounded-md border transition ${availPaymentType === 'DOWN_PAYMENT' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 text-neutral-700 hover:border-primary-500'}`}
+                  >
+                    Down Payment (30%)
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-neutral-700">Payment Method</label>
+                <select value={availPaymentMethod} onChange={e => setAvailPaymentMethod(e.target.value)} className="select-field">
+                  {PAYMENT_METHODS.map(m => (
+                    <option key={m} value={m}>{formatPaymentMethod(m)}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-neutral-700">Amount Paid</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max={Number(availPaymentPlan.promo_price ?? availPaymentPlan.regular_price ?? 0)}
+                  value={availAmountPaid}
+                  onChange={e => setAvailAmountPaid(parseFloat(e.target.value) || 0)}
+                  className="input-field"
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t border-neutral-200 flex gap-3 justify-end">
+              <button onClick={() => { setAvailPaymentOpen(false); setAvailPaymentPlan(null); }} className="btn-secondary" disabled={availSubmitting}>
+                Cancel
+              </button>
+              <button onClick={handleAvailPaymentSubmit} disabled={availSubmitting} className="btn-primary">
+                {availSubmitting ? 'Processing...' : 'Confirm & Avail'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

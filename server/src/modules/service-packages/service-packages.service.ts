@@ -2,6 +2,14 @@ import prisma from '../../config/database';
 import { createPaginatedResult } from '../../utils/pagination';
 import { Prisma } from '@prisma/client';
 
+function normalizeInclusions(v: string | string[] | null | undefined): string[] | typeof Prisma.JsonNull {
+  let items: string[] = [];
+  if (Array.isArray(v)) items = v;
+  else if (typeof v === 'string') items = v.split(/[,\n]+/);
+  items = items.map((i) => i.trim()).filter(Boolean);
+  return items.length ? items : Prisma.JsonNull;
+}
+
 class ServicePackagesService {
   async list(query: any) {
     const { page = '1', limit = '20', group_slug, search } = query;
@@ -44,7 +52,7 @@ class ServicePackagesService {
         sessions_included: data.sessions_included ?? 7,
         session_price: data.session_price,
         ten_session_price: data.ten_session_price ?? null,
-        inclusions: data.inclusions ?? Prisma.JsonNull,
+        inclusions: normalizeInclusions(data.inclusions),
         savings_note: data.savings_note ?? null,
       },
       include: { service: true },
@@ -58,7 +66,7 @@ class ServicePackagesService {
         sessions_included: data.sessions_included,
         session_price: data.session_price,
         ten_session_price: data.ten_session_price,
-        inclusions: data.inclusions ?? undefined,
+        inclusions: data.inclusions === undefined ? undefined : normalizeInclusions(data.inclusions),
         savings_note: data.savings_note,
       },
       include: { service: true },

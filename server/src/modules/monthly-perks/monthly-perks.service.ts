@@ -112,6 +112,19 @@ export class MonthlyPerksService {
       },
     });
 
+    await prisma.membership_activity_logs.create({
+      data: {
+        membership_id: membershipId,
+        action: 'perk_used',
+        details: JSON.stringify({
+          year_month: perk.year_month,
+          discount_amount: discountAmount,
+          max_value: maxValue,
+        }),
+        performed_by: null,
+      },
+    });
+
     return updated;
   }
 
@@ -196,7 +209,7 @@ export class MonthlyPerksService {
         membership_id: membershipId,
         year_month: currentYearMonth,
         status: 'available',
-        max_value: membership.plan.promo_price,
+        max_value: 300,
         min_spend: 800,
       },
     });

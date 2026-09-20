@@ -21,17 +21,15 @@ import treatmentRecordsRoutes from './modules/treatment-records/treatment-record
 import membershipPlansRoutes from './modules/membership-plans/membership-plans.routes';
 import membershipsRoutes from './modules/memberships/memberships.routes';
 import loyaltyRoutes from './modules/loyalty/loyalty.routes';
-import referralsRoutes from './modules/referrals/referrals.routes';
 import monthlyPerksRoutes from './modules/monthly-perks/monthly-perks.routes';
 import membershipGiftsRoutes from './modules/membership-gifts/membership-gifts.routes';
-import servicePricesRoutes from './modules/service-prices/service-prices.routes';
 import servicePackagesRoutes from './modules/service-packages/service-packages.routes';
-import membershipFamiliesRoutes from './modules/membership-families/membership-families.routes';
-import dataQualityRoutes from './modules/data-quality/data-quality.routes';
 import posRoutes from './modules/pos/pos.routes';
 import serviceCategoriesRoutes from './modules/service-categories/service-categories.routes';
 import resourcesRoutes from './modules/resources/resources.routes';
 import serviceAddonsRoutes from './modules/service-addons/service-addons.routes';
+import contactRoutes from './modules/contact/contact.routes';
+import reviewsRoutes from './modules/reviews/reviews.routes';
 
 const app = express();
 
@@ -76,17 +74,15 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/membership-plans', membershipPlansRoutes);
 app.use('/api/memberships', membershipsRoutes);
 app.use('/api/loyalty', loyaltyRoutes);
-app.use('/api/referrals', referralsRoutes);
 app.use('/api/monthly-perks', monthlyPerksRoutes);
 app.use('/api/membership-gifts', membershipGiftsRoutes);
-app.use('/api/service-prices', servicePricesRoutes);
 app.use('/api/service-packages', servicePackagesRoutes);
-app.use('/api/membership-families', membershipFamiliesRoutes);
-app.use('/api/data-quality', dataQualityRoutes);
 app.use('/api/pos', posRoutes);
 app.use('/api/service-categories', serviceCategoriesRoutes);
 app.use('/api/resources', resourcesRoutes);
 app.use('/api/service-addons', serviceAddonsRoutes);
+app.use('/api/contact', contactRoutes);
+app.use('/api/reviews', reviewsRoutes);
 
 // Error handling
 app.use(notFoundHandler);

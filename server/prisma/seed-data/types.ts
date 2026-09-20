@@ -10,6 +10,13 @@ export interface CatalogServiceInput {
   variants?: VariantInput[];
   prices: PriceRowInput[];
   package?: PackageInput;
+  external_id?: string;
+  sku?: string;
+  treatment_type?: string;
+  online_booking?: string;
+  available_for?: string;
+  voucher_sales?: string;
+  commissions?: string;
 }
 
 export interface VariantInput {

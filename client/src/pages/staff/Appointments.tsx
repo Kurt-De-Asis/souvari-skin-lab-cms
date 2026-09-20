@@ -6,7 +6,6 @@ import {
   UserCheck,
   XCircle,
   ClipboardCheck,
-  Star,
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
@@ -16,6 +15,8 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Modal from '@/components/ui/Modal';
+import CheckoutModal from '@/components/checkout/CheckoutModal';
+import CustomerDetailDrawer from '@/components/admin/CustomerDetailDrawer';
 
 interface Appointment {
   id: number;
@@ -26,6 +27,8 @@ interface Appointment {
   notes: string | null;
   customer: { id: number; first_name: string; last_name: string } | null;
   service: { id: number; name: string; duration_minutes: number } | null;
+  services?: { id: number; name: string; price?: number; duration_minutes?: number }[];
+  paid?: boolean;
 }
 
 const STATUS_OPTIONS = [
@@ -45,12 +48,11 @@ export default function Appointments() {
   const [statusFilter, setStatusFilter] = useState('');
   const [dateFilter, setDateFilter] = useState(dayjs().format('YYYY-MM-DD'));
 
-  const [completeModalOpen, setCompleteModalOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [treatmentNotes, setTreatmentNotes] = useState('');
   const [recommendations, setRecommendations] = useState('');
-  const [satisfactionRating, setSatisfactionRating] = useState(5);
-  const [submitting, setSubmitting] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
 
   useEffect(() => {
     fetchAppointments();
@@ -82,36 +84,17 @@ export default function Appointments() {
   };
 
   const openCompleteModal = (appointment: Appointment) => {
+    if (appointment.paid) {
+      handleUpdateStatus(appointment.id, 'completed');
+      return;
+    }
     setSelectedAppointment(appointment);
     setTreatmentNotes('');
     setRecommendations('');
-    setSatisfactionRating(5);
-    setCompleteModalOpen(true);
+    setCheckoutOpen(true);
   };
 
-  const handleCompleteWithRecord = async () => {
-    if (!selectedAppointment || !user?.staff) return;
-    setSubmitting(true);
-    try {
-      await appointmentsApi.updateStatus(selectedAppointment.id, { status: 'completed' });
-      await treatmentRecordsApi.create({
-        appointment_id: selectedAppointment.id,
-        customer_id: selectedAppointment.customer?.id,
-        staff_id: user.staff.id,
-        service_id: selectedAppointment.service?.id,
-        notes: treatmentNotes,
-        recommendations,
-        satisfaction_rating: satisfactionRating,
-      });
-      toast.success('Appointment completed and treatment record created');
-      setCompleteModalOpen(false);
-      fetchAppointments();
-    } catch {
-      toast.error('Failed to complete appointment');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  
 
   const getStatusActions = (appt: Appointment) => {
     switch (appt.status) {
@@ -139,7 +122,7 @@ export default function Appointments() {
           <>
             <button
               onClick={() => handleUpdateStatus(appt.id, 'checked_in')}
-              className="btn-ghost text-xs text-blue-600 hover:text-blue-700"
+              className="btn-ghost text-xs text-primary-700 hover:text-primary-700"
             >
               <UserCheck size={14} />
               Check In
@@ -180,7 +163,7 @@ export default function Appointments() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-neutral-900">Appointments</h1>
+        <h1 className="text-2xl font-sans font-semibold text-neutral-900">Appointments</h1>
         <p className="text-sm text-neutral-500 mt-1">Manage your daily appointments</p>
       </div>
 
@@ -242,11 +225,23 @@ export default function Appointments() {
                       {dayjs(`2000-01-01 ${appt.end_time}`).format('h:mm A')}
                     </td>
                     <td className="px-4 py-3 text-neutral-900 font-medium">
-                      {appt.customer
-                        ? `${appt.customer.first_name} ${appt.customer.last_name}`
-                        : '—'}
+                      {appt.customer ? (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCustomer(appt.customer)}
+                          className="font-medium text-neutral-900 hover:text-primary-600 underline decoration-neutral-300 hover:decoration-primary-600 transition text-left"
+                          title="View complete client records, notes, allergies, and history"
+                        >
+                          {appt.customer.first_name} {appt.customer.last_name}
+                        </button>
+                      ) : (
+                        '—'
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-neutral-700">{appt.service?.name || '—'}</td>
+                    <td className="px-4 py-3 text-neutral-700">
+                      {appt.service?.name || '—'}
+                      {appt.services && appt.services.length > 1 ? ` +${appt.services.length - 1}` : ''}
+                    </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={appt.status} />
                     </td>
@@ -263,84 +258,45 @@ export default function Appointments() {
         </div>
       )}
 
-      <Modal
-        open={completeModalOpen}
-        onClose={() => setCompleteModalOpen(false)}
-        title="Complete Appointment"
-      >
-        {selectedAppointment && (
-          <div className="space-y-4">
-            <div className="bg-neutral-50 rounded-lg p-3 text-sm">
-              <p className="font-medium text-neutral-900">
-                {selectedAppointment.customer?.first_name} {selectedAppointment.customer?.last_name}
-              </p>
-              <p className="text-neutral-600">{selectedAppointment.service?.name}</p>
-            </div>
+      <CheckoutModal
+        open={checkoutOpen}
+        onClose={() => { setCheckoutOpen(false); setSelectedAppointment(null); }}
+        onSuccess={() => { fetchAppointments(); toast.success('Appointment completed and payment recorded'); }}
+        appointmentId={selectedAppointment?.id}
+        customerId={selectedAppointment?.customer?.id ?? 0}
+        staffId={user?.staff?.id ?? 0}
+        services={
+          selectedAppointment
+            ? selectedAppointment.services && selectedAppointment.services.length > 0
+              ? selectedAppointment.services.map((s) => ({
+                  id: s.id,
+                  name: s.name,
+                  price: s.price ?? 0,
+                  duration: s.duration_minutes ?? 0,
+                  category: '',
+                  staff: [],
+                }))
+              : [{
+                  id: selectedAppointment.service?.id ?? 0,
+                  name: selectedAppointment.service?.name ?? '',
+                  price: 0,
+                  duration: selectedAppointment.service?.duration_minutes ?? 0,
+                  category: '',
+                  staff: [],
+                }]
+            : []
+        }
+        isStaff={true}
+        treatmentNotes={treatmentNotes}
+        treatmentRecommendations={recommendations}
+      />
 
-            <div>
-              <label className="label">Treatment Notes</label>
-              <textarea
-                rows={3}
-                value={treatmentNotes}
-                onChange={(e) => setTreatmentNotes(e.target.value)}
-                className="input-field"
-                placeholder="Describe the treatment performed..."
-              />
-            </div>
-
-            <div>
-              <label className="label">Recommendations</label>
-              <textarea
-                rows={2}
-                value={recommendations}
-                onChange={(e) => setRecommendations(e.target.value)}
-                className="input-field"
-                placeholder="Any follow-up recommendations..."
-              />
-            </div>
-
-            <div>
-              <label className="label">Customer Satisfaction</label>
-              <div className="flex gap-1 mt-1">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    onClick={() => setSatisfactionRating(star)}
-                    className="p-0.5"
-                  >
-                    <Star
-                      size={24}
-                      className={
-                        star <= satisfactionRating
-                          ? 'fill-yellow-400 text-yellow-400'
-                          : 'text-neutral-300'
-                      }
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-2">
-              <button
-                onClick={() => setCompleteModalOpen(false)}
-                className="btn-secondary"
-                disabled={submitting}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCompleteWithRecord}
-                className="btn-primary"
-                disabled={submitting}
-              >
-                {submitting ? 'Saving...' : 'Complete & Save Record'}
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      {/* Customer Detail Drawer */}
+      <CustomerDetailDrawer
+        open={selectedCustomer !== null}
+        onClose={() => setSelectedCustomer(null)}
+        customer={selectedCustomer}
+      />
     </div>
   );
 }

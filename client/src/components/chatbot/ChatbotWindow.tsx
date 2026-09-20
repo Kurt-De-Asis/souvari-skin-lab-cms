@@ -11,15 +11,18 @@ interface Message {
 
 interface ChatbotWindowProps {
   onClose: () => void;
+  className?: string;
 }
 
 const QUICK_REPLIES = [
   'What services do you offer?',
+  'What are your best-selling services?',
+  'What do you recommend?',
   'How much is a facial?',
   'What are your clinic hours?',
 ];
 
-export default function ChatbotWindow({ onClose }: ChatbotWindowProps) {
+export default function ChatbotWindow({ onClose, className = '' }: ChatbotWindowProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
@@ -101,7 +104,7 @@ export default function ChatbotWindow({ onClose }: ChatbotWindowProps) {
   };
 
   return (
-    <div className="fixed bottom-20 right-4 sm:right-6 w-[350px] max-w-[calc(100vw-2rem)] h-[500px] max-h-[calc(100vh-6rem)] bg-white rounded-2xl border border-neutral-200 shadow-lg flex flex-col z-50 overflow-hidden">
+    <div className={`fixed bottom-20 right-4 sm:right-6 w-[350px] max-w-[calc(100vw-2rem)] h-[500px] max-h-[calc(100vh-6rem)] bg-white rounded-md border border-neutral-200 flex flex-col z-50 overflow-hidden ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-100">
         <div className="flex items-center gap-2">
@@ -110,7 +113,7 @@ export default function ChatbotWindow({ onClose }: ChatbotWindowProps) {
           </div>
           <span className="text-sm font-semibold text-neutral-900">Clinic Assistant</span>
         </div>
-        <button onClick={onClose} className="p-1 rounded-lg hover:bg-neutral-100 transition text-neutral-400 hover:text-neutral-600" aria-label="Close chat">
+        <button onClick={onClose} className="p-1 rounded-md hover:bg-neutral-100 transition text-neutral-400 hover:text-neutral-600" aria-label="Close chat">
           <X size={18} />
         </button>
       </div>
@@ -130,8 +133,8 @@ export default function ChatbotWindow({ onClose }: ChatbotWindowProps) {
               <div
                 className={`px-3.5 py-2.5 text-sm leading-relaxed ${
                   msg.role === 'user'
-                    ? 'bg-neutral-900 text-white rounded-2xl rounded-br-md'
-                    : 'bg-neutral-100 text-neutral-900 rounded-2xl rounded-bl-md'
+                    ? 'bg-neutral-900 text-white rounded-md rounded-br-md'
+                    : 'bg-neutral-100 text-neutral-900 rounded-md rounded-bl-md'
                 }`}
               >
                 <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -162,7 +165,7 @@ export default function ChatbotWindow({ onClose }: ChatbotWindowProps) {
                 <Bot size={10} className="text-neutral-600" />
               </div>
             </div>
-            <div className="px-3.5 py-3 rounded-2xl rounded-bl-md bg-neutral-100">
+            <div className="px-3.5 py-3 rounded-md rounded-bl-md bg-neutral-100">
               <Loader2 size={14} className="animate-spin text-neutral-400" />
             </div>
           </div>
@@ -182,12 +185,12 @@ export default function ChatbotWindow({ onClose }: ChatbotWindowProps) {
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             disabled={sending}
-            className="flex-1 px-3.5 py-2 text-sm rounded-lg border border-neutral-200 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900 disabled:opacity-50"
+            className="flex-1 px-3.5 py-2 text-sm rounded-md border border-neutral-200 focus:border-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900 disabled:opacity-50"
           />
           <button
             onClick={handleSend}
             disabled={!input.trim() || sending}
-            className="p-2 rounded-lg bg-neutral-900 text-white hover:bg-neutral-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-2 rounded-md bg-neutral-900 text-white hover:bg-neutral-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label="Send message"
           >
             <Send size={14} />

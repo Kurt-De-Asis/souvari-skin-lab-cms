@@ -15,10 +15,16 @@ const envSchema = z.object({
   BACKEND_URL: z.string().default('http://localhost:3000'),
   AI_API_KEY: z.string().optional().default(''),
   AI_MODEL: z.string().default('gpt-3.5-turbo'),
+  AI_BASE_URL: z.string().optional().default(''),
   SMS_PROVIDER: z.string().default('mock'),
   SMS_API_KEY: z.string().optional().default(''),
   SMS_SENDER: z.string().default('Souvari Skin Lab'),
   TEXTBEE_DEVICE_ID: z.string().optional().default(''),
+  MAIL_HOST: z.string().default('smtp.gmail.com'),
+  MAIL_PORT: z.coerce.number().default(587),
+  MAIL_USER: z.string().default(''),
+  MAIL_PASS: z.string().default(''),
+  MAIL_FROM_NAME: z.string().default('Souvari Skin Lab'),
 });
 
 const parsed = envSchema.safeParse(process.env);

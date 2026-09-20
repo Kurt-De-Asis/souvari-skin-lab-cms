@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { User, Save } from 'lucide-react';
+import { User, Save, Phone } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 import { customersApi } from '@/api';
@@ -9,7 +9,6 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 interface ProfileForm {
   first_name: string;
   last_name: string;
-  phone: string;
   gender: string;
   date_of_birth: string;
   address: string;
@@ -19,6 +18,8 @@ export default function Profile() {
   const { user, refreshUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [phoneInput, setPhoneInput] = useState('');
+  const [phoneSaving, setPhoneSaving] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors, isDirty } } = useForm<ProfileForm>();
 
@@ -30,11 +31,11 @@ export default function Profile() {
         reset({
           first_name: c.first_name || '',
           last_name: c.last_name || '',
-          phone: c.phone || '',
           gender: c.gender || '',
           date_of_birth: c.date_of_birth ? c.date_of_birth.split('T')[0] : '',
           address: c.address || '',
         });
+        setPhoneInput(c.user?.phone || c.phone || '');
       } catch {
         toast.error('Failed to load profile');
       } finally {
@@ -57,11 +58,25 @@ export default function Profile() {
     }
   };
 
+  const onPhoneSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPhoneSaving(true);
+    try {
+      await customersApi.updateMe({ phone: phoneInput });
+      await refreshUser();
+      toast.success('Phone number updated successfully');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to update phone number');
+    } finally {
+      setPhoneSaving(false);
+    }
+  };
+
   if (loading) return <LoadingSpinner fullScreen />;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-neutral-900">My Profile</h1>
+      <h1 className="text-2xl font-sans font-semibold text-neutral-900">My Profile</h1>
 
       <div className="card">
         <div className="flex items-center gap-4 mb-6 pb-6 border-b border-neutral-100">
@@ -74,7 +89,26 @@ export default function Profile() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <form onSubmit={onPhoneSubmit} className="space-y-2">
+          <label className="label">Phone Number</label>
+          <input
+            type="tel"
+            value={phoneInput}
+            onChange={(e) => setPhoneInput(e.target.value)}
+            className="input-field"
+            placeholder="+63 917 123 4567"
+          />
+          <button
+            type="submit"
+            disabled={phoneSaving}
+            className="btn-primary mt-2"
+          >
+            <Phone size={16} />
+            {phoneSaving ? 'Updating...' : 'Update Phone Number'}
+          </button>
+        </form>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 mt-8 pt-6 border-t border-neutral-100">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <label className="label">First Name</label>
@@ -92,15 +126,6 @@ export default function Profile() {
               />
               {errors.last_name && <p className="text-xs text-red-500 mt-1">{errors.last_name.message}</p>}
             </div>
-          </div>
-
-          <div>
-            <label className="label">Phone Number</label>
-            <input
-              {...register('phone')}
-              className="input-field"
-              placeholder="+63 917 123 4567"
-            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">

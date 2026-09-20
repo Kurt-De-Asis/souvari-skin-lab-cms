@@ -87,7 +87,16 @@ class InventoryService {
 
     const currentStock = new Decimal(product.current_stock.toString());
     const quantity = new Decimal(data.quantity.toString());
-    const newStock = currentStock.add(quantity);
+    const isDeduct = data.adjustment_type === 'deduct';
+
+    if (isDeduct && currentStock.lessThan(quantity)) {
+      throw new AppError(
+        `Insufficient stock: cannot deduct ${data.quantity} from current stock of ${product.current_stock}`,
+        400
+      );
+    }
+
+    const newStock = isDeduct ? currentStock.sub(quantity) : currentStock.add(quantity);
 
     const movement = await prisma.$transaction(async (tx) => {
       const updatedProduct = await tx.products.update({
@@ -99,12 +108,12 @@ class InventoryService {
         data: {
           product_id: data.product_id,
           type: 'adjustment',
-          quantity: data.quantity,
+          quantity: isDeduct ? quantity.negated() : quantity,
           unit_cost: data.unit_cost ?? product.unit_cost,
           running_stock_after: newStock,
           reference_type: 'manual',
           performed_by: userId,
-          notes: data.notes ?? null,
+          notes: data.reason ?? data.notes ?? null,
         },
       });
 

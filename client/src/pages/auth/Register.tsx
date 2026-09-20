@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -19,6 +19,8 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const { register: registerUser } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get('redirect');
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<RegisterForm>();
   const password = watch('password');
 
@@ -27,34 +29,39 @@ export default function Register() {
       const { confirm_password, ...data } = values;
       const userData = await registerUser(data);
       toast.success('Account created successfully!');
-      navigate(userData.role === 'admin' ? '/admin' : userData.role === 'staff' ? '/staff' : '/customer', { replace: true });
+      const isSafeRedirect =
+        userData.role === 'customer' &&
+        redirectTo &&
+        redirectTo.startsWith('/') &&
+        !redirectTo.startsWith('//');
+      navigate(isSafeRedirect ? redirectTo : '/customer', { replace: true });
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Registration failed. Please try again.');
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col bg-neutral-50">
       {/* Simple top nav */}
-      <div className="border-b border-neutral-100">
+      <div className="border-b border-neutral-800 bg-neutral-900">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center">
-          <Link to="/" className="flex items-center gap-1.5">
-            <span className="text-xl font-display font-bold text-neutral-900">Souvari Skin Lab</span>
-            <span className="text-sm font-light text-neutral-400 hidden sm:block">Beauty & Co.</span>
+          <Link to="/" className="flex items-center">
+            <img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-14 w-auto object-contain" />
           </Link>
         </div>
       </div>
 
       {/* Form */}
       <div className="flex-1 flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-md bg-white border border-neutral-200 p-8 md:p-10">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-semibold text-neutral-900">Create account</h1>
+            <p className="text-xs font-medium uppercase tracking-[0.3em] text-primary-600">Join us</p>
+            <h1 className="mt-4 text-3xl font-sans font-semibold text-neutral-900">Create account</h1>
             <p className="text-sm text-neutral-500 mt-2">Join us to book your first appointment</p>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="label">First Name</label>
                 <input
@@ -102,10 +109,10 @@ export default function Register() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   className="input-field pr-10"
-                  placeholder="Min. 6 characters"
+                  placeholder="Min. 8 characters"
                   {...register('password', {
                     required: 'Password is required',
-                    minLength: { value: 6, message: 'Must be at least 6 characters' },
+                    minLength: { value: 8, message: 'Must be at least 8 characters' },
                   })}
                 />
                 <button
@@ -133,14 +140,14 @@ export default function Register() {
               {errors.confirm_password && <p className="text-xs text-red-600 mt-1">{errors.confirm_password.message}</p>}
             </div>
 
-            <button type="submit" disabled={isSubmitting} className="btn-primary w-full mt-2">
+            <button type="submit" disabled={isSubmitting} className="btn-primary w-full mt-3">
               {isSubmitting ? 'Creating account...' : 'Create account'}
             </button>
           </form>
 
-          <p className="text-center text-sm text-neutral-500 mt-6">
+          <p className="text-center text-sm text-neutral-500 mt-7">
             Already have an account?{' '}
-            <Link to="/login" className="text-neutral-900 font-medium hover:underline">
+            <Link to="/login" className="text-primary-700 font-medium hover:underline">
               Sign in
             </Link>
           </p>

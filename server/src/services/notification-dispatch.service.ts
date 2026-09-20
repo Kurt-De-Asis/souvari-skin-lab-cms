@@ -162,6 +162,65 @@ class NotificationDispatchService {
     }
   }
 
+  async dispatchAppointmentRescheduled(params: {
+    appointmentId: number;
+    customerUserId: number;
+    customerName: string;
+    customerPhone?: string | null;
+    staffUserId: number | null;
+    staffName: string;
+    serviceName: string;
+    oldDate: string;
+    oldTime: string;
+    newDate: string;
+    newTime: string;
+    reason?: string | null;
+    adminUserIds: number[];
+  }): Promise<void> {
+    const {
+      appointmentId, customerUserId, customerName, customerPhone,
+      staffUserId, staffName, serviceName,
+      oldDate, oldTime, newDate, newTime, reason, adminUserIds,
+    } = params;
+
+    const reasonText = reason?.trim() ? ` Reason: ${reason.trim()}` : '';
+
+    // Notify customer (in-app + SMS)
+    await this.dispatch({
+      userId: customerUserId,
+      type: 'appointment_update',
+      title: 'Appointment Rescheduled',
+      message: `Your ${serviceName} appointment has been rescheduled from ${oldDate} at ${oldTime} to ${newDate} at ${newTime}.${reasonText}`,
+      data: { appointment_id: appointmentId, rescheduled: true, reason: reason?.trim() ?? null },
+      sendSMS: true,
+      smsPhone: customerPhone ?? undefined,
+    });
+
+    // Notify assigned staff (in-app only)
+    if (staffUserId) {
+      await this.dispatch({
+        userId: staffUserId,
+        type: 'appointment_update',
+        title: 'Appointment Rescheduled',
+        message: `Appointment #${appointmentId} for ${customerName} — ${serviceName} has been rescheduled from ${oldDate} at ${oldTime} to ${newDate} at ${newTime}.`,
+        data: { appointment_id: appointmentId, rescheduled: true },
+        sendSMS: false,
+      });
+    }
+
+    // Notify admins (in-app only)
+    for (const adminId of adminUserIds) {
+      await this.dispatch({
+        userId: adminId,
+        type: 'appointment_update',
+        title: 'Appointment Rescheduled',
+        message: `Appointment #${appointmentId}: ${customerName} — ${serviceName} rescheduled from ${oldDate} at ${oldTime} to ${newDate} at ${newTime} by ${staffName}.`,
+        data: { appointment_id: appointmentId, rescheduled: true },
+        sendSMS: false,
+      });
+    }
+  }
+
   async dispatchNewBooking(params: {
     appointmentId: number;
     customerUserId: number;

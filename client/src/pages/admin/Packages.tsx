@@ -19,7 +19,7 @@ interface ServicePackage {
   sessions_included: number;
   session_price: number;
   ten_session_price?: number | null;
-  inclusions?: string | null;
+  inclusions?: string[] | null;
   savings_note?: string | null;
   service?: {
     name: string;
@@ -97,7 +97,7 @@ export default function Packages() {
       sessions_included: p.sessions_included,
       session_price: p.session_price,
       ten_session_price: p.ten_session_price ?? undefined,
-      inclusions: p.inclusions || '',
+      inclusions: Array.isArray(p.inclusions) ? p.inclusions.join('\n') : (p.inclusions || ''),
       savings_note: p.savings_note || '',
     });
     setModalOpen(true);
@@ -115,7 +115,7 @@ export default function Packages() {
       const payload = {
         ...values,
         ten_session_price: values.ten_session_price || null,
-        inclusions: values.inclusions || null,
+        inclusions: values.inclusions ? values.inclusions.split('\n').map((s) => s.trim()).filter(Boolean) : null,
         savings_note: values.savings_note || null,
       };
       if (editingPackage) {
@@ -128,7 +128,10 @@ export default function Packages() {
       setModalOpen(false);
       fetchPackages();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Operation failed');
+      const detail = err?.response?.data?.errors
+        ? `: ${err.response.data.errors.map((e: any) => `${e.field} ${e.message}`).join(', ')}`
+        : '';
+      toast.error((err?.response?.data?.message || 'Operation failed') + detail);
     } finally {
       setSubmitting(false);
     }
@@ -153,7 +156,7 @@ export default function Packages() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Session Packages</h1>
+          <h1 className="text-2xl font-sans font-semibold text-neutral-900">Session Packages</h1>
           <p className="text-sm text-neutral-500 mt-1">Manage per-service session packages and pricing</p>
         </div>
         <button onClick={openAddModal} className="btn-primary">
@@ -189,14 +192,14 @@ export default function Packages() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                  <th className="px-6 py-3 font-medium">Service Name</th>
-                  <th className="px-6 py-3 font-medium">Category</th>
-                  <th className="px-6 py-3 font-medium">Sessions Included</th>
-                  <th className="px-6 py-3 font-medium">1-Session Price</th>
-                  <th className="px-6 py-3 font-medium">10-Session Price</th>
-                  <th className="px-6 py-3 font-medium">Inclusions</th>
-                  <th className="px-6 py-3 font-medium">Savings Note</th>
-                  <th className="px-6 py-3 font-medium text-right">Actions</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Service Name</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Category</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Sessions Included</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">1-Session Price</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">10-Session Price</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Inclusions</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Savings Note</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
@@ -207,14 +210,14 @@ export default function Packages() {
                     <td className="px-6 py-4 text-neutral-600">{p.sessions_included}</td>
                     <td className="px-6 py-4 text-neutral-600">{formatPrice(p.session_price)}</td>
                     <td className="px-6 py-4 text-neutral-600">{formatPrice(p.ten_session_price)}</td>
-                    <td className="px-6 py-4 text-neutral-600 max-w-[220px] truncate" title={p.inclusions || ''}>{p.inclusions || '—'}</td>
+                    <td className="px-6 py-4 text-neutral-600 max-w-[220px] truncate" title={Array.isArray(p.inclusions) ? p.inclusions.join(', ') : p.inclusions || ''}>{Array.isArray(p.inclusions) ? p.inclusions.join(', ') : p.inclusions || '—'}</td>
                     <td className="px-6 py-4 text-neutral-600 max-w-[180px] truncate" title={p.savings_note || ''}>{p.savings_note || '—'}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => openEditModal(p)} title="Edit" className="p-2 text-neutral-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
+                        <button onClick={() => openEditModal(p)} title="Edit" className="p-2 text-neutral-500 hover:text-primary-600 hover:bg-primary-50 rounded-md transition">
                           <Pencil size={16} />
                         </button>
-                        <button onClick={() => setDeleteId(p.id)} title="Delete" className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition">
+                        <button onClick={() => setDeleteId(p.id)} title="Delete" className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-md transition">
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -245,7 +248,7 @@ export default function Packages() {
             </select>
             {errors.service_id && <p className="text-xs text-red-600 mt-1">{errors.service_id.message}</p>}
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Sessions Included</label>
               <input type="number" min="1" className="input-field" {...register('sessions_included', { required: 'Required', valueAsNumber: true, min: { value: 1, message: 'Min 1 session' } })} />

@@ -61,6 +61,18 @@ export class AnalyticsController {
       next(error);
     }
   }
+
+  async getSummary(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const data = await analyticsService.getSummary(req.query as any);
+      res.json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const analyticsController = new AnalyticsController();

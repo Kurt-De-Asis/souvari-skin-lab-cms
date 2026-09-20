@@ -12,6 +12,10 @@ interface MonthlyPerk {
   id: number;
   customer_name: string;
   membership_id: number;
+  membership?: {
+    id: number;
+    code: string;
+  };
   year_month: string;
   status: string;
   used_at?: string;
@@ -76,7 +80,7 @@ export default function MonthlyPerks() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-neutral-900">Monthly Perks</h1>
+        <h1 className="text-2xl font-sans font-semibold text-neutral-900">Monthly Perks</h1>
         <p className="text-sm text-neutral-500 mt-1">Track and manage monthly membership perks</p>
       </div>
 
@@ -111,19 +115,19 @@ export default function MonthlyPerks() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                  <th className="px-6 py-3 font-medium">Customer</th>
-                  <th className="px-6 py-3 font-medium">Membership Code</th>
-                  <th className="px-6 py-3 font-medium">Year-Month</th>
-                  <th className="px-6 py-3 font-medium">Status</th>
-                  <th className="px-6 py-3 font-medium">Used At</th>
-                  <th className="px-6 py-3 font-medium text-right">Actions</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Customer</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Membership Code</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Year-Month</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Status</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Used At</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {perks.map((p) => (
                   <tr key={p.id} className="hover:bg-neutral-50/50">
                     <td className="px-6 py-4 font-medium text-neutral-900">{p.customer_name}</td>
-                    <td className="px-6 py-4 text-neutral-600 font-mono text-xs">{p.membership_code}</td>
+                    <td className="px-6 py-4 text-neutral-600 font-mono text-xs">{p.membership?.code}</td>
                     <td className="px-6 py-4 text-neutral-600">{p.year_month}</td>
                     <td className="px-6 py-4"><StatusBadge status={p.status} /></td>
                     <td className="px-6 py-4 text-neutral-600">{formatDate(p.used_at)}</td>
@@ -132,7 +136,7 @@ export default function MonthlyPerks() {
                         {p.status !== 'available' && (
                           <button
                             onClick={() => setResetModal({ open: true, perk: p })}
-                            className="px-3 py-1 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition"
+                            className="px-3 py-1 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-md transition"
                           >
                             Reset
                           </button>

@@ -4,6 +4,8 @@ import { Clock, ArrowRight } from 'lucide-react';
 import { servicesApi } from '../../api';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import EmptyState from '../../components/shared/EmptyState';
+import Reveal from '../../components/ui/Reveal';
+import formatCategory from '../../utils/formatCategory';
 
 interface Service {
   id: number;
@@ -22,13 +24,24 @@ export default function PublicServices() {
   useEffect(() => {
     const fetchServices = async () => {
       try {
-        const { data } = await servicesApi.browse();
-        const raw = data.data || [];
-        setServices((Array.isArray(raw) ? raw : []).map((s: any) => ({
-          ...s,
-          price: Number(s.price) || 0,
-          duration: Number(s.duration || s.duration_minutes) || 0,
-        })));
+        const all: any[] = [];
+        let page = 1;
+        let totalPages = 1;
+        do {
+          const { data } = await servicesApi.browse({ page: String(page), limit: '100' });
+          const result = data.data;
+          const raw = result?.data || result?.items || result || [];
+          totalPages = result?.pagination?.totalPages || 1;
+          if (Array.isArray(raw)) {
+            all.push(...raw.map((s: any) => ({
+              ...s,
+              price: Number(s.price) || 0,
+              duration: Number(s.duration || s.duration_minutes) || 0,
+            })));
+          }
+          page++;
+        } while (page <= totalPages);
+        setServices(all);
       } catch {
         // silent
       } finally {
@@ -51,60 +64,66 @@ export default function PublicServices() {
   return (
     <div>
       {/* Header */}
-      <section className="bg-white border-b border-neutral-100">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <h1 className="text-3xl font-semibold text-neutral-900">Services</h1>
-          <p className="mt-2 text-neutral-500">Browse our aesthetic treatments and find the right service for you.</p>
+      <section className="bg-neutral-900 text-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
+          <Reveal>
+            <p className="text-xs font-medium uppercase tracking-[0.3em] text-primary-400">The menu</p>
+            <h1 className="mt-5 text-4xl sm:text-5xl font-sans font-semibold leading-[1.1]">Services</h1>
+            <p className="mt-4 text-neutral-300 max-w-2xl">
+              Browse our aesthetic treatments and find the right service for you.
+            </p>
+          </Reveal>
         </div>
       </section>
 
       {/* Content */}
-      <section className="bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Category Pills */}
+      <section className="bg-neutral-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
+          {/* Category Tabs */}
           {categories.length > 1 && (
-            <div className="flex flex-wrap gap-2 mb-8">
+            <div className="flex flex-wrap gap-x-8 gap-y-2 border-b border-neutral-200 mb-10">
               {categories.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                  className={`pb-3 text-xs font-semibold uppercase tracking-[0.2em] transition border-b ${
                     activeCategory === cat
-                      ? 'bg-neutral-900 text-white'
-                      : 'bg-white text-neutral-600 border border-neutral-200 hover:border-neutral-300 hover:text-neutral-900'
+                      ? 'border-primary-600 text-primary-700'
+                      : 'border-transparent text-neutral-400 hover:text-neutral-900'
                   }`}
                 >
-                  {cat}
+                  {formatCategory(cat)}
                 </button>
               ))}
             </div>
           )}
 
           {loading ? (
-            <LoadingSpinner />
+            <div className="py-12 flex justify-center"><LoadingSpinner /></div>
           ) : filtered.length === 0 ? (
             <EmptyState title="No services found" description="No services available in this category." />
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="border-t border-neutral-200">
               {filtered.map((service) => (
                 <Link
                   key={service.id}
                   to={`/services/${service.id}`}
-                  className="group p-5 rounded-xl border border-neutral-200 hover:border-neutral-300 transition"
+                  className="group flex items-center justify-between gap-6 py-6 border-b border-neutral-200 transition"
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <h3 className="text-base font-medium text-neutral-900 group-hover:text-neutral-700 transition">{service.name}</h3>
-                    <span className="text-sm font-semibold text-neutral-900 ml-4 whitespace-nowrap">₱{service.price.toLocaleString()}</span>
-                  </div>
-                  <p className="text-sm text-neutral-500 line-clamp-2 mb-3">{service.description}</p>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs text-neutral-400">
-                      <Clock size={12} />
-                      <span>{service.duration} min</span>
-                      <span className="mx-1">·</span>
-                      <span>{service.category}</span>
+                  <div className="min-w-0">
+                    <h3 className="font-sans text-xl md:text-2xl text-neutral-900 group-hover:text-primary-700 transition">
+                      {service.name}
+                    </h3>
+                    <p className="mt-1 text-sm text-neutral-500 line-clamp-1 md:line-clamp-none">{service.description}</p>
+                    <div className="mt-2 flex items-center gap-3 text-xs uppercase tracking-wide text-neutral-400">
+                      <span className="flex items-center gap-1.5"><Clock size={12} /> {service.duration} min</span>
+                      <span className="text-neutral-300">·</span>
+                      <span>{formatCategory(service.category)}</span>
                     </div>
-                    <ArrowRight size={14} className="text-neutral-300 group-hover:text-neutral-600 transition" />
+                  </div>
+                  <div className="flex items-center gap-5 flex-shrink-0">
+                    <span className="font-sans text-lg text-primary-700 whitespace-nowrap">₱{service.price.toLocaleString()}</span>
+                    <ArrowRight size={18} className="text-neutral-300 transition group-hover:translate-x-1 group-hover:text-primary-600" />
                   </div>
                 </Link>
               ))}

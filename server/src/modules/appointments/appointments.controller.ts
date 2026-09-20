@@ -55,11 +55,12 @@ export class AppointmentsController {
 
   async getAvailability(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { staff_id, service_id, date } = req.query;
+      const { staff_id, service_id, date, duration_minutes } = req.query;
       const result = await appointmentService.getAvailability(
         parseInt(String(staff_id), 10),
         parseInt(String(service_id), 10),
-        String(date)
+        String(date),
+        duration_minutes ? parseInt(String(duration_minutes), 10) : undefined
       );
       res.json({ success: true, data: result });
     } catch (error) {
@@ -74,14 +75,6 @@ export class AppointmentsController {
       if (start_date) where.appointment_date = { ...where.appointment_date, gte: new Date(String(start_date)) };
       if (end_date) where.appointment_date = { ...where.appointment_date, lte: new Date(String(end_date) + 'T23:59:59.999Z') };
 
-      if (req.user!.role === 'staff') {
-        const staff = await prisma.staff.findFirst({
-          where: { user_id: req.user!.userId, deleted_at: null },
-          select: { id: true },
-        });
-        if (staff) where.staff_id = staff.id;
-      }
-
       const appointments = await prisma.appointments.findMany({
         where,
         select: {
@@ -94,6 +87,11 @@ export class AppointmentsController {
           customer: { select: { id: true, first_name: true, last_name: true } },
           staff: { select: { id: true, first_name: true, last_name: true } },
           service: { select: { id: true, name: true } },
+          services: {
+            select: { service_id: true, service: { select: { id: true, name: true } } },
+            orderBy: { id: 'asc' },
+          },
+          transactions: { select: { id: true, payment_status: true } },
         },
         orderBy: [{ appointment_date: 'asc' }, { start_time: 'asc' }],
       });
@@ -108,6 +106,8 @@ export class AppointmentsController {
         customer: a.customer,
         staff: a.staff,
         service: a.service,
+        services: a.services.map((as) => ({ id: as.service_id, name: as.service.name })),
+        paid: a.transactions.some((t) => t.payment_status === 'paid'),
       }));
 
       res.json({ success: true, data: { appointments: mapped } });
@@ -123,6 +123,19 @@ export class AppointmentsController {
         success: true,
         message: 'Appointment created successfully',
         data: appointment,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createGroup(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await appointmentService.createGroup(req.body);
+      res.status(201).json({
+        success: true,
+        message: 'Appointments created successfully',
+        data: result,
       });
     } catch (error) {
       next(error);
@@ -147,7 +160,8 @@ export class AppointmentsController {
         customerId = parseInt(String(req.query.customer_id), 10);
       }
 
-      const pricing = await appointmentService.quote(serviceId, customerId);
+      const membershipCode = typeof req.query.membership_code === 'string' ? req.query.membership_code : undefined;
+      const pricing = await appointmentService.quote(serviceId, customerId, membershipCode);
       res.json({ success: true, data: pricing });
     } catch (error) {
       next(error);

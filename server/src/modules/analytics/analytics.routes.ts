@@ -3,7 +3,7 @@ import { analyticsController } from './analytics.controller';
 import { authenticate } from '../../middleware/auth';
 import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
-import { revenueQuerySchema, appointmentTrendsQuerySchema } from './analytics.validation';
+import { revenueQuerySchema, appointmentTrendsQuerySchema, summaryQuerySchema } from './analytics.validation';
 
 const router = Router();
 
@@ -23,5 +23,7 @@ router.get(
 router.get('/services', analyticsController.getServices);
 
 router.get('/inventory', analyticsController.getInventory);
+
+router.get('/summary', validate(summaryQuerySchema, 'query'), analyticsController.getSummary);
 
 export default router;

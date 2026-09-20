@@ -43,6 +43,13 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // Credential failures on the login/register forms must surface their own
+      // error instead of triggering a refresh-token round trip (which would
+      // report a misleading "Refresh token not found").
+      if (originalRequest.url === '/auth/login' || originalRequest.url === '/auth/register') {
+        return Promise.reject(error);
+      }
+
       if (!accessToken && originalRequest.url === '/auth/profile') {
         return Promise.reject(error);
       }

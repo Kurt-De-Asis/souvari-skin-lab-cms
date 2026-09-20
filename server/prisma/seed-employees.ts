@@ -89,7 +89,6 @@ async function main() {
     position: string;
     jobTitle?: string;
     permissionLevel: string;
-    rating?: number;
     role: 'staff' | 'admin';
     schedule: Array<{ day: string; start: string; end: string }>;
   }) {
@@ -113,7 +112,6 @@ async function main() {
         position: config.position as any,
         job_title: config.jobTitle ?? null,
         permission_level: config.permissionLevel,
-        rating: config.rating ?? null,
         status: 'active',
       },
     });
@@ -146,7 +144,7 @@ async function main() {
     lastName: 'Daygon',
     email: 'gianheartdaygon24@gmail.com',
     phone: '+63199631651',
-    position: 'aesthetician',
+position: 'aesthetician',
     permissionLevel: 'medium',
     role: 'staff',
     schedule: [
@@ -168,7 +166,6 @@ async function main() {
     phone: '+639959582764',
     position: 'aesthetician',
     permissionLevel: 'medium',
-    rating: 5.0,
     role: 'staff',
     schedule: [
       { day: 'sunday', start: '00:00', end: '00:00' }, // off
@@ -211,7 +208,6 @@ async function main() {
     position: 'aesthetician',
     jobTitle: 'Skincare Specialist',
     permissionLevel: 'medium',
-    rating: 5.0,
     role: 'staff',
     schedule: [
       { day: 'sunday', start: '10:00', end: '20:00' },
@@ -233,7 +229,6 @@ async function main() {
     position: 'therapist',
     jobTitle: 'Nail Technician',
     permissionLevel: 'medium',
-    rating: 5.0,
     role: 'staff',
     schedule: [
       { day: 'sunday', start: '10:00', end: '20:00' },
@@ -365,7 +360,6 @@ async function main() {
     phone: '+639173851616',
     position: 'aesthetician',
     permissionLevel: 'medium',
-    rating: 5.0,
     role: 'staff',
     schedule: [
       { day: 'sunday', start: '10:00', end: '20:00' },
@@ -373,6 +367,27 @@ async function main() {
       { day: 'tuesday', start: '10:00', end: '20:00' },
       { day: 'wednesday', start: '10:00', end: '20:00' },
       { day: 'thursday', start: '00:00', end: '00:00' }, // off
+      { day: 'friday', start: '10:00', end: '20:00' },
+      { day: 'saturday', start: '10:00', end: '20:00' },
+    ],
+  });
+
+  // 8. Queenie Rose Feliciano (Nurse — handles complicated procedures)
+  await createStaffMember({
+    firstName: 'Queenie Rose',
+    lastName: 'Feliciano',
+    email: 'queenie.feliciano@souvari.local',
+    phone: '+639000000001',
+    position: 'nurse',
+    jobTitle: 'Clinic Nurse',
+    permissionLevel: 'medium',
+    role: 'staff',
+    schedule: [
+      { day: 'sunday', start: '00:00', end: '00:00' }, // off
+      { day: 'monday', start: '10:00', end: '20:00' },
+      { day: 'tuesday', start: '10:00', end: '20:00' },
+      { day: 'wednesday', start: '10:00', end: '20:00' },
+      { day: 'thursday', start: '10:00', end: '20:00' },
       { day: 'friday', start: '10:00', end: '20:00' },
       { day: 'saturday', start: '10:00', end: '20:00' },
     ],
@@ -395,7 +410,7 @@ async function main() {
       orderBy: { day_of_week: 'asc' },
     });
     const workingDays = schedules.filter(sc => sc.start_time !== '00:00' || sc.end_time !== '00:00');
-    console.log(`  ${s.first_name} ${s.last_name} | ${s.user.email} | ${s.user.role} | ${s.position} | ${s.permission_level} | ${s.rating ?? 'N/A'} | ${workingDays.length} days/week`);
+    console.log(`  ${s.first_name} ${s.last_name} | ${s.user.email} | ${s.user.role} | ${s.position} | ${s.permission_level} | ${workingDays.length} days/week`);
   }
 
   console.log('\n✓ Done!');

@@ -36,7 +36,12 @@ class TreatmentRecordsService {
       if (!staff) {
         throw new AppError('Staff profile not found', 404);
       }
-      where.staff_id = staff.id;
+      // If a specific customer is requested, staff can see all records for that customer
+      if (customer_id) {
+        where.customer_id = customer_id;
+      } else {
+        where.staff_id = staff.id;
+      }
     }
 
     if (customer_id && user.role === 'admin') {
@@ -142,54 +147,102 @@ class TreatmentRecordsService {
       throw new AppError('Staff profile not found', 404);
     }
 
-    const appointment = await prisma.appointments.findUnique({
-      where: { id: data.appointment_id },
-    });
+    if (data.appointment_id) {
+      const appointment = await prisma.appointments.findUnique({
+        where: { id: data.appointment_id },
+      });
 
-    if (!appointment) {
-      throw new AppError('Appointment not found', 404);
+      if (!appointment) {
+        throw new AppError('Appointment not found', 404);
+      }
+
+      if (appointment.status !== 'completed') {
+        throw new AppError('Treatment record can only be created for completed appointments', 400);
+      }
+
+      const existingRecord = await prisma.treatment_records.findUnique({
+        where: { appointment_id: data.appointment_id },
+      });
+
+      if (existingRecord) {
+        const record = await prisma.treatment_records.update({
+          where: { id: existingRecord.id },
+          data: {
+            notes: data.notes ?? existingRecord.notes,
+            recommendations: data.recommendations ?? existingRecord.recommendations,
+            side_effects: data.side_effects ?? existingRecord.side_effects,
+            before_photo: data.before_photo ?? existingRecord.before_photo,
+            after_photo: data.after_photo ?? existingRecord.after_photo,
+          },
+          include: {
+            appointment: {
+              select: { id: true, appointment_date: true, start_time: true, end_time: true, status: true },
+            },
+            customer: {
+              select: { id: true, first_name: true, last_name: true },
+            },
+            staff: {
+              select: { id: true, first_name: true, last_name: true },
+            },
+            service: {
+              select: { id: true, name: true, price: true },
+            },
+          },
+        });
+
+        return record;
+      }
+
+      const record = await prisma.treatment_records.create({
+        data: {
+          appointment_id: data.appointment_id,
+          staff_id: staff.id,
+          customer_id: appointment.customer_id,
+          service_id: appointment.service_id,
+          treatment_date: appointment.appointment_date,
+          start_time: appointment.start_time,
+          end_time: appointment.end_time,
+          notes: data.notes ?? null,
+          recommendations: data.recommendations ?? null,
+          side_effects: data.side_effects ?? null,
+          before_photo: data.before_photo ?? null,
+          after_photo: data.after_photo ?? null,
+        },
+        include: {
+          appointment: {
+            select: { id: true, appointment_date: true, start_time: true, end_time: true, status: true },
+          },
+          customer: {
+            select: { id: true, first_name: true, last_name: true },
+          },
+          staff: {
+            select: { id: true, first_name: true, last_name: true },
+          },
+          service: {
+            select: { id: true, name: true, price: true },
+          },
+        },
+      });
+
+      return record;
     }
 
-    if (appointment.status !== 'completed') {
-      throw new AppError('Treatment record can only be created for completed appointments', 400);
-    }
-
-    const existingRecord = await prisma.treatment_records.findUnique({
-      where: { appointment_id: data.appointment_id },
-    });
-
-    if (existingRecord) {
-      throw new AppError('Treatment record already exists for this appointment', 409);
-    }
-
+    // Handle general clinical notes (no appointment_id)
     const record = await prisma.treatment_records.create({
       data: {
-        appointment_id: data.appointment_id,
         staff_id: staff.id,
-        customer_id: appointment.customer_id,
-        service_id: appointment.service_id,
-        treatment_date: appointment.appointment_date,
-        start_time: appointment.start_time,
-        end_time: appointment.end_time,
+        customer_id: data.customer_id,
+        treatment_date: data.treatment_date ? new Date(data.treatment_date) : new Date(),
         notes: data.notes ?? null,
         recommendations: data.recommendations ?? null,
         side_effects: data.side_effects ?? null,
-        before_photo: data.before_photo ?? null,
-        after_photo: data.after_photo ?? null,
-        satisfaction_rating: data.satisfaction_rating ?? null,
       },
       include: {
-        appointment: {
-          select: { id: true, appointment_date: true, start_time: true, end_time: true, status: true },
-        },
         customer: {
           select: { id: true, first_name: true, last_name: true },
         },
         staff: {
           select: { id: true, first_name: true, last_name: true },
-        },
-        service: {
-          select: { id: true, name: true, price: true },
         },
       },
     });
@@ -228,7 +281,6 @@ class TreatmentRecordsService {
         side_effects: data.side_effects,
         before_photo: data.before_photo,
         after_photo: data.after_photo,
-        satisfaction_rating: data.satisfaction_rating,
       },
       include: {
         appointment: {

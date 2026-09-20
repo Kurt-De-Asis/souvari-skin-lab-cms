@@ -13,6 +13,9 @@ import {
 const router = Router();
 
 router.use(authenticate);
+
+router.get('/me', loyaltyController.getMyProgress);
+
 router.use(authorize('admin'));
 
 router.get(

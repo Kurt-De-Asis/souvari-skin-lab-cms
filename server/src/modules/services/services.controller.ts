@@ -20,6 +20,20 @@ export class ServicesController {
     }
   }
 
+  async getByIdPublic(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!Number.isInteger(id) || id <= 0) {
+        res.status(404).json({ success: false, message: 'Service not found' });
+        return;
+      }
+      const service = await servicesService.getByIdPublic(id);
+      res.json({ success: true, data: service });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = parseInt(String(req.params.id), 10);

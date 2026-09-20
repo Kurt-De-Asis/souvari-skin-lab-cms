@@ -5,6 +5,7 @@ import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
 import {
   createAppointmentSchema,
+  createGroupAppointmentSchema,
   updateAppointmentSchema,
   updateStatusSchema,
   listAppointmentsQuerySchema,
@@ -12,17 +13,17 @@ import {
 
 const router = Router();
 
+router.get(
+  '/availability',
+  appointmentsController.getAvailability
+);
+
 router.use(authenticate);
 
 router.get(
   '/',
   validate(listAppointmentsQuerySchema, 'query'),
   appointmentsController.list
-);
-
-router.get(
-  '/availability',
-  appointmentsController.getAvailability
 );
 
 router.get(
@@ -45,6 +46,13 @@ router.post(
   authorize('admin', 'staff', 'customer'),
   validate(createAppointmentSchema),
   appointmentsController.create
+);
+
+router.post(
+  '/group',
+  authorize('admin', 'staff', 'customer'),
+  validate(createGroupAppointmentSchema),
+  appointmentsController.createGroup
 );
 
 router.patch(

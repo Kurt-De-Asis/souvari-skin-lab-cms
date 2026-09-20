@@ -12,18 +12,18 @@ export default function BookingSteps({ currentStep, steps }: BookingStepsProps) 
         <div key={label} className="flex items-center flex-1 last:flex-initial">
           <div className="flex flex-col items-center">
             <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition ${
+              className={`w-8 h-8 flex items-center justify-center text-xs font-semibold transition ${
                 i < currentStep
                   ? 'bg-neutral-900 text-white'
                   : i === currentStep
-                  ? 'bg-neutral-900 text-white ring-4 ring-neutral-100'
-                  : 'bg-neutral-100 text-neutral-400'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-neutral-200 text-neutral-400'
               }`}
             >
               {i < currentStep ? <Check size={14} /> : i + 1}
             </div>
             <span
-              className={`text-xs mt-1.5 font-medium hidden sm:block ${
+              className={`text-[10px] sm:text-xs mt-2 font-medium uppercase tracking-[0.15em] text-center px-1 ${
                 i <= currentStep ? 'text-neutral-900' : 'text-neutral-400'
               }`}
             >
@@ -31,7 +31,7 @@ export default function BookingSteps({ currentStep, steps }: BookingStepsProps) 
             </span>
           </div>
           {i < steps.length - 1 && (
-            <div className={`flex-1 h-px mx-3 ${i < currentStep ? 'bg-neutral-900' : 'bg-neutral-200'}`} />
+            <div className={`flex-1 h-px mx-3 ${i < currentStep ? 'bg-primary-600' : 'bg-neutral-200'}`} />
           )}
         </div>
       ))}

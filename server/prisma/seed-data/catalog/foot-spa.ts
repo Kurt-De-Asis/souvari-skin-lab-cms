@@ -1,43 +1,16 @@
 import { SectionDef } from '../types';
 import { vipNm } from '../helpers';
 
-const FOOT_SPA_INCLUSIONS = [
-  'Nail Shaping',
-  'Cuticle Cleaning',
-  'Exfoliation Scrub',
-  'Moisturizing Lotion',
-  'Hot Towel Wrap',
-];
+const SRC = 'PDF p.37-40 · Foot Spa Services';
 
 const section: SectionDef = {
   slug: 'foot-spa',
   name: 'Foot Spa',
   display_order: 16,
   services: [
-    {
-      name: 'Foot Spa',
-      slug: 'foot-spa',
-      category: 'other',
-      duration_minutes: 45,
-      inclusions: [...FOOT_SPA_INCLUSIONS],
-      prices: vipNm(500, 600),
-    },
-    {
-      name: 'Foot Spa + Whitening',
-      slug: 'foot-spa-whitening',
-      category: 'other',
-      duration_minutes: 45,
-      inclusions: [...FOOT_SPA_INCLUSIONS, 'Whitening Treatment'],
-      prices: vipNm(650, 750),
-    },
-    {
-      name: 'Foot Spa + Whitening + Para Film',
-      slug: 'foot-spa-whitening-para-film',
-      category: 'other',
-      duration_minutes: 45,
-      inclusions: [...FOOT_SPA_INCLUSIONS, 'Whitening Treatment', 'Para Film Wrap'],
-      prices: vipNm(750, 850),
-    },
+    { name: 'Essential Foot Spa', slug: 'fs-essential', category: 'other', duration_minutes: 40, prices: vipNm(262, 349, { source_ref: SRC }) },
+    { name: 'Deluxe Foot Spa', slug: 'fs-deluxe', category: 'other', duration_minutes: 70, prices: vipNm(449, 599, { source_ref: SRC }) },
+    { name: 'Ultimate Luxe Foot Spa', slug: 'fs-ultimate-luxe', category: 'other', duration_minutes: 90, prices: vipNm(599, 799, { source_ref: SRC }) },
   ],
 };
 

@@ -5,8 +5,9 @@ import isoWeek from 'dayjs/plugin/isoWeek';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 import { appointmentsApi, staffApi } from '@/api';
-import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import StatusBadge from '@/components/ui/StatusBadge';
+import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import CustomerDetailDrawer from '@/components/admin/CustomerDetailDrawer';
 
 dayjs.extend(isoWeek);
 
@@ -27,6 +28,7 @@ interface Appointment {
   status: string;
   customer: { first_name: string; last_name: string } | null;
   service: { name: string } | null;
+  services?: { name: string }[];
 }
 
 export default function Schedule() {
@@ -35,6 +37,7 @@ export default function Schedule() {
   const [schedules, setSchedules] = useState<StaffSchedule[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
 
   const staffId = user?.staff?.id;
 
@@ -81,9 +84,9 @@ export default function Schedule() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900">My Schedule</h1>
+          <h1 className="text-2xl font-sans font-semibold text-neutral-900">My Schedule</h1>
           <p className="text-sm text-neutral-500 mt-1">
             {weekStart.format('MMM D')} - {weekStart.add(6, 'day').format('MMM D, YYYY')}
           </p>
@@ -101,7 +104,7 @@ export default function Schedule() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
         {days.map((day) => {
           const daySchedule = getScheduleForDay(day.day());
           const dayAppointments = getAppointmentsForDay(day);
@@ -159,12 +162,22 @@ export default function Schedule() {
                         {dayjs(`2000-01-01 ${appt.start_time}`).format('h:mm A')}
                       </p>
                       <p className="text-[10px] text-neutral-600 truncate">
-                        {appt.customer
-                          ? `${appt.customer.first_name} ${appt.customer.last_name}`
-                          : 'Customer'}
+                        {appt.customer ? (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCustomer(appt.customer)}
+                            className="font-medium text-neutral-900 hover:text-primary-600 underline decoration-neutral-300 hover:decoration-primary-600 transition text-left"
+                            title="View complete client records, notes, allergies, and history"
+                          >
+                            {appt.customer.first_name} {appt.customer.last_name}
+                          </button>
+                        ) : (
+                          'Customer'
+                        )}
                       </p>
                       <p className="text-[10px] text-neutral-500 truncate">
                         {appt.service?.name || 'Service'}
+                        {appt.services && appt.services.length > 1 ? ` +${appt.services.length - 1}` : ''}
                       </p>
                       <StatusBadge status={appt.status} />
                     </div>
@@ -175,6 +188,13 @@ export default function Schedule() {
           );
         })}
       </div>
+
+      {/* Customer Detail Drawer */}
+      <CustomerDetailDrawer
+        open={selectedCustomer !== null}
+        onClose={() => setSelectedCustomer(null)}
+        customer={selectedCustomer}
+      />
     </div>
   );
 }

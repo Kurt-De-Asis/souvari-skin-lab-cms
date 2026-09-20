@@ -130,7 +130,7 @@ export default function MembershipPlans() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Membership Plans</h1>
+          <h1 className="text-2xl font-sans font-semibold text-neutral-900">Membership Plans</h1>
           <p className="text-sm text-neutral-500 mt-1">Manage membership tiers and pricing</p>
         </div>
         <button onClick={openAddModal} className="btn-primary">
@@ -158,7 +158,7 @@ export default function MembershipPlans() {
             <option value="PLATINUM">Platinum</option>
             <option value="ELITE">Diamond</option>
           </select>
-          <select className="select-field w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value === '' ? '' : e.target.value === 'true')}>
+          <select className="select-field w-auto" value={String(statusFilter)} onChange={(e) => setStatusFilter(e.target.value === '' ? '' : e.target.value === 'true')}>
             <option value="">All Status</option>
             <option value="true">Active</option>
             <option value="false">Inactive</option>
@@ -176,13 +176,13 @@ export default function MembershipPlans() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                  <th className="px-6 py-3 font-medium">Name</th>
-                  <th className="px-6 py-3 font-medium">Tier</th>
-                  <th className="px-6 py-3 font-medium">Duration</th>
-                  <th className="px-6 py-3 font-medium">Regular Price</th>
-                  <th className="px-6 py-3 font-medium">Promo Price</th>
-                  <th className="px-6 py-3 font-medium">Status</th>
-                  <th className="px-6 py-3 font-medium text-right">Actions</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Name</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Tier</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Duration</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Regular Price</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Promo Price</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Status</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
@@ -196,10 +196,10 @@ export default function MembershipPlans() {
                     <td className="px-6 py-4"><StatusBadge status={p.is_active ? 'active' : 'inactive'} /></td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => openEditModal(p)} className="p-2 text-neutral-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
+                        <button onClick={() => openEditModal(p)} className="p-2 text-neutral-500 hover:text-primary-600 hover:bg-primary-50 rounded-md transition">
                           <Pencil size={16} />
                         </button>
-                        <button onClick={() => setDeleteId(p.id)} className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition">
+                        <button onClick={() => setDeleteId(p.id)} className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-md transition">
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -224,7 +224,7 @@ export default function MembershipPlans() {
             <input className="input-field" placeholder="e.g. Annual Gold Plan" {...register('name', { required: 'Required' })} />
             {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name.message}</p>}
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Tier</label>
               <select className="select-field" {...register('tier', { required: 'Required' })}>
@@ -240,7 +240,7 @@ export default function MembershipPlans() {
               {errors.duration_months && <p className="text-xs text-red-600 mt-1">{errors.duration_months.message}</p>}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Regular Price (₱)</label>
               <input type="number" step="0.01" className="input-field" {...register('regular_price', { required: 'Required', valueAsNumber: true })} />

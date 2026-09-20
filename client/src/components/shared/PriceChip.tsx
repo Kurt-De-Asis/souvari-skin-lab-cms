@@ -5,13 +5,13 @@ interface PriceChipProps {
 }
 
 export default function PriceChip({ amount, variant = 'default', size = 'sm' }: PriceChipProps) {
-  const baseClass = 'inline-flex items-center gap-0.5 font-medium border rounded-full';
+  const baseClass = 'inline-flex items-center gap-0.5 font-medium border';
   const sizeClass = size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm';
 
   const variantClass = {
-    default: 'bg-white border-gray-200 text-gray-900',
-    vip: 'bg-gray-900 border-gray-900 text-white',
-    regular: 'bg-white border-gray-300 text-gray-700',
+    default: 'bg-white border-neutral-200 text-neutral-900',
+    vip: 'bg-primary-500 border-primary-500 text-white',
+    regular: 'bg-white border-neutral-300 text-neutral-700',
     discount: 'bg-green-50 border-green-200 text-green-700',
   }[variant];
 

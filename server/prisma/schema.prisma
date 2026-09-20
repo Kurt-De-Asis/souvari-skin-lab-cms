@@ -61,17 +61,18 @@ model customers {
   postal_code   String? @db.VarChar(20)
   notes         String? @db.Text
   avatar_url    String? @db.VarChar(500)
+  preferred_staff_id Int?
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
   deleted_at    DateTime?
 
   user           users          @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  preferred_staff staff?  @relation("PreferredCustomers", fields: [preferred_staff_id], references: [id], onDelete: SetNull)
   appointments   appointments[]
   transactions   transactions[]
   treatment_records treatment_records[]
+  service_reviews  service_reviews[]
   memberships    memberships[]
-  referral_rewards referral_rewards[]
-  referrals_received referrals[] @relation("referred_customer_rel")
 
   @@index([last_name, first_name])
 }
@@ -93,7 +94,6 @@ model staff {
   position        StaffPosition @default(aesthetician)
   job_title       String? @db.VarChar(100)
   permission_level String @default("medium") @db.VarChar(20)
-  rating          Decimal? @db.Decimal(2, 1)
   status          StaffStatus   @default(active)
   hire_date       DateTime?
   date_of_birth   DateTime?
@@ -106,12 +106,16 @@ model staff {
   updated_at      DateTime @updatedAt
   deleted_at      DateTime?
 
-  user             users              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  schedules        staff_schedules[]
-  appointments     appointments[]
-  transactions     transactions[]
-  treatment_records treatment_records[]
-  service_staff    service_staff[]
+  user                      users                      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  schedules                 staff_schedules[]
+  appointments              appointments[]
+  transactions              transactions[]
+  discounts_applied         transactions[]           @relation("DiscountApplied")
+  membership_payments_received membership_payments[]  @relation("MembershipPaymentReceived")
+  treatment_records         treatment_records[]
+  service_reviews          service_reviews[]
+  service_staff             service_staff[]
+  preferred_customers       customers[]              @relation("PreferredCustomers")
 
   @@index([position])
   @@index([status])
@@ -125,6 +129,11 @@ enum StaffPosition {
   therapist
   receptionist
   manager
+  head_admin
+  nail_technician
+  facialist
+  nail_and_skin_care_specialist
+  clinic_head_nurse
 }
 
 enum StaffStatus {
@@ -195,14 +204,24 @@ model services {
   is_legacy           Boolean @default(false)
   needs_verification  Boolean @default(false)
 
+  // ── Extended: external catalog provenance (SOURCE B / Doctors-Procedures.xlsx) ──
+  external_id         String? @db.VarChar(100)
+  sku                 String? @db.VarChar(120)
+  treatment_type      String? @db.VarChar(100)
+  online_booking      String  @default("Enabled") @db.VarChar(20)
+  available_for       String  @default("Everyone") @db.VarChar(30)
+  voucher_sales       String  @default("Enabled") @db.VarChar(20)
+  commissions         String  @default("Enabled") @db.VarChar(20)
+
   appointments          appointments[]
   service_staff         service_staff[]
   service_inventory_items service_inventory_items[]
   transaction_items     transaction_items[]
   treatment_records     treatment_records[]
+  service_reviews       service_reviews[]
+  appointment_services  appointment_services[] @relation("AppointmentServices")
   group                 service_groups? @relation(fields: [group_id], references: [id], onDelete: SetNull, onUpdate: Cascade)
   variants              service_variants[]
-  prices                service_prices[]
   packages              service_packages?
   category_ref          service_categories? @relation(fields: [category_id], references: [id], onDelete: SetNull, onUpdate: Cascade)
   resources             service_resources[]
@@ -235,58 +254,11 @@ enum ServiceStatus {
 
 // ─── Service Catalog Pricing Enums ──────────────────────
 
-enum PriceAudience {
-  vip
-  non_member
-  regular
-}
-
-enum StaffPriceTier {
-  standard
-  technician
-  senior
-  guru
-}
-
 enum UnitBasis {
   session
   per_nail
   full_set
   per_piece
-}
-
-enum GenderScope {
-  any
-  male
-  female
-}
-
-enum DataIssueType {
-  missing_price
-  ambiguous_pricing
-  unavailable_option
-  precision_anomaly
-  pdf_mismatch
-  duplicate_name
-}
-
-enum DataIssueSeverity {
-  info
-  warning
-  critical
-}
-
-enum DataIssueStatus {
-  open
-  resolved
-  waived
-}
-
-enum MembershipFamilyCode {
-  VIP_ELITE_PLATINUM
-  VIP_RADIANT_SKIN
-  VIP_LASH_NAIL
-  SILVER_ACCESS
 }
 
 enum MembershipVariantCode {
@@ -360,33 +332,9 @@ model service_variants {
   is_active        Boolean  @default(true)
 
   service services        @relation(fields: [service_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  prices  service_prices[]
 
   @@unique([service_id, variant_key])
   @@index([service_id])
-}
-
-// ─── Service Prices (multi-dimensional pricing matrix) ───
-
-model service_prices {
-  id                 Int            @id @default(autoincrement())
-  service_id         Int
-  service_variant_id Int?
-  audience           PriceAudience
-  staff_tier         StaffPriceTier @default(standard)
-  gender_scope       GenderScope    @default(any)
-  amount             Decimal        @db.Decimal(12, 2)
-  is_available       Boolean        @default(true)
-  needs_verification Boolean        @default(false)
-  source_ref         String?        @db.VarChar(120)
-
-  service  services           @relation(fields: [service_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  variant  service_variants?  @relation(fields: [service_variant_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-
-  @@unique([service_id, service_variant_id, audience, staff_tier, gender_scope])
-  @@index([service_id])
-  @@index([audience])
-  @@index([needs_verification])
 }
 
 // ─── Service Packages (session bundles) ─────────────────
@@ -401,26 +349,6 @@ model service_packages {
   savings_note      String?  @db.VarChar(255)
 
   service services @relation(fields: [service_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-}
-
-// ─── Data Quality Issues ────────────────────────────────
-
-model service_data_issues {
-  id          Int               @id @default(autoincrement())
-  service_id  Int?
-  price_id    Int?
-  issue_type  DataIssueType
-  severity    DataIssueSeverity @default(warning)
-  status      DataIssueStatus   @default(open)
-  title       String            @db.VarChar(255)
-  details     Json?
-  resolved_by Int?
-  resolved_at DateTime?
-  created_at  DateTime          @default(now())
-
-  @@index([status, severity])
-  @@index([service_id])
-  @@index([price_id])
 }
 
 // ─── Product Categories ──────────────────────────────────
@@ -540,7 +468,10 @@ model appointments {
   end_time         String   @db.VarChar(5)  // "15:00"
   status           AppointmentStatus @default(pending)
   quoted_price     Decimal? @db.Decimal(12, 2)
+  price_type       String? @db.VarChar(20)
+  membership_code  String? @db.VarChar(50)
   cancellation_reason String? @db.Text
+  reschedule_reason   String? @db.Text
   notes            String?  @db.Text
   reminder_sent    Boolean  @default(false)
   created_at       DateTime @default(now())
@@ -552,13 +483,31 @@ model appointments {
   service          services           @relation(fields: [service_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
   status_history   appointment_status_history[]
   treatment_record treatment_records?
+  service_review   service_reviews?
   transactions     transactions[]
+  services         appointment_services[] @relation("AppointmentServices")
 
   @@index([appointment_date])
   @@index([staff_id, appointment_date])
   @@index([customer_id])
   @@index([status])
   @@index([staff_id, appointment_date, start_time, end_time])
+}
+
+// ─── Appointment Services (multi-service bookings) ──────
+
+model appointment_services {
+  id               Int     @id @default(autoincrement())
+  appointment_id   Int
+  service_id       Int
+  unit_price       Decimal? @db.Decimal(12, 2)
+  duration_minutes Int?
+
+  appointment appointments @relation("AppointmentServices", fields: [appointment_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  service    services      @relation("AppointmentServices", fields: [service_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([appointment_id])
+  @@index([service_id])
 }
 
 enum AppointmentStatus {
@@ -604,7 +553,6 @@ model treatment_records {
   side_effects         String?  @db.Text
   before_photo         String?  @db.VarChar(500)
   after_photo          String?  @db.VarChar(500)
-  satisfaction_rating  Int?     // 1-5
   created_at           DateTime @default(now())
   updated_at           DateTime @updatedAt
 
@@ -618,6 +566,29 @@ model treatment_records {
   @@index([staff_id])
 }
 
+// ─── Service Reviews ────────────────────────────────────
+
+model service_reviews {
+  id            Int      @id @default(autoincrement())
+  customer_id   Int
+  appointment_id Int     @unique
+  service_id    Int
+  staff_id      Int?
+  rating        Int      // 1 - 5
+  feedback      String?  @db.Text
+  created_at    DateTime @default(now())
+
+  customer    customers   @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  appointment appointments @relation(fields: [appointment_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  service     services    @relation(fields: [service_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  staff       staff?      @relation(fields: [staff_id], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([service_id])
+  @@index([customer_id])
+  @@index([staff_id])
+  @@index([rating])
+}
+
 // ─── Transactions ────────────────────────────────────────
 
 model transactions {
@@ -629,6 +600,9 @@ model transactions {
   type              TransactionType @default(sale)
   subtotal          Decimal @default(0) @db.Decimal(12, 2)
   discount_amount   Decimal @default(0) @db.Decimal(12, 2)
+  discount_pct      Decimal? @db.Decimal(5, 2)
+  discount_reason   String? @db.Text
+  discount_applied_by Int?
   tax_amount        Decimal @default(0) @db.Decimal(12, 2)
   total_amount      Decimal @default(0) @db.Decimal(12, 2)
   payment_method    PaymentMethod?
@@ -639,10 +613,11 @@ model transactions {
   updated_at        DateTime @updatedAt
   deleted_at        DateTime?
 
-  customer     customers?     @relation(fields: [customer_id], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  staff        staff?         @relation(fields: [staff_id], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  appointment  appointments?  @relation(fields: [appointment_id], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  items        transaction_items[]
+  customer          customers?     @relation(fields: [customer_id], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  staff             staff?         @relation(fields: [staff_id], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  discount_applier  staff?         @relation("DiscountApplied", fields: [discount_applied_by], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  appointment       appointments?  @relation(fields: [appointment_id], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  items             transaction_items[]
 
   @@index([customer_id])
   @@index([staff_id])
@@ -659,11 +634,10 @@ enum TransactionType {
 
 enum PaymentMethod {
   cash
-  credit_card
-  debit_card
-  bank_transfer
-  e_wallet
-  voucher
+  gcash
+  gotyme
+  rcbc
+  paid_on_us
 }
 
 enum PaymentStatus {
@@ -684,6 +658,7 @@ model transaction_items {
   description    String  @db.VarChar(255)
   quantity       Decimal @default(1) @db.Decimal(10, 3)
   unit_price     Decimal @default(0) @db.Decimal(12, 2)
+  price_type     String? @db.VarChar(20)
   discount       Decimal @default(0) @db.Decimal(12, 2)
   tax            Decimal @default(0) @db.Decimal(12, 2)
   line_total     Decimal @default(0) @db.Decimal(12, 2)
@@ -817,24 +792,6 @@ model system_settings {
   updated_at    DateTime @updatedAt
 }
 
-// ─── Membership Families ─────────────────────────────────
-
-model membership_families {
-  id                  Int                 @id @default(autoincrement())
-  code                MembershipFamilyCode @unique
-  name                String              @db.VarChar(150)
-  tagline             String?             @db.VarChar(255)
-  description         String?             @db.Text
-  eligible_categories Json?
-  display_order       Int                 @default(0)
-  is_active           Boolean             @default(true)
-  created_at          DateTime            @default(now())
-  updated_at          DateTime            @updatedAt
-
-  plans     membership_plans[]
-  benefits  membership_benefits[]
-}
-
 // ─── Membership Plans ────────────────────────────────────
 
 model membership_plans {
@@ -850,8 +807,7 @@ model membership_plans {
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
-  // ── Extended: variant/membership-family system ──
-  family_id                  Int?
+  // ── Extended: variant system ──
   variant_code               MembershipVariantCode @default(single)
   term_months                Int      @default(6)
   max_persons                Int      @default(1)
@@ -864,11 +820,9 @@ model membership_plans {
   loyalty_milestones    loyalty_milestones[]
   benefits              membership_benefits[]
   installment_options   membership_installment_options[]
-  family                membership_families? @relation(fields: [family_id], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([is_active])
   @@index([tier])
-  @@index([family_id])
   @@index([variant_code])
 }
 
@@ -886,7 +840,7 @@ model membership_installment_options {
   plan_id          Int
   down_payment_pct Decimal       @db.Decimal(5, 2)
   months           Int
-  payment_method   PaymentMethod @default(credit_card)
+  payment_method   PaymentMethod @default(cash)
   is_active        Boolean       @default(true)
 
   plan membership_plans @relation(fields: [plan_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
@@ -895,30 +849,58 @@ model membership_installment_options {
   @@index([plan_id])
 }
 
+// ─── Membership Payments ───────────────────────────────────
+
+model membership_payments {
+  id               Int           @id @default(autoincrement())
+  membership_id    Int
+  amount           Decimal       @db.Decimal(12, 2)
+  payment_method   PaymentMethod
+  payment_type     MembershipPaymentType @default(FULL)
+  installment_no   Int?
+  notes            String?       @db.Text
+  received_by      Int?
+  created_at       DateTime      @default(now())
+
+  membership       memberships   @relation(fields: [membership_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  receiver         staff?        @relation("MembershipPaymentReceived", fields: [received_by], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([membership_id])
+  @@index([created_at])
+}
+
+enum MembershipPaymentType {
+  FULL
+  DOWN_PAYMENT
+  INSTALLMENT
+}
+
 // ─── Memberships ─────────────────────────────────────────
 
 model memberships {
   id              Int      @id @default(autoincrement())
   customer_id     Int
   plan_id         Int
-  code            String   @unique @db.VarChar(50)  // SOUVARI-VIP-XXXXXX
+  code            String   @unique @db.VarChar(50)
   status          MembershipStatus @default(pending)
   start_date      DateTime @db.Date
   end_date        DateTime @db.Date
   total_spending  Decimal  @default(0) @db.Decimal(12, 2)
-  referral_credits Decimal @default(0) @db.Decimal(12, 2)
+  price           Decimal? @db.Decimal(12, 2)
+  amount_paid     Decimal  @default(0) @db.Decimal(12, 2)
+  balance         Decimal  @default(0) @db.Decimal(12, 2)
+  payment_status  PaymentStatus @default(pending)
   notes           String?  @db.Text
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
-  customer        customers       @relation(fields: [customer_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  plan            membership_plans @relation(fields: [plan_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  customer        customers             @relation(fields: [customer_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  plan            membership_plans      @relation(fields: [plan_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
   loyalty_progress loyalty_progress?
   monthly_perks   monthly_perks[]
   gifts           membership_gifts[]
-  referrals_made  referrals[]        @relation("referrer")
-  referrals_received referrals[]     @relation("referred")
   activity_logs   membership_activity_logs[]
+  payments        membership_payments[]
 
   @@index([customer_id])
   @@index([code])
@@ -939,7 +921,6 @@ enum MembershipStatus {
 model membership_benefits {
   id                 Int      @id @default(autoincrement())
   membership_plan_id Int?
-  family_id          Int?
   name               String   @db.VarChar(255)
   description        String?  @db.Text
   benefit_type       String?  @db.VarChar(50)
@@ -954,10 +935,8 @@ model membership_benefits {
   updated_at         DateTime @updatedAt
 
   plan membership_plans? @relation(fields: [membership_plan_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  family membership_families? @relation(fields: [family_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([membership_plan_id])
-  @@index([family_id])
 }
 
 // ─── Loyalty Progress ────────────────────────────────────
@@ -998,55 +977,6 @@ enum LoyaltyPlanType {
   GOLD
   PLATINUM
   ELITE
-}
-
-// ─── Referrals ───────────────────────────────────────────
-
-model referrals {
-  id                    Int      @id @default(autoincrement())
-  referrer_membership_id Int
-  referred_membership_id Int?
-  referred_customer_id  Int?
-  status                ReferralStatus @default(pending)
-  credit_amount         Decimal  @default(0) @db.Decimal(12, 2)
-  referred_name         String?  @db.VarChar(255)
-  referred_email        String?  @db.VarChar(255)
-  created_at            DateTime @default(now())
-  updated_at            DateTime @updatedAt
-
-  referrer  memberships @relation("referrer", fields: [referrer_membership_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  referred  memberships? @relation("referred", fields: [referred_membership_id], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  referred_customer customers? @relation("referred_customer_rel", fields: [referred_customer_id], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  rewards   referral_rewards[]
-
-  @@index([referrer_membership_id])
-  @@index([status])
-}
-
-enum ReferralStatus {
-  pending
-  completed
-  rejected
-}
-
-// ─── Referral Rewards ────────────────────────────────────
-
-model referral_rewards {
-  id              Int      @id @default(autoincrement())
-  referral_id     Int
-  customer_id     Int
-  credit_amount   Decimal  @db.Decimal(12, 2)
-  credit_type     String   @db.VarChar(50)  // "referral", "signup"
-  balance         Decimal  @default(0) @db.Decimal(12, 2)
-  notes           String?  @db.Text
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
-
-  referral referrals @relation(fields: [referral_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  customer customers @relation(fields: [customer_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
-
-  @@index([customer_id])
-  @@index([referral_id])
 }
 
 // ─── Monthly Perks ───────────────────────────────────────

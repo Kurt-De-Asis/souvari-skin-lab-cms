@@ -1,7 +1,45 @@
 import { Request, Response, NextFunction } from 'express';
 import { loyaltyService } from './loyalty.service';
+import prisma from '../../config/database';
 
 export class LoyaltyController {
+  async getMyProgress(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const customer = await prisma.customers.findFirst({
+        where: { user_id: req.user!.userId, deleted_at: null },
+      });
+
+      if (!customer) {
+        res.status(404).json({
+          success: false,
+          message: 'Customer profile not found',
+        });
+        return;
+      }
+
+      const membership = await prisma.memberships.findFirst({
+        where: { customer_id: customer.id, status: 'active' },
+        select: { id: true },
+      });
+
+      if (!membership) {
+        res.status(404).json({
+          success: false,
+          message: 'No active membership found',
+        });
+        return;
+      }
+
+      const result = await loyaltyService.getProgress(membership.id);
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getProgress(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const membershipId = parseInt(String(req.params.membershipId), 10);

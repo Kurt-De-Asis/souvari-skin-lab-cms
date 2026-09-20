@@ -12,6 +12,10 @@ Test individual functions and business logic:
 - **Transaction calculations**: Subtotal, tax, discount computation
 - **Authentication**: Password hashing, JWT generation/verification
 - **Authorization**: Role-based permission checks
+- **Pricing engine core** (`server/src/services/pricing-engine.core.test.ts`): unit-price resolution across audience/tier/gender/variant dimensions, membership discount, installments, rounding
+- **Seed data helpers** (`server/prisma/seed-data/helpers.test.ts`): lashTiers / waxVipNm4 / vipNm / vipNmRegular / nailArtPrices matrix builders
+
+Run with `npx vitest run` (34 tests).
 
 ### Integration Tests
 
@@ -76,22 +80,30 @@ Complete user workflows:
 ## Running Tests
 
 ```bash
-# Backend unit tests
-cd server && npm test
+# Pricing engine + seed helper unit tests
+cd server && npx vitest run
 
-# Frontend tests
-cd client && npm test
-
-# Full test suite
-npm test
+# Type checks
+cd server && npx tsc -p tsconfig.json --noEmit
+cd client && npx tsc -b
 ```
+
+## Pricing Smoke Checks
+
+Verify the live pricing engine against the seeded database (`npx ts-node --project tsconfig.seed.json <script>`):
+
+1. **Non-member and VIP paths** — a real service (e.g. Diamond Glow Classic) must resolve `non_member` → full price and `vip` → discounted price with booking fee waived and savings reported.
+2. **Membership code path** — passing `membershipCode` must resolve to VIP pricing (e.g. `SOUVARI-VIP-ZBKTYO` → vip).
+3. **Expired membership** — a membership with `end_date` in the past must resolve to `non_member` pricing with the booking fee applied, even if `status` is still `active`.
+4. **Public listing** — `GET /services` (`services.service.listPublic`) must expose numeric `vip_price` / `non_member_price` alongside `price` for the frontend catalog.
+5. **Idempotent re-seed** — re-running `npm run db:seed:catalog` must report 0 orphaned services, 0 legacy backfills, and only re-touch data issues (stale issues for retired services get auto-resolved).
 
 ## Test Data
 
 Seed data provides realistic test scenarios:
 - 1 admin, 4 staff, 20 customers
-- 12 services with inventory consumption configs
-- 18 products with various units
-- 85+ historical appointments
-- 35+ historical transactions
-- Treatment records and inventory movements
+- 24 catalog sections, 389 active services, 48 variants, 1,414 available price rows, 129 packages
+- 237 retired placeholder services kept for history (`service_staff`, appointments preserved)
+- 38 active memberships driving VIP pricing
+- Historical appointments (14) and transaction items with `price_type` backfilled; `quoted_price`/`unit_price` preserved
+- Data quality issues browsable in the **Data Quality** admin page (`/admin/data-quality`)

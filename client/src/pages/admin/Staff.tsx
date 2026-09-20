@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
-import { Search, Plus, Pencil, Calendar, Scissors, Star } from 'lucide-react';
+import { Search, Plus, Pencil, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
 import dayjs from 'dayjs';
-import { staffApi, servicesApi } from '@/api';
+import { staffApi } from '@/api';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
 import Pagination from '@/components/ui/Pagination';
@@ -19,7 +19,6 @@ interface Staff {
   position: string;
   job_title?: string;
   permission_level?: string;
-  rating?: number;
   status: string;
   schedules?: any[];
 }
@@ -36,19 +35,23 @@ interface StaffForm {
 }
 
 interface Schedule {
-  id: number;
-  day_of_week: number;
+  day_of_week: string;
   start_time: string;
   end_time: string;
-  is_off: boolean;
+  break_start: string | null;
+  break_end: string | null;
 }
 
-interface Service {
-  id: number;
-  name: string;
-}
-
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const WEEK_ORDER = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+const WEEK: { key: string; label: string }[] = [
+  { key: 'sunday', label: 'Sunday' },
+  { key: 'monday', label: 'Monday' },
+  { key: 'tuesday', label: 'Tuesday' },
+  { key: 'wednesday', label: 'Wednesday' },
+  { key: 'thursday', label: 'Thursday' },
+  { key: 'friday', label: 'Friday' },
+  { key: 'saturday', label: 'Saturday' },
+];
 
 export default function Staff() {
   const [staff, setStaff] = useState<Staff[]>([]);
@@ -68,14 +71,6 @@ export default function Staff() {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [scheduleSaving, setScheduleSaving] = useState(false);
-
-  // Services modal
-  const [servicesModalOpen, setServicesModalOpen] = useState(false);
-  const [serviceStaff, setServiceStaff] = useState<Staff | null>(null);
-  const [allServices, setAllServices] = useState<Service[]>([]);
-  const [assignedServiceIds, setAssignedServiceIds] = useState<number[]>([]);
-  const [servicesLoading, setServicesLoading] = useState(false);
-  const [servicesSaving, setServicesSaving] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<StaffForm>();
 
@@ -138,32 +133,69 @@ export default function Staff() {
     setScheduleLoading(true);
     try {
       const { data } = await staffApi.getSchedules(s.id);
-      setSchedules(data.data?.schedules || data.data || []);
+      const rows = data.data?.schedules || data.data || [];
+      const normalized = WEEK_ORDER.map((d) => {
+        const existing = (rows || []).find((r: any) => r.day_of_week === d);
+        if (existing) {
+          return {
+            day_of_week: existing.day_of_week,
+            start_time: existing.start_time,
+            end_time: existing.end_time,
+            break_start: existing.break_start ?? null,
+            break_end: existing.break_end ?? null,
+          };
+        }
+        return { day_of_week: d, start_time: '00:00', end_time: '00:00', break_start: null, break_end: null };
+      });
+      setSchedules(normalized);
     } catch {
       toast.error('Failed to load schedule');
-      setSchedules([]);
+      setSchedules(WEEK_ORDER.map((d) => ({ day_of_week: d, start_time: '00:00', end_time: '00:00', break_start: null, break_end: null })));
     } finally {
       setScheduleLoading(false);
     }
   };
 
-  const updateScheduleDay = (dayIndex: number, field: keyof Schedule, value: any) => {
-    setSchedules((prev) => {
-      const existing = prev.find((s) => s.day_of_week === dayIndex);
-      if (existing) {
-        return prev.map((s) => (s.day_of_week === dayIndex ? { ...s, [field]: value } : s));
-      }
-      return [...prev, { id: 0, day_of_week: dayIndex, start_time: '09:00', end_time: '17:00', is_off: true, [field]: value }].sort((a, b) => a.day_of_week - b.day_of_week);
-    });
+  const toggleWorkingDay = (dayOfWeek: string, working: boolean) => {
+    setSchedules((prev) =>
+      prev.map((s) => {
+        if (s.day_of_week !== dayOfWeek) return s;
+        if (working) {
+          const isCurrentlyOff = s.start_time === '00:00' && s.end_time === '00:00';
+          return {
+            ...s,
+            start_time: isCurrentlyOff ? '09:00' : s.start_time,
+            end_time: isCurrentlyOff ? '18:00' : s.end_time,
+            break_start: null,
+            break_end: null,
+          };
+        }
+        return { ...s, start_time: '00:00', end_time: '00:00', break_start: null, break_end: null };
+      })
+    );
+  };
+
+  const updateScheduleDay = (dayOfWeek: string, field: keyof Schedule, value: any) => {
+    setSchedules((prev) =>
+      prev.map((s) => (s.day_of_week === dayOfWeek ? { ...s, [field]: value } : s))
+    );
   };
 
   const saveSchedules = async () => {
     if (!scheduleStaff) return;
     setScheduleSaving(true);
     try {
-      await staffApi.updateSchedules(scheduleStaff.id, { schedules });
+      const payload = WEEK_ORDER.map((d) => {
+        const s = schedules.find((x) => x.day_of_week === d);
+        const isOff = !s || (s.start_time === '00:00' && s.end_time === '00:00');
+        return isOff
+          ? { day_of_week: d, start_time: '00:00', end_time: '00:00', break_start: null, break_end: null, is_active: true }
+          : { day_of_week: d, start_time: s!.start_time, end_time: s!.end_time, break_start: s!.break_start || null, break_end: s!.break_end || null, is_active: true };
+      });
+      await staffApi.updateSchedules(scheduleStaff.id, { schedules: payload });
       toast.success('Schedule updated');
       setScheduleModalOpen(false);
+      fetchStaff();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to save schedule');
     } finally {
@@ -171,49 +203,12 @@ export default function Staff() {
     }
   };
 
-  const openServicesModal = async (s: Staff) => {
-    setServiceStaff(s);
-    setServicesModalOpen(true);
-    setServicesLoading(true);
-    try {
-      const [allRes, staffRes] = await Promise.all([servicesApi.list(), staffApi.getById(s.id)]);
-      const allSvcs = allRes.data.data?.services || allRes.data.data?.data || [];
-      setAllServices(allSvcs);
-      const staffData = staffRes.data.data;
-      setAssignedServiceIds((staffData?.services || []).map((sv: any) => sv.id));
-    } catch {
-      toast.error('Failed to load services');
-    } finally {
-      setServicesLoading(false);
-    }
-  };
-
-  const toggleService = (serviceId: number) => {
-    setAssignedServiceIds((prev) =>
-      prev.includes(serviceId) ? prev.filter((id) => id !== serviceId) : [...prev, serviceId]
-    );
-  };
-
-  const saveAssignedServices = async () => {
-    if (!serviceStaff) return;
-    setServicesSaving(true);
-    try {
-      await staffApi.update(serviceStaff.id, { serviceIds: assignedServiceIds });
-      toast.success('Services updated');
-      setServicesModalOpen(false);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to save services');
-    } finally {
-      setServicesSaving(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Staff</h1>
-          <p className="text-sm text-neutral-500 mt-1">Manage staff members and schedules</p>
+          <h1 className="text-2xl font-sans font-semibold text-neutral-900">Team Members</h1>
+          <p className="text-sm text-neutral-500 mt-1">Manage team members and their weekly schedules</p>
         </div>
         <button onClick={openAddModal} className="btn-primary">
           <Plus size={18} />
@@ -226,6 +221,11 @@ export default function Staff() {
         <div className="flex flex-wrap gap-3 pb-4">
           <select className="select-field w-auto" value={positionFilter} onChange={(e) => setPositionFilter(e.target.value)}>
             <option value="">All Positions</option>
+            <option value="head_admin">Head/Admin</option>
+            <option value="nail_technician">Nail Technician</option>
+            <option value="facialist">Facialist</option>
+            <option value="nail_and_skin_care_specialist">Nail and Skin Care Specialist</option>
+            <option value="clinic_head_nurse">Clinic Head Nurse</option>
             <option value="doctor">Doctor</option>
             <option value="nurse">Nurse</option>
             <option value="therapist">Therapist</option>
@@ -254,13 +254,12 @@ export default function Staff() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                  <th className="px-6 py-3 font-medium">Name</th>
-                  <th className="px-6 py-3 font-medium">Job Title</th>
-                  <th className="px-6 py-3 font-medium">Permission</th>
-                  <th className="px-6 py-3 font-medium">Rating</th>
-                  <th className="px-6 py-3 font-medium">Hours/Week</th>
-                  <th className="px-6 py-3 font-medium">Status</th>
-                  <th className="px-6 py-3 font-medium text-right">Actions</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Name</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Job Title</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Permission</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Hours/Week</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Status</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
@@ -295,26 +294,15 @@ export default function Staff() {
                           {s.permission_level || 'medium'}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        {s.rating ? (
-                          <div className="flex items-center gap-1 text-sm">
-                            <Star size={14} className="fill-amber-400 text-amber-400" />
-                            <span className="text-neutral-700">{Number(s.rating).toFixed(1)}</span>
-                          </div>
-                        ) : <span className="text-neutral-400 text-sm">—</span>}
-                      </td>
                       <td className="px-6 py-4 text-sm text-neutral-600">{hoursPerWeek}h</td>
                       <td className="px-6 py-4"><StatusBadge status={s.status} /></td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => openEditModal(s)} title="Edit" className="p-2 text-neutral-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition">
+                          <button onClick={() => openEditModal(s)} title="Edit" className="p-2 text-neutral-500 hover:text-primary-600 hover:bg-primary-50 rounded-md transition">
                             <Pencil size={16} />
                           </button>
-                          <button onClick={() => openScheduleModal(s)} title="Schedule" className="p-2 text-neutral-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition">
+                          <button onClick={() => openScheduleModal(s)} title="Schedule" className="p-2 text-neutral-500 hover:text-primary-700 hover:bg-blue-50 rounded-md transition">
                             <Calendar size={16} />
-                          </button>
-                          <button onClick={() => openServicesModal(s)} title="Services" className="p-2 text-neutral-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition">
-                            <Scissors size={16} />
                           </button>
                         </div>
                       </td>
@@ -335,7 +323,7 @@ export default function Staff() {
       {/* Add/Edit Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingStaff ? 'Edit Staff' : 'Add Staff'}>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">First Name</label>
               <input className="input-field" placeholder="First name" {...register('first_name', { required: 'Required' })} />
@@ -352,7 +340,7 @@ export default function Staff() {
             <input type="email" className="input-field" placeholder="email@example.com" {...register('email', { required: 'Required' })} />
             {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email.message}</p>}
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Phone</label>
               <input className="input-field" placeholder="Phone number" {...register('phone', { required: 'Required' })} />
@@ -360,19 +348,24 @@ export default function Staff() {
             </div>
             <div>
               <label className="label">Position</label>
-              <select className="select-field" {...register('position', { required: 'Required' })}>
-                <option value="">Select position</option>
-                <option value="doctor">Doctor</option>
-                <option value="nurse">Nurse</option>
-                <option value="therapist">Therapist</option>
-                <option value="aesthetician">Aesthetician</option>
-                <option value="receptionist">Receptionist</option>
-                <option value="manager">Manager</option>
-              </select>
+<select className="select-field" {...register('position', { required: 'Required' })}>
+            <option value="">Select position</option>
+            <option value="head_admin">Head/Admin</option>
+            <option value="nail_technician">Nail Technician</option>
+            <option value="facialist">Facialist</option>
+            <option value="nail_and_skin_care_specialist">Nail and Skin Care Specialist</option>
+            <option value="clinic_head_nurse">Clinic Head Nurse</option>
+            <option value="doctor">Doctor</option>
+            <option value="nurse">Nurse</option>
+            <option value="therapist">Therapist</option>
+            <option value="aesthetician">Aesthetician</option>
+            <option value="receptionist">Receptionist</option>
+            <option value="manager">Manager</option>
+          </select>
               {errors.position && <p className="text-xs text-red-600 mt-1">{errors.position.message}</p>}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Job Title</label>
               <input className="input-field" placeholder="e.g. Skincare Specialist" {...register('job_title')} />
@@ -407,36 +400,56 @@ export default function Staff() {
           <LoadingSpinner />
         ) : (
           <div className="space-y-3">
-            <div className="text-xs text-neutral-500 mb-2">Set working hours for each day of the week.</div>
-            {DAYS.map((day, idx) => {
-              const daySchedule = schedules.find((s) => s.day_of_week === idx);
-              const isOff = daySchedule?.is_off ?? true;
+            <div className="text-xs text-neutral-500 mb-2">Set working hours for each day of the week. Break times are optional.</div>
+            {WEEK.map((day) => {
+              const daySchedule = schedules.find((s) => s.day_of_week === day.key);
+              const isOff = !daySchedule || (daySchedule.start_time === '00:00' && daySchedule.end_time === '00:00');
               return (
-                <div key={idx} className="flex items-center gap-4 p-3 rounded-lg bg-neutral-50">
-                  <span className="w-28 text-sm font-medium text-neutral-700">{day}</span>
-                  <label className="flex items-center gap-2 text-sm text-neutral-600">
-                    <input
-                      type="checkbox"
-                      checked={!isOff}
-                      onChange={(e) => updateScheduleDay(idx, 'is_off', !e.target.checked)}
-                      className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    Working
-                  </label>
+                <div key={day.key} className="p-3 rounded-md bg-neutral-50">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <span className="w-full sm:w-28 text-sm font-medium text-neutral-700">{day.label}</span>
+                    <label className="flex items-center gap-2 text-sm text-neutral-600">
+                      <input
+                        type="checkbox"
+                        checked={!isOff}
+                        onChange={(e) => toggleWorkingDay(day.key, e.target.checked)}
+                        className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                      />
+                      Working
+                    </label>
+                    {!isOff && (
+                      <div className="flex items-center gap-2 ml-auto">
+                        <input
+                          type="time"
+                          value={daySchedule!.start_time}
+                          onChange={(e) => updateScheduleDay(day.key, 'start_time', e.target.value)}
+                          className="input-field w-auto"
+                        />
+                        <span className="text-neutral-400">—</span>
+                        <input
+                          type="time"
+                          value={daySchedule!.end_time}
+                          onChange={(e) => updateScheduleDay(day.key, 'end_time', e.target.value)}
+                          className="input-field w-auto"
+                        />
+                      </div>
+                    )}
+                  </div>
                   {!isOff && (
-                    <div className="flex items-center gap-2 ml-auto">
+                    <div className="flex items-center gap-3 mt-2 ml-[7.5rem] sm:ml-[8.5rem]">
+                      <span className="text-xs text-neutral-500 whitespace-nowrap">Break:</span>
                       <input
                         type="time"
-                        value={daySchedule?.start_time || '09:00'}
-                        onChange={(e) => updateScheduleDay(idx, 'start_time', e.target.value)}
-                        className="input-field w-auto"
+                        value={daySchedule!.break_start || ''}
+                        onChange={(e) => updateScheduleDay(day.key, 'break_start', e.target.value || null)}
+                        className="input-field w-auto text-xs"
                       />
                       <span className="text-neutral-400">—</span>
                       <input
                         type="time"
-                        value={daySchedule?.end_time || '17:00'}
-                        onChange={(e) => updateScheduleDay(idx, 'end_time', e.target.value)}
-                        className="input-field w-auto"
+                        value={daySchedule!.break_end || ''}
+                        onChange={(e) => updateScheduleDay(day.key, 'break_end', e.target.value || null)}
+                        className="input-field w-auto text-xs"
                       />
                     </div>
                   )}
@@ -447,40 +460,6 @@ export default function Staff() {
               <button onClick={() => setScheduleModalOpen(false)} className="btn-secondary">Cancel</button>
               <button onClick={saveSchedules} disabled={scheduleSaving} className="btn-primary">
                 {scheduleSaving ? 'Saving...' : 'Save Schedule'}
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Services Modal */}
-      <Modal open={servicesModalOpen} onClose={() => setServicesModalOpen(false)} title={`Assign Services — ${serviceStaff?.first_name} ${serviceStaff?.last_name}`} maxWidth="max-w-lg">
-        {servicesLoading ? (
-          <LoadingSpinner />
-        ) : (
-          <div className="space-y-4">
-            <p className="text-sm text-neutral-500">Select the services this staff member can perform.</p>
-            <div className="max-h-80 overflow-y-auto space-y-2">
-              {allServices.length === 0 ? (
-                <p className="text-sm text-neutral-400 text-center py-4">No services available</p>
-              ) : (
-                allServices.map((svc) => (
-                  <label key={svc.id} className="flex items-center gap-3 p-3 rounded-lg border border-neutral-200 hover:bg-neutral-50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={assignedServiceIds.includes(svc.id)}
-                      onChange={() => toggleService(svc.id)}
-                      className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <span className="text-sm font-medium text-neutral-700">{svc.name}</span>
-                  </label>
-                ))
-              )}
-            </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <button onClick={() => setServicesModalOpen(false)} className="btn-secondary">Cancel</button>
-              <button onClick={saveAssignedServices} disabled={servicesSaving} className="btn-primary">
-                {servicesSaving ? 'Saving...' : 'Save Services'}
               </button>
             </div>
           </div>

@@ -14,10 +14,12 @@ interface Movement {
   product: { id: number; name: string } | string;
   type: string;
   quantity: number;
-  stock_after: number;
-  performed_by: string;
+  running_stock_after: number;
+  performed_by: number;
+  performed_by_user?: { id: number; email: string } | null;
   created_at: string;
   reason?: string;
+  notes?: string | null;
 }
 
 interface LowStockProduct {
@@ -26,7 +28,7 @@ interface LowStockProduct {
   current_stock: number;
   minimum_stock: number;
   unit: string;
-  category: string;
+  category_name: string;
 }
 
 interface Product {
@@ -93,12 +95,12 @@ export default function Inventory() {
       const params: Record<string, string> = { page: String(movementsPage), limit: '15' };
       if (movementProductFilter) params.product_id = movementProductFilter;
       if (movementTypeFilter) params.type = movementTypeFilter;
-      if (movementDateFrom) params.date_from = movementDateFrom;
-      if (movementDateTo) params.date_to = movementDateTo;
+      if (movementDateFrom) params.start_date = movementDateFrom;
+      if (movementDateTo) params.end_date = movementDateTo;
       const { data } = await inventoryApi.list(params);
-      setMovements(data.data?.movements || data.data?.data || []);
-      setMovementsTotalPages(data.data?.totalPages || data.data?.pagination?.totalPages || 1);
-      setMovementsTotal(data.data?.total || data.data?.pagination?.total || 0);
+      setMovements(data.data || []);
+      setMovementsTotalPages(data.pagination?.totalPages || 1);
+      setMovementsTotal(data.pagination?.total || 0);
     } catch {
       toast.error('Failed to load movements');
     } finally {
@@ -110,7 +112,7 @@ export default function Inventory() {
     setLowStockLoading(true);
     try {
       const { data } = await inventoryApi.getLowStock();
-      setLowStockProducts(data.data?.products || data.data?.data || []);
+      setLowStockProducts(data.data || []);
     } catch {
       toast.error('Failed to load low stock data');
     } finally {
@@ -121,7 +123,7 @@ export default function Inventory() {
   const fetchProducts = useCallback(async () => {
     try {
       const { data } = await productsApi.list({ limit: '200' });
-      setAllProducts(data.data?.products || data.data?.data || []);
+      setAllProducts(data.data || []);
     } catch { /* silent */ }
   }, []);
 
@@ -171,11 +173,13 @@ export default function Inventory() {
   const getTypeBadge = (type: string) => {
     const colors: Record<string, string> = {
       purchase: 'badge-success',
-      adjustment_add: 'badge-info',
-      adjustment_deduct: 'badge-danger',
+      adjustment: 'badge-info',
       sale: 'badge-warning',
-      usage: 'badge-warning',
+      consumption: 'badge-warning',
       return: 'badge-info',
+      damage: 'badge-danger',
+      transfer: 'badge-neutral',
+      opening_stock: 'badge-neutral',
     };
     return colors[type] || 'badge-neutral';
   };
@@ -184,7 +188,7 @@ export default function Inventory() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900">Inventory</h1>
+          <h1 className="text-2xl font-sans font-semibold text-neutral-900">Inventory</h1>
           <p className="text-sm text-neutral-500 mt-1">Track stock movements and manage inventory</p>
         </div>
         <div className="flex gap-2">
@@ -208,7 +212,7 @@ export default function Inventory() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
             {lowStockProducts.map((p) => (
-              <div key={p.id} className="flex items-center justify-between p-2 bg-white rounded-lg border border-red-100">
+              <div key={p.id} className="flex items-center justify-between p-2 bg-white rounded-md border border-red-100">
                 <div>
                   <p className="text-sm font-medium text-neutral-900">{p.name}</p>
                   <p className="text-xs text-red-600">Stock: {p.current_stock} / Min: {p.minimum_stock} {p.unit}</p>
@@ -260,11 +264,12 @@ export default function Inventory() {
                 <select className="select-field w-auto" value={movementTypeFilter} onChange={(e) => setMovementTypeFilter(e.target.value)}>
                   <option value="">All Types</option>
                   <option value="purchase">Purchase</option>
-                  <option value="adjustment_add">Adjustment (+)</option>
-                  <option value="adjustment_deduct">Adjustment (-)</option>
+                  <option value="adjustment">Adjustment</option>
                   <option value="sale">Sale</option>
-                  <option value="usage">Usage</option>
+                  <option value="consumption">Consumption</option>
                   <option value="return">Return</option>
+                  <option value="damage">Damage</option>
+                  <option value="transfer">Transfer</option>
                 </select>
               </div>
               <div>
@@ -288,12 +293,12 @@ export default function Inventory() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                      <th className="px-6 py-3 font-medium">Date</th>
-                      <th className="px-6 py-3 font-medium">Product</th>
-                      <th className="px-6 py-3 font-medium">Type</th>
-                      <th className="px-6 py-3 font-medium">Quantity</th>
-                      <th className="px-6 py-3 font-medium">Stock After</th>
-                      <th className="px-6 py-3 font-medium">Performed By</th>
+                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Date</th>
+                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Product</th>
+                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Type</th>
+                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Quantity</th>
+                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Stock After</th>
+                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Performed By</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-100">
@@ -307,12 +312,18 @@ export default function Inventory() {
                           <span className={`badge ${getTypeBadge(m.type)}`}>{m.type.replace(/_/g, ' ')}</span>
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`font-medium ${m.type.includes('deduct') || m.type === 'sale' || m.type === 'usage' ? 'text-red-600' : 'text-green-600'}`}>
-                            {m.type.includes('deduct') || m.type === 'sale' || m.type === 'usage' ? '-' : '+'}{m.quantity}
+                          <span className={`font-medium ${
+                            m.quantity < 0 || m.type === 'sale' || m.type === 'consumption' || m.type === 'damage'
+                              ? 'text-red-600'
+                              : 'text-green-600'
+                          }`}>
+                            {m.quantity < 0 || m.type === 'sale' || m.type === 'consumption' || m.type === 'damage'
+                              ? m.quantity < 0 ? m.quantity : `-${m.quantity}`
+                              : `+${m.quantity}`}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-neutral-600">{m.stock_after}</td>
-                        <td className="px-6 py-4 text-neutral-600">{m.performed_by || '—'}</td>
+                        <td className="px-6 py-4 text-neutral-600">{m.running_stock_after}</td>
+                        <td className="px-6 py-4 text-neutral-600">{m.performed_by_user?.email || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -340,12 +351,12 @@ export default function Inventory() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                    <th className="px-6 py-3 font-medium">Product</th>
-                    <th className="px-6 py-3 font-medium">Category</th>
-                    <th className="px-6 py-3 font-medium">Current Stock</th>
-                    <th className="px-6 py-3 font-medium">Minimum Stock</th>
-                    <th className="px-6 py-3 font-medium">Unit</th>
-                    <th className="px-6 py-3 font-medium">Deficit</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Product</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Category</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Current Stock</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Minimum Stock</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Unit</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Deficit</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
@@ -357,7 +368,7 @@ export default function Inventory() {
                           {p.name}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-neutral-600 capitalize">{p.category || '—'}</td>
+                      <td className="px-6 py-4 text-neutral-600 capitalize">{p.category_name || '—'}</td>
                       <td className="px-6 py-4 font-medium text-red-600">{p.current_stock}</td>
                       <td className="px-6 py-4 text-neutral-600">{p.minimum_stock}</td>
                       <td className="px-6 py-4 text-neutral-600">{p.unit}</td>
@@ -376,8 +387,8 @@ export default function Inventory() {
         <div className="card">
           <p className="text-sm text-neutral-500 mb-4">Quick access to stock adjustments and purchase recording.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <button onClick={() => setAdjustModalOpen(true)} className="flex items-center gap-4 p-5 rounded-xl border-2 border-dashed border-neutral-200 hover:border-primary-300 hover:bg-primary-50/30 transition text-left">
-              <div className="p-3 rounded-xl bg-blue-50 text-blue-600">
+            <button onClick={() => setAdjustModalOpen(true)} className="flex items-center gap-4 p-5 rounded-md border-2 border-dashed border-neutral-200 hover:border-primary-300 hover:bg-primary-50/30 transition text-left">
+              <div className="p-3 rounded-md bg-blue-50 text-primary-700">
                 <ArrowUpDown size={22} />
               </div>
               <div>
@@ -385,8 +396,8 @@ export default function Inventory() {
                 <p className="text-sm text-neutral-500">Add or deduct stock with a reason</p>
               </div>
             </button>
-            <button onClick={() => setPurchaseModalOpen(true)} className="flex items-center gap-4 p-5 rounded-xl border-2 border-dashed border-neutral-200 hover:border-primary-300 hover:bg-primary-50/30 transition text-left">
-              <div className="p-3 rounded-xl bg-green-50 text-green-600">
+            <button onClick={() => setPurchaseModalOpen(true)} className="flex items-center gap-4 p-5 rounded-md border-2 border-dashed border-neutral-200 hover:border-primary-300 hover:bg-primary-50/30 transition text-left">
+              <div className="p-3 rounded-md bg-green-50 text-green-600">
                 <Package size={22} />
               </div>
               <div>

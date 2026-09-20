@@ -9,6 +9,7 @@ import {
   extendMembershipSchema,
   membershipQuerySchema,
   availMembershipSchema,
+  membershipPaymentSchema,
 } from './memberships.validation';
 
 const router = Router();
@@ -53,6 +54,19 @@ router.put(
   authorize('admin'),
   validate(extendMembershipSchema),
   membershipsController.extend
+);
+
+router.get(
+  '/:id/payments',
+  authorize('admin'),
+  membershipsController.listPayments
+);
+
+router.post(
+  '/:id/payments',
+  authorize('admin'),
+  validate(membershipPaymentSchema),
+  membershipsController.recordPayment
 );
 
 export default router;

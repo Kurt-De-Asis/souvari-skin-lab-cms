@@ -2,7 +2,58 @@
 
 ## Overview
 
-The database uses MySQL 8.0 with InnoDB engine and utf8mb4 character set. It contains 20 tables and 6 analytics views.
+The database uses MySQL 8.0 with InnoDB engine and utf8mb4 character set. It contains 26 tables and 6 analytics views.
+
+The service catalog is seed-managed from `server/prisma/seed-catalog.ts`. It defines 24 sections (groups), each with its own slug and sorted by `display_order`:
+
+| Section | Display Order | Pricing Model |
+|---------|--------------|----------------|
+| signature-facials | 1 | vipNm |
+| glow-combos | 2 | vipNm |
+| body-whitening | 3 | vipNm |
+| diode-laser | 4 | vipNm |
+| beauty-enhancers | 5 | vipNm |
+| hifu | 6 | vipNm |
+| session-packages | 7 | vipNm + service_packages |
+| skin-tag-removal | 8 | vipNm (variants for size) |
+| nails-essential | 9 | vipNm |
+| nails-gel | 10 | vipNm |
+| nails-extensions | 11 | vipNm |
+| nails-art | 12 | nailArtPrices (variants) |
+| nails-crystals | 13 | crystalPrices |
+| nails-packages | 14 | vipNm + packages |
+| hand-spa | 15 | vipNm |
+| foot-spa | 16 | vipNm |
+| spa-addons | 17 | vipNm |
+| lashes-brows | 18 | lashTiers (senior/guru staff tiers) |
+| permanent-makeup | 19 | vipNmRegular (3-tier) |
+| threading | 21 | vipNm |
+| hot-wax | 22 | waxVipNm4 (female/male split) |
+| advance-aesthetic-solutions | 23 | retail (non_member only) |
+| premium-iv-drips | 24 | retail |
+| premium-iv-addons | 25 | retail |
+
+### Pricing Model
+
+- **Audiences**: `vip` (SOUVARI member), `non_member` (regular customer without membership), `regular` (used for PMU/staff-tier pricing on permanent-makeup section).
+- **Resolution order** (server/src/services/pricing.service.ts): VIP → exact match → gender → staff tier → no_variant → regular_fallback; Non-member → exact → gender → staff → no_variant → null (no regular fallback). Legacy services fall back to `vip_price`/`non_member_price`/`price` columns.
+- **SOURCE B retail-only** services (sections 23-25): single `non_member` price row. VIP members fall back to the backfilled `vip_price`/`non_member_price` legacy columns.
+- **Membership expiry**: an active-VIP pricing lookup is only honored while `end_date` >= today (end-of-day). Expired memberships resolve to non_member pricing.
+- **History is preserved**: quotes, transaction unit prices, and line totals are never rewritten. Only the new `price_type` column on appointments/transaction_items is backfilled from membership status at the time.
+
+### Retire-not-delete
+
+Placeholder services removed during the catalog rollout are **retired**, not deleted: `is_active=false`, `status='inactive'`. Their `service_staff` rows (1,189) and historical appointments remain intact so past records keep referencing real services. `retireOrphanedServices()` in `seed-catalog.ts` only retires services that belong to a seeded group and whose slug is no longer in the catalog; standalone legacy services (e.g. Acne Treatment) are left active.
+
+### Seed Workflow
+
+```bash
+npm run db:seed:catalog          # groups, services, variants, prices, packages
+npm run db:seed:memberships      # membership plans + sample members
+npx vitest run                   # pricing engine + helper regression tests
+```
+
+The catalog seed is idempotent: re-running it retires no extra services, backfills nothing new, and replaces stale data-issue rows. Provenance fields (`external_id`, `sku`, `treatment_type`) are written for SOURCE B imports.
 
 ## Entity Relationship Summary
 
@@ -107,10 +158,89 @@ Unique constraint: (staff_id, day_of_week)
 | name | VARCHAR(255) | Service name |
 | description | TEXT | Full description |
 | category | ENUM | facial, body, hair_removal, skin_rejuvenation, injection, laser, consultation, package, other |
-| price | DECIMAL(12,2) | Price in PHP |
+| category_id | INT FK | Legacy service category |
+| pricing_type | VARCHAR(20) | fixed (other pricing models TBD) |
+| price | DECIMAL(12,2) | Regular (non-VIP) price in PHP |
+| vip_price | DECIMAL(12,2) NULL | VIP price (legacy fallback column) |
+| non_member_price | DECIMAL(12,2) NULL | Non-member price (legacy fallback column) |
 | duration_minutes | INT | Duration |
-| is_active | BOOLEAN | Active flag |
+| is_active | BOOLEAN | Active flag (0 = retired, never deleted) |
 | status | ENUM | active, inactive, draft |
+| group_id | INT FK → service_groups | Catalog section this service belongs to |
+| slug | VARCHAR(255) UNIQUE NULL | Stable catalog identifier (th-chin, di-hair-removal, hx-…) |
+| inclusions | JSON NULL | What the service includes |
+| is_legacy | BOOLEAN | True = pre-catalog service not managed by the seed |
+| needs_verification | BOOLEAN | Flagged for manual price review from source |
+| external_id | VARCHAR(100) NULL | SOURCE B (Doctors-Procedures.xlsx) Service ID |
+| sku | VARCHAR(120) NULL | SOURCE B SKU |
+| treatment_type | VARCHAR(100) NULL | SOURCE B treatment type |
+| online_booking | VARCHAR(20) | Enabled/Disabled |
+| available_for | VARCHAR(30) | Everyone (or restricted group) |
+| voucher_sales | VARCHAR(20) | Enabled/Disabled |
+| commissions | VARCHAR(20) | Enabled/Disabled |
+
+### service_groups
+| Column | Type | Description |
+|--------|------|-------------|
+| id | INT PK AUTO_INCREMENT | Unique identifier |
+| slug | VARCHAR(80) UNIQUE | Section slug (signature-facials, premium-iv-drips, …) |
+| name | VARCHAR(150) | Display name |
+| description | TEXT NULL | Group description |
+| display_order | INT | Section order in the catalog |
+| is_bookable | BOOLEAN | False for SOURCE B groups (advance procedures / IV drips) |
+
+### service_variants
+| Column | Type | Description |
+|--------|------|-------------|
+| id | INT PK AUTO_INCREMENT | Unique identifier |
+| service_id | INT FK → services | Parent service |
+| variant_key | ENUM | session, per_nail, full_set, fill_up, … |
+| label | VARCHAR(150) | Display label |
+| duration_minutes | INT NULL | Per-variant duration |
+| is_active | BOOLEAN | Active flag |
+
+Unique constraint: `(service_id, variant_key)`
+
+### service_prices (multi-dimensional pricing matrix)
+| Column | Type | Description |
+|--------|------|-------------|
+| id | INT PK AUTO_INCREMENT | Unique identifier |
+| service_id | INT FK → services | Service |
+| service_variant_id | INT FK → service_variants NULL | Variant (per_nail, etc.) |
+| audience | ENUM | vip, non_member, regular |
+| staff_tier | ENUM | technician, standard, senior, guru |
+| gender_scope | ENUM | any, male, female |
+| amount | DECIMAL(12,2) | Price for this dimension combination |
+| is_available | BOOLEAN | False = option offered (e.g. male wax where PDF shows dash) |
+| needs_verification | BOOLEAN | Manual review flag |
+| source_ref | VARCHAR(120) | "PDF p.48 · Threading" |
+
+Unique constraint: `(service_id, service_variant_id, audience, staff_tier, gender_scope)`
+
+### service_packages
+| Column | Type | Description |
+|--------|------|-------------|
+| id | INT PK AUTO_INCREMENT | Unique identifier |
+| service_id | INT FK → services | Parent service |
+| sessions_included | INT | Sessions in package |
+| session_price | DECIMAL(12,2) | **Per-session** rate (vip ÷ sessions) |
+| ten_session_price | DECIMAL(12,2) NULL | 10-session VIP rate |
+| inclusions | JSON NULL | What the package includes |
+| savings_note | VARCHAR(255) | Displayed savings message |
+
+### service_data_issues
+| Column | Type | Description |
+|--------|------|-------------|
+| id | INT PK AUTO_INCREMENT | Unique identifier |
+| service_id | INT FK NULL | Related service |
+| price_id | INT FK NULL | Related price row |
+| issue_type | ENUM | pdf_mismatch, ambiguous_pricing, unavailable_option, … |
+| severity | ENUM | info, warning, critical |
+| status | ENUM | open, resolved, waived |
+| title | VARCHAR(255) | Issue summary |
+| details | JSON | Structured details (amounts, source refs) |
+| resolved_by | INT FK NULL | Who resolved it |
+| resolved_at | DATETIME NULL | When resolved/waived |
 
 ### service_staff (M2M junction)
 | Column | Type | Description |
@@ -173,6 +303,9 @@ Unique constraint: (staff_id, day_of_week)
 | start_time | VARCHAR(5) | "14:00" |
 | end_time | VARCHAR(5) | "15:00" |
 | status | ENUM | pending, confirmed, checked_in, in_progress, completed, cancelled, no_show |
+| quoted_price | DECIMAL(12,2) NULL | Price quoted at booking (preserved literally) |
+| price_type | VARCHAR(20) NULL | vip / non_member / regular snapshot at booking |
+| membership_code | VARCHAR(50) NULL | Membership code that determined the price |
 | cancellation_reason | TEXT | Reason for cancellation |
 | reminder_sent | BOOLEAN | SMS reminder sent |
 
@@ -224,8 +357,25 @@ Unique constraint: (staff_id, day_of_week)
 | service_id | INT FK → services NULL | Service (if service item) |
 | description | VARCHAR(255) | Item description |
 | quantity | DECIMAL(10,3) | Quantity |
-| unit_price | DECIMAL(12,2) | Price per unit |
+| unit_price | DECIMAL(12,2) | Price per unit (preserved literally) |
+| price_type | VARCHAR(20) NULL | vip / non_member / regular snapshot at sale |
+| discount | DECIMAL(12,2) | Line discount |
+| tax | DECIMAL(12,2) | Line tax |
 | line_total | DECIMAL(12,2) | Line total |
+
+### memberships
+| Column | Type | Description |
+|--------|------|-------------|
+| id | INT PK AUTO_INCREMENT | Unique identifier |
+| customer_id | INT FK → customers | Member |
+| plan_id | INT FK → membership_plans | Plan |
+| code | VARCHAR(50) UNIQUE | SOUVARI-VIP-XXXXXX |
+| status | ENUM | active, expired, suspended, cancelled, pending |
+| start_date | DATE | Membership start |
+| end_date | DATE | Membership expiry (drives active pricing) |
+| total_spending | DECIMAL(12,2) | Lifetime spend |
+| referral_credits | DECIMAL(12,2) | Referral credits |
+| notes | TEXT NULL | Notes |
 
 ### notifications
 | Column | Type | Description |

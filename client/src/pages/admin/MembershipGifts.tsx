@@ -101,7 +101,7 @@ export default function MembershipGifts() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-neutral-900">Membership Gifts</h1>
+        <h1 className="text-2xl font-sans font-semibold text-neutral-900">Membership Gifts</h1>
         <p className="text-sm text-neutral-500 mt-1">Review and manage membership gift requests</p>
       </div>
 
@@ -137,11 +137,11 @@ export default function MembershipGifts() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                  <th className="px-6 py-3 font-medium">Nominee</th>
-                  <th className="px-6 py-3 font-medium">Membership</th>
-                  <th className="px-6 py-3 font-medium">Status</th>
-                  <th className="px-6 py-3 font-medium">Date</th>
-                  <th className="px-6 py-3 font-medium text-right">Actions</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Nominee</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Membership</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Status</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Date</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
@@ -157,13 +157,13 @@ export default function MembershipGifts() {
                           <>
                             <button
                               onClick={() => openActionModal(g, 'approve')}
-                              className="px-3 py-1 text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition"
+                              className="px-3 py-1 text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-md transition"
                             >
                               Approve
                             </button>
                             <button
                               onClick={() => openActionModal(g, 'reject')}
-                              className="px-3 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition"
+                              className="px-3 py-1 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition"
                             >
                               Reject
                             </button>
@@ -172,7 +172,7 @@ export default function MembershipGifts() {
                         {g.status === 'approved' && (
                           <button
                             onClick={() => setRedeemModal({ open: true, gift: g })}
-                            className="px-3 py-1 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition"
+                            className="px-3 py-1 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-md transition"
                           >
                             Redeem
                           </button>

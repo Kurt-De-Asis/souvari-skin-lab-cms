@@ -23,6 +23,11 @@ router.get(
 );
 
 router.get(
+  '/browse/:id',
+  servicesController.getByIdPublic
+);
+
+router.get(
   '/',
   authenticate,
   validate(serviceQuerySchema, 'query'),

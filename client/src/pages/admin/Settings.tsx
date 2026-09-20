@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Save, Building2, Clock, DollarSign } from 'lucide-react';
+import { Save, Building2, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { settingsApi } from '@/api';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -12,9 +12,6 @@ interface SettingsForm {
   clinic_address: string;
   business_hours_start: string;
   business_hours_end: string;
-  tax_rate: number;
-  currency: string;
-  currency_symbol: string;
 }
 
 export default function Settings() {
@@ -29,9 +26,6 @@ export default function Settings() {
       clinic_address: '',
       business_hours_start: '09:00',
       business_hours_end: '18:00',
-      tax_rate: 0,
-      currency: 'PHP',
-      currency_symbol: '₱',
     },
   });
 
@@ -39,7 +33,11 @@ export default function Settings() {
     const fetchSettings = async () => {
       try {
         const { data } = await settingsApi.getAll();
-        const s = data.data || data.settings || data;
+        const items: any[] = Array.isArray(data.data) ? data.data : [];
+        const s: Record<string, any> = {};
+        items.forEach((item: any) => {
+          s[item.key] = item.value;
+        });
         reset({
           clinic_name: s.clinic_name || '',
           clinic_phone: s.clinic_phone || '',
@@ -47,9 +45,6 @@ export default function Settings() {
           clinic_address: s.clinic_address || '',
           business_hours_start: s.business_hours_start || '09:00',
           business_hours_end: s.business_hours_end || '18:00',
-          tax_rate: s.tax_rate || 0,
-          currency: s.currency || 'PHP',
-          currency_symbol: s.currency_symbol || '₱',
         });
       } catch {
         toast.error('Failed to load settings');
@@ -63,7 +58,9 @@ export default function Settings() {
   const onSubmit = async (values: SettingsForm) => {
     setSaving(true);
     try {
-      await settingsApi.update(values);
+      await settingsApi.update({
+        settings: (Object.keys(values) as Array<keyof SettingsForm>).map((key) => ({ key, value: values[key] })),
+      });
       toast.success('Settings saved successfully');
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to save settings');
@@ -77,7 +74,7 @@ export default function Settings() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-neutral-900">Settings</h1>
+        <h1 className="text-2xl font-sans font-semibold text-neutral-900">Settings</h1>
         <p className="text-sm text-neutral-500 mt-1">Configure your clinic system preferences</p>
       </div>
 
@@ -127,28 +124,6 @@ export default function Settings() {
               <label className="label">Closing Time</label>
               <input type="time" className="input-field" {...register('business_hours_end', { required: 'Required' })} />
               {errors.business_hours_end && <p className="text-xs text-red-600 mt-1">{errors.business_hours_end.message}</p>}
-            </div>
-          </div>
-        </div>
-
-        {/* Financial Section */}
-        <div className="card">
-          <div className="flex items-center gap-2 mb-4">
-            <DollarSign size={18} className="text-primary-600" />
-            <h2 className="font-semibold text-neutral-900">Financial Settings</h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="label">Tax Rate (%)</label>
-              <input type="number" step="0.01" min="0" max="100" className="input-field" {...register('tax_rate', { valueAsNumber: true })} />
-            </div>
-            <div>
-              <label className="label">Currency Code</label>
-              <input className="input-field" placeholder="PHP" {...register('currency')} />
-            </div>
-            <div>
-              <label className="label">Currency Symbol</label>
-              <input className="input-field" placeholder="₱" {...register('currency_symbol')} />
             </div>
           </div>
         </div>
