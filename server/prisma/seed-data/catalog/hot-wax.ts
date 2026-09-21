@@ -63,7 +63,7 @@ const section: SectionDef = {
     { name: 'Full Leg', slug: 'hx-full-leg', category: 'body', duration_minutes: 60, prices: waxVipNm4(655, 775, 819, 969) },
     { name: 'Back (Upper/Lower)', slug: 'hx-back-upper-lower', category: 'body', duration_minutes: 30, prices: waxVipNm4(599, 743, 749, 929) },
     { name: 'Bikini', slug: 'hx-bikini', category: 'body', duration_minutes: 30, prices: waxVipNm4(519, 631, 649, 789) },
-    { name: 'Buttocks', slug: 'hx-buttocks', category: 'body', duration_minutes: 30, prices: waxVipNm4(479, 575, 599, 719) },
+    
     { name: 'Half Leg', slug: 'hx-half-leg', category: 'body', duration_minutes: 45, prices: waxVipNm4(479, 599, 599, 749) },
     { name: 'Full Arm', slug: 'hx-full-arm', category: 'body', duration_minutes: 45, prices: waxVipNm4(599, 759, 749, 949) },
     { name: 'Tummy / Stomach', slug: 'hx-tummy-stomach', category: 'body', duration_minutes: 30, prices: waxVipNm4(399, 479, 499, 599) },

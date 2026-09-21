@@ -12,6 +12,7 @@ const section: SectionDef = {
   name: 'Permanent Makeup',
   display_order: 20,
   services: [
+    { name: 'Eyebrow Microblading', slug: 'pm-eyebrow-microblading', category: 'other', duration_minutes: 90, description: 'Professional permanent makeup at Souvari Skin Lab.', ...pmu(9519, 5099, 6799) },
     { name: 'Ombré Powder Brows', slug: 'pm-ombre-powder-brows', category: 'other', duration_minutes: 90, ...pmu(9519, 5099, 6799) },
     { name: '6Ds Microblading', slug: 'pm-6ds-microblading', category: 'other', duration_minutes: 90, ...pmu(10219, 5474, 7299) },
     { name: 'Premium Combi Brows', slug: 'pm-premium-combi-brows', category: 'other', duration_minutes: 90, ...pmu(11619, 6224, 8299) },

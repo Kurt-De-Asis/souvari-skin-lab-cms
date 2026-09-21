@@ -45,7 +45,7 @@ const FEATURED = [
     flip: true,
   },
   {
-    serviceId: 326,
+    serviceId: 402,
     image: '/images/permanent-makeup.webp',
     alt: 'Permanent makeup artistry at Souvari Skin Lab',
     eyebrow: 'Permanent makeup',
@@ -149,19 +149,24 @@ export default function Home() {
           <Reveal>
             <div className="space-y-6 flex flex-col items-center">
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary-300">
-                Science-backed aesthetic clinic · Makati City
+                Welcome to Souvari Skin Lab
               </p>
               <h1 className="text-4xl sm:text-6xl md:text-7xl font-sans font-semibold leading-[1.08] tracking-wide max-w-4xl">
-                Glow with Confidence,<br />
-                <em className="italic text-primary-300">Every Single Day</em>
+                Revitalize, Rejuvenate,<br />
+                <em className="italic text-primary-300">Breathe.</em>
               </h1>
               <p className="text-base sm:text-lg md:text-xl text-neutral-300 leading-relaxed max-w-2xl font-light">
-                Science-backed aesthetic treatments tailored to your unique skin, delivered by certified
-                professionals in a space designed around your comfort.
+                Helping you age gracefully and look like the best version of you!
+              </p>
+              <p className="text-sm sm:text-base text-neutral-400 leading-relaxed max-w-3xl font-light">
+                At Souvari Skin Lab, we offer a variety of products and treatments that can help soften
+                signs of aging and improve the health and appearance of your skin. Our services are
+                comprehensive, and we are dedicated to providing an exceptional experience for both our
+                returning and new clients.
               </p>
               <div className="pt-4 flex flex-wrap justify-center gap-4">
                 <Link to="/booking" className="btn-gold">
-                  Book Your Appointment <ArrowRight size={14} />
+                  Book An Appointment <ArrowRight size={14} />
                 </Link>
                 <Link to="/services" className="btn-outline-light">
                   Explore Treatments
