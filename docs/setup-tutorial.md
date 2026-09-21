@@ -49,7 +49,25 @@ node --version
 
 You need a running MySQL 8.0 server. Pick **one** option.
 
-### Option A — Docker (easiest and recommended)
+### Option A — Native MySQL Installer (recommended — no Docker needed)
+Works on any PC without special virtualization support.
+- **Windows:** go to https://dev.mysql.com/downloads/installer/ and download the **MySQL Installer**.
+  1. During setup, choose "MySQL Server".
+  2. Keep the default port `3306`.
+  3. **Set a password you will remember** (you'll type it into `server/.env` later).
+- **macOS:** https://dev.mysql.com/downloads/mysql/ — download and run the dmg installer.
+- **Linux (Ubuntu/Debian):**
+  ```bash
+  sudo apt update
+  sudo apt install mysql-server
+  sudo systemctl enable --now mysql
+  ```
+
+> In `server/.env` (Step 6), the line `DATABASE_URL="mysql://root:password@localhost:3306/iave_clinic"` must use the password you set here.
+
+### Option B — Docker (only if Docker Desktop already works)
+Docker is only needed to run MySQL inside a virtual machine, and it **requires Windows virtualization support (VT-x/AMD-V + WSL2 or Hyper-V)**. On many office PCs this is not available. If you hit "Windows virtualization support isn't detected", use **Option A** instead, or see the Troubleshooting section.
+
 1. Install **Docker Desktop** from https://www.docker.com/products/docker-desktop/ and open it.
 2. The project ships with a `docker-compose.yml` that sets everything up. From the project folder run:
    ```bash
@@ -62,16 +80,6 @@ You need a running MySQL 8.0 server. Pick **one** option.
    - Port: `3306`
 
 > Keep the `docker-compose.yml` file that came with the project — it already contains these settings.
-
-### Option B — Native MySQL Installer
-- **Windows:** https://dev.mysql.com/downloads/installer/ — install "MySQL Server", choose the default port `3306`, and set a password you will remember.
-- **macOS:** https://dev.mysql.com/downloads/mysql/ — download and run the dmg installer.
-- **Linux (Ubuntu/Debian):**
-  ```bash
-  sudo apt update
-  sudo apt install mysql-server
-  sudo systemctl enable --now mysql
-  ```
 
 ---
 
@@ -253,7 +261,8 @@ mysql -u root -p < overdue.sql
 | Problem | Fix |
 |---------|-----|
 | `Access denied for user 'root'` | Check the password in `DATABASE_URL` in `server/.env`. |
-| `Can't connect to MySQL` / `ECONNREFUSED` | MySQL isn't running (start Docker with `docker compose up -d` first), or the port in `DATABASE_URL` is wrong. |
+| `Can't connect to MySQL` / `ECONNREFUSED` | MySQL isn't running (start it / run `docker compose up -d` first), or the port in `DATABASE_URL` is wrong. |
+| Docker Desktop: *"cannot start because Windows virtualization support isn't detected"* | Docker needs CPU virtualization, which is off on this PC. Either (a) install MySQL natively instead — see Section 3, **Option A** — or (b) fix virtualization: 1) Enable **VT-x/AMD-V** in your PC's BIOS/UEFI (check: Task Manager → Performance → CPU → "Virtualization: Enabled"); 2) enable Windows features "Virtual Machine Platform" + "Windows Hypervisor Platform" (Control Panel → Programs → Turn Windows features on or off); 3) install WSL 2: run `wsl --install` in an admin terminal. |
 | `Port 3000 already in use` | Change `PORT` to `3001` in `server/.env` and `BACKEND_URL` to `http://localhost:3001`. |
 | `Port 5173 already in use` | Edit `client/vite.config.ts` → `server.port` to e.g. `5174`. |
 | `npx prisma migrate dev` fails | Try `npx prisma migrate deploy`, then `npx prisma db push`. |
@@ -268,7 +277,7 @@ mysql -u root -p < overdue.sql
 ```
 [ ] Node.js 20+ installed            (node --version)
 [ ] npm installed                    (npm --version)
-[ ] MySQL 8.0 running                (Docker: docker compose up -d)
+[ ] MySQL 8.0 running                (native install, or Docker: docker compose up -d)
 [ ] Project folder copied/cloned
 [ ] npm install  (root, server, client)
 [ ] server/.env created and filled in
