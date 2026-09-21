@@ -11,11 +11,15 @@ import Modal from '@/components/ui/Modal';
 
 interface TransactionItem {
   id: number;
-  name: string;
+  description?: string;
   quantity: number;
   unit_price: number;
-  total: number;
-  type: string;
+  line_total: number;
+  price_type?: string;
+  service_id?: number | null;
+  product_id?: number | null;
+  product?: { id: number; name: string };
+  service?: { id: number; name: string; price?: number };
 }
 
 interface Transaction {
@@ -285,11 +289,11 @@ export default function Transactions() {
                                 <tbody className="divide-y divide-neutral-100">
                                   {txn.items.map((item) => (
                                     <tr key={item.id}>
-                                      <td className="py-2 text-neutral-900 font-medium">{item.name}</td>
-                                      <td className="py-2 text-neutral-500 capitalize">{item.type}</td>
-                                      <td className="py-2 text-neutral-600 text-right">{item.quantity}</td>
-                                      <td className="py-2 text-neutral-600 text-right">{formatCurrency(item.unit_price)}</td>
-                                      <td className="py-2 text-neutral-900 font-medium text-right">{formatCurrency(item.total)}</td>
+                                      <td className="py-2 text-neutral-900 font-medium">{item.description || item.product?.name || item.service?.name || 'Item'}</td>
+                                      <td className="py-2 text-neutral-500 capitalize">{item.service_id ? 'service' : item.product_id ? 'product' : item.price_type || 'sale'}</td>
+                                      <td className="py-2 text-neutral-600 text-right">{Number(item.quantity)}</td>
+                                      <td className="py-2 text-neutral-600 text-right">{formatCurrency(Number(item.unit_price))}</td>
+                                      <td className="py-2 text-neutral-900 font-medium text-right">{formatCurrency(Number(item.line_total))}</td>
                                     </tr>
                                   ))}
                                 </tbody>

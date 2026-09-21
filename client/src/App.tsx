@@ -29,6 +29,8 @@ import StaffDashboard from './pages/staff/Dashboard';
 import StaffAppointments from './pages/staff/Appointments';
 import StaffSchedule from './pages/staff/Schedule';
 import StaffNotifications from './pages/staff/Notifications';
+import StaffProducts from './pages/staff/Products';
+import StaffMemberships from './pages/staff/Memberships';
 
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminCustomers from './pages/admin/Customers';
@@ -99,6 +101,8 @@ export default function App() {
         <Route path="appointments" element={<StaffAppointments />} />
         <Route path="calendar" element={<AdminCalendar />} />
         <Route path="schedule" element={<StaffSchedule />} />
+        <Route path="products" element={<StaffProducts />} />
+        <Route path="memberships" element={<StaffMemberships />} />
         <Route path="notifications" element={<StaffNotifications />} />
       </Route>
 

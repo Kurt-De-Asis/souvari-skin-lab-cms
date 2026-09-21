@@ -9,7 +9,7 @@ export default function DeltaBadge({ value, label = 'vs prev period' }: DeltaBad
   if (value === null || value === undefined) {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-500">
-        <Minus size={12} /> n/a
+        <Minus size={12} /> No prior data
       </span>
     );
   }

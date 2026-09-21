@@ -8,6 +8,7 @@ import EmptyState from '@/components/shared/EmptyState';
 import Pagination from '@/components/ui/Pagination';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Modal from '@/components/ui/Modal';
+import { registerMoney } from '@/utils/money';
 
 interface MembershipPlan {
   id: number;
@@ -243,12 +244,12 @@ export default function MembershipPlans() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Regular Price (₱)</label>
-              <input type="number" step="0.01" className="input-field" {...register('regular_price', { required: 'Required', valueAsNumber: true })} />
+              <input type="text" inputMode="decimal" className="input-field hide-number-spinners" {...registerMoney(register, 'regular_price', { required: 'Required' })} />
               {errors.regular_price && <p className="text-xs text-red-600 mt-1">{errors.regular_price.message}</p>}
             </div>
             <div>
               <label className="label">Promo Price (₱)</label>
-              <input type="number" step="0.01" className="input-field" placeholder="Optional" {...register('promo_price', { valueAsNumber: true })} />
+              <input type="text" inputMode="decimal" className="input-field hide-number-spinners" placeholder="Optional" {...registerMoney(register, 'promo_price')} />
             </div>
           </div>
           <div>

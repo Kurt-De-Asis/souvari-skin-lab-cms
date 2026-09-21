@@ -54,6 +54,8 @@ const staffNav: NavEntry[] = [
   { to: '/staff/calendar', icon: CalendarDays, label: 'Calendar' },
   { to: '/staff/appointments', icon: ClipboardList, label: 'Appointments' },
   { to: '/staff/schedule', icon: Clock, label: 'My Schedule' },
+  { to: '/staff/memberships', icon: Award, label: 'Memberships' },
+  { to: '/staff/products', icon: Package, label: 'Products & POS' },
   { to: '/staff/notifications', icon: Bell, label: 'Notifications' },
 ];
 

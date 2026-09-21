@@ -18,7 +18,7 @@ router.use(authenticate);
 
 router.get(
   '/',
-  authorize('admin'),
+  authorize('admin', 'staff'),
   validate(membershipQuerySchema, 'query'),
   membershipsController.list
 );
@@ -33,11 +33,11 @@ router.post(
   membershipsController.availPlan
 );
 
-router.get('/:id', authorize('admin'), membershipsController.getById);
+router.get('/:id', authorize('admin', 'staff'), membershipsController.getById);
 
 router.post(
   '/',
-  authorize('admin'),
+  authorize('admin', 'staff'),
   validate(createMembershipSchema),
   membershipsController.create
 );
@@ -56,15 +56,25 @@ router.put(
   membershipsController.extend
 );
 
+router.post(
+  '/:id/pay-in-store',
+  membershipsController.requestPayInStore
+);
+
 router.get(
   '/:id/payments',
-  authorize('admin'),
+  authorize('admin', 'staff'),
   membershipsController.listPayments
+);
+
+router.get(
+  '/:id/payments/me',
+  membershipsController.listMyPayments
 );
 
 router.post(
   '/:id/payments',
-  authorize('admin'),
+  authorize('admin', 'staff'),
   validate(membershipPaymentSchema),
   membershipsController.recordPayment
 );

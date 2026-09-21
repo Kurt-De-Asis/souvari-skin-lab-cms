@@ -149,6 +149,9 @@ export const membershipsApi = {
   updateStatus: (id: number, data: any) => api.put(`/memberships/${id}/status`, data),
   extend: (id: number, data: any) => api.put(`/memberships/${id}/extend`, data),
   validateCode: (code: string) => api.get(`/memberships/validate/${code}`),
+  requestPayInStore: (id: number) => api.post(`/memberships/${id}/pay-in-store`),
+  recordPayment: (id: number, data: any) => api.post(`/memberships/${id}/payments`, data),
+  listPayments: (id: number) => api.get(`/memberships/${id}/payments`),
 };
 
 export const loyaltyApi = {

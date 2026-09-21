@@ -7,6 +7,7 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
 import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
+import { registerMoney } from '@/utils/money';
 
 interface ServiceOption {
   id: number;
@@ -256,13 +257,13 @@ export default function Packages() {
             </div>
             <div>
               <label className="label">1-Session Price (₱)</label>
-              <input type="number" step="0.01" min="0" className="input-field" {...register('session_price', { required: 'Required', valueAsNumber: true })} />
+              <input type="text" inputMode="decimal" className="input-field hide-number-spinners" {...registerMoney(register, 'session_price', { required: 'Required' })} />
               {errors.session_price && <p className="text-xs text-red-600 mt-1">{errors.session_price.message}</p>}
             </div>
           </div>
           <div>
             <label className="label">10-Session Price (₱)</label>
-            <input type="number" step="0.01" min="0" className="input-field" placeholder="Optional" {...register('ten_session_price', { valueAsNumber: true })} />
+            <input type="text" inputMode="decimal" className="input-field hide-number-spinners" placeholder="Optional" {...registerMoney(register, 'ten_session_price')} />
           </div>
           <div>
             <label className="label">Inclusions</label>

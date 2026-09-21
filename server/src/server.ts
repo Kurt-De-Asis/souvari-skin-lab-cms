@@ -2,16 +2,37 @@ import app from './app';
 import { env } from './config/env';
 import prisma from './config/database';
 import logger from './utils/logger';
+import { membershipService } from './modules/memberships/memberships.service';
+
+const OVERDUE_CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
+
+async function runOverdueCheck() {
+  try {
+    const { reminded, failed } = await membershipService.processOverdueMemberships(true);
+    if (reminded > 0 || failed > 0) {
+      logger.info(`[MEMBERSHIP] Overdue check: ${failed} failed, ${reminded} reminders sent`);
+    }
+  } catch (error: any) {
+    logger.error(`[MEMBERSHIP] Overdue check failed: ${error.message}`);
+  }
+}
 
 async function main() {
   try {
     await prisma.$connect();
     logger.info('Database connected successfully');
 
-    app.listen(env.PORT, () => {
+    const server = app.listen(env.PORT, () => {
       logger.info(`Souvari Skin Lab API server running on port ${env.PORT}`);
       logger.info(`Environment: ${env.NODE_ENV}`);
       logger.info(`Frontend URL: ${env.FRONTEND_URL}`);
+      void runOverdueCheck();
+      setInterval(() => { void runOverdueCheck(); }, OVERDUE_CHECK_INTERVAL_MS);
+    });
+
+    // Keep process alive for the overdue scheduler even if the HTTP server errors.
+    server.on('error', (err) => {
+      logger.error('HTTP server error:', err);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

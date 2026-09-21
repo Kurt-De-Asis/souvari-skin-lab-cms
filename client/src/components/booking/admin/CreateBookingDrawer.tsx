@@ -5,6 +5,7 @@ import { appointmentsApi, customersApi, posApi } from '../../../api';
 import Drawer from '../../ui/Drawer';
 import CustomerDetailDrawer from '../../admin/CustomerDetailDrawer';
 import formatCategory from '../../../utils/formatCategory';
+import { formatAmountInput, parseAmountInput } from '../../../utils/format';
 import type {
   CreateGroupAppointmentPayload,
   CustomerOption,
@@ -284,7 +285,7 @@ export default function CreateBookingDrawer({
     });
   };
 
-  const tendered = parseFloat(amountTendered) || 0;
+  const tendered = parseAmountInput(amountTendered) || 0;
   const change = Math.max(0, tendered - finalTotal);
 
   const canSubmit =
@@ -728,13 +729,13 @@ export default function CreateBookingDrawer({
                     <div>
                       <label className="label">Amount Tendered</label>
                       <input
-                        type="number"
-                        className="input-field"
-                        min="0"
+                        type="text"
+                        inputMode="decimal"
+                        className="input-field hide-number-spinners"
                         placeholder="0.00"
                         value={amountTendered}
                         onChange={(e) => {
-                          setAmountTendered(e.target.value);
+                          setAmountTendered(formatAmountInput(e.target.value));
                           setPayError('');
                         }}
                       />

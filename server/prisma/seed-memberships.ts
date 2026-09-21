@@ -3,73 +3,41 @@ import { PrismaClient, Prisma } from '@prisma/client';
 const prisma = new PrismaClient();
 
 const plansData = [
-  // VIP Elite Platinum - Student
-  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Student', tier: 'ELITE', variant: 'student', term: 6, maxPersons: 1, regular: 1999, promo: 1999, advertisedDay: 333.17 },
-  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Student', tier: 'ELITE', variant: 'student', term: 12, maxPersons: 1, regular: 1999, promo: 1999, advertisedDay: 274.88 },
-  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Student', tier: 'ELITE', variant: 'student', term: 13, maxPersons: 1, regular: 1999, promo: 1999, advertisedDay: 249.39 },
+  // ── VIP Elite Platinum Membership ─────────────────────────
+  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Student', tier: 'ELITE', variant: 'student', term: 6, maxPersons: 1, regular: 11400, promo: 3990, advertisedDay: 22.17 },
+  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Student', tier: 'ELITE', variant: 'student', term: 12, maxPersons: 1, regular: 19971, promo: 6990, advertisedDay: 19.15 },
+  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Single', tier: 'ELITE', variant: 'single', term: 6, maxPersons: 1, regular: 14257, promo: 4990, advertisedDay: 27.72 },
+  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Single', tier: 'ELITE', variant: 'single', term: 12, maxPersons: 1, regular: 27114, promo: 9490, advertisedDay: 26.00 },
+  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Duo', tier: 'ELITE', variant: 'duo', term: 6, maxPersons: 2, regular: 24257, promo: 8490, advertisedDay: 47.17 },
+  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Duo', tier: 'ELITE', variant: 'duo', term: 12, maxPersons: 2, regular: 39971, promo: 13990, advertisedDay: 38.33 },
+  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Family', tier: 'ELITE', variant: 'family', term: 6, maxPersons: 4, regular: 37114, promo: 12990, advertisedDay: 72.17 },
+  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Family', tier: 'ELITE', variant: 'family', term: 12, maxPersons: 4, regular: 65686, promo: 22990, advertisedDay: 62.99 },
+  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Add-On', tier: 'ELITE', variant: 'add_on', term: 6, maxPersons: 1, regular: 11400, promo: 3990, advertisedDay: 22.17 },
+  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Add-On', tier: 'ELITE', variant: 'add_on', term: 12, maxPersons: 1, regular: 19971, promo: 6990, advertisedDay: 19.15 },
 
-  // VIP Elite Platinum - Single
-  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Single', tier: 'ELITE', variant: 'single', term: 6, maxPersons: 1, regular: 6999, promo: 6999, advertisedDay: 1166.50 },
-  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Single', tier: 'ELITE', variant: 'single', term: 12, maxPersons: 1, regular: 6999, promo: 6999, advertisedDay: 972.08 },
-  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Single', tier: 'ELITE', variant: 'single', term: 13, maxPersons: 1, regular: 6999, promo: 6999, advertisedDay: 883.71 },
+  // ── VIP Radiant Skin Club ────────────────────────────────
+  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Single', tier: 'PLATINUM', variant: 'single', term: 6, maxPersons: 1, regular: 9971, promo: 3490, advertisedDay: 19.39 },
+  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Single', tier: 'PLATINUM', variant: 'single', term: 12, maxPersons: 1, regular: 19943, promo: 6980, advertisedDay: 17.67 },
+  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Duo', tier: 'PLATINUM', variant: 'duo', term: 6, maxPersons: 2, regular: 18543, promo: 6490, advertisedDay: 36.06 },
+  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Duo', tier: 'PLATINUM', variant: 'duo', term: 12, maxPersons: 2, regular: 37086, promo: 12980, advertisedDay: 32.86 },
+  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Family', tier: 'PLATINUM', variant: 'family', term: 6, maxPersons: 4, regular: 31971, promo: 11190, advertisedDay: 62.17 },
+  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Family', tier: 'PLATINUM', variant: 'family', term: 12, maxPersons: 4, regular: 63943, promo: 22380, advertisedDay: 56.66 },
+  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Add-On', tier: 'PLATINUM', variant: 'add_on', term: 6, maxPersons: 1, regular: 7686, promo: 2690, advertisedDay: 14.94 },
+  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Add-On', tier: 'PLATINUM', variant: 'add_on', term: 12, maxPersons: 1, regular: 15371, promo: 5380, advertisedDay: 13.62 },
 
-  // VIP Elite Platinum - Duo
-  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Duo', tier: 'ELITE', variant: 'duo', term: 6, maxPersons: 2, regular: 9999, promo: 9999, advertisedDay: 1666.50 },
-  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Duo', tier: 'ELITE', variant: 'duo', term: 12, maxPersons: 2, regular: 9999, promo: 9999, advertisedDay: 1388.75 },
-  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Duo', tier: 'ELITE', variant: 'duo', term: 13, maxPersons: 2, regular: 9999, promo: 9999, advertisedDay: 1262.56 },
+  // ── VIP Lash & Nail Club ─────────────────────────────────
+  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Single', tier: 'GOLD', variant: 'single', term: 6, maxPersons: 1, regular: 8543, promo: 2990, advertisedDay: 16.61 },
+  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Single', tier: 'GOLD', variant: 'single', term: 12, maxPersons: 1, regular: 17086, promo: 5980, advertisedDay: 15.14 },
+  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Duo', tier: 'GOLD', variant: 'duo', term: 6, maxPersons: 2, regular: 15140, promo: 5299, advertisedDay: 29.44 },
+  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Duo', tier: 'GOLD', variant: 'duo', term: 12, maxPersons: 2, regular: 28829, promo: 10090, advertisedDay: 25.54 },
+  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Family', tier: 'GOLD', variant: 'family', term: 6, maxPersons: 4, regular: 28543, promo: 9990, advertisedDay: 55.50 },
+  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Family', tier: 'GOLD', variant: 'family', term: 12, maxPersons: 4, regular: 54829, promo: 19190, advertisedDay: 48.58 },
+  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Add-On', tier: 'GOLD', variant: 'add_on', term: 6, maxPersons: 1, regular: 6257, promo: 2190, advertisedDay: 12.17 },
+  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Add-On', tier: 'GOLD', variant: 'add_on', term: 12, maxPersons: 1, regular: 12543, promo: 4390, advertisedDay: 11.11 },
 
-  // VIP Elite Platinum - Family
-  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Family', tier: 'ELITE', variant: 'family', term: 6, maxPersons: 3, regular: 12999, promo: 12999, advertisedDay: 2166.50 },
-  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Family', tier: 'ELITE', variant: 'family', term: 12, maxPersons: 3, regular: 12999, promo: 12999, advertisedDay: 1805.42 },
-  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Family', tier: 'ELITE', variant: 'family', term: 13, maxPersons: 3, regular: 12999, promo: 12999, advertisedDay: 1641.29 },
-
-  // VIP Elite Platinum - Add-On
-  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Add-On', tier: 'ELITE', variant: 'add_on', term: 6, maxPersons: 1, regular: 1999, promo: 1999, advertisedDay: 333.17 },
-  { familyCode: 'VIP_ELITE_PLATINUM', name: 'VIP Elite Platinum - Add-On', tier: 'ELITE', variant: 'add_on', term: 12, maxPersons: 1, regular: 1999, promo: 1999, advertisedDay: 274.88 },
-
-  // VIP Radiant Skin - Single
-  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Single', tier: 'PLATINUM', variant: 'single', term: 6, maxPersons: 1, regular: 4999, promo: 4999, advertisedDay: 833.17 },
-  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Single', tier: 'PLATINUM', variant: 'single', term: 12, maxPersons: 1, regular: 4999, promo: 4999, advertisedDay: 694.31 },
-  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Single', tier: 'PLATINUM', variant: 'single', term: 13, maxPersons: 1, regular: 4999, promo: 4999, advertisedDay: 630.64 },
-
-  // VIP Radiant Skin - Duo
-  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Duo', tier: 'PLATINUM', variant: 'duo', term: 6, maxPersons: 2, regular: 7999, promo: 7999, advertisedDay: 1333.17 },
-  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Duo', tier: 'PLATINUM', variant: 'duo', term: 12, maxPersons: 2, regular: 7999, promo: 7999, advertisedDay: 1111.04 },
-  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Duo', tier: 'PLATINUM', variant: 'duo', term: 13, maxPersons: 2, regular: 7999, promo: 7999, advertisedDay: 1012.69 },
-
-  // VIP Radiant Skin - Family
-  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Family', tier: 'PLATINUM', variant: 'family', term: 6, maxPersons: 3, regular: 8999, promo: 8999, advertisedDay: 1499.83 },
-  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Family', tier: 'PLATINUM', variant: 'family', term: 12, maxPersons: 3, regular: 8999, promo: 8999, advertisedDay: 1249.86 },
-  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Family', tier: 'PLATINUM', variant: 'family', term: 13, maxPersons: 3, regular: 8999, promo: 8999, advertisedDay: 1140.90 },
-
-  // VIP Radiant Skin - Add-On
-  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Add-On', tier: 'PLATINUM', variant: 'add_on', term: 6, maxPersons: 1, regular: 1999, promo: 1999, advertisedDay: 333.17 },
-  { familyCode: 'VIP_RADIANT_SKIN', name: 'VIP Radiant Skin - Add-On', tier: 'PLATINUM', variant: 'add_on', term: 12, maxPersons: 1, regular: 1999, promo: 1999, advertisedDay: 274.88 },
-
-  // VIP Lash & Nail - Single
-  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Single', tier: 'GOLD', variant: 'single', term: 6, maxPersons: 1, regular: 4999, promo: 4999, advertisedDay: 833.17 },
-  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Single', tier: 'GOLD', variant: 'single', term: 12, maxPersons: 1, regular: 4999, promo: 4999, advertisedDay: 694.31 },
-  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Single', tier: 'GOLD', variant: 'single', term: 13, maxPersons: 1, regular: 4999, promo: 4999, advertisedDay: 630.64 },
-
-  // VIP Lash & Nail - Duo
-  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Duo', tier: 'GOLD', variant: 'duo', term: 6, maxPersons: 2, regular: 7999, promo: 7999, advertisedDay: 1333.17 },
-  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Duo', tier: 'GOLD', variant: 'duo', term: 12, maxPersons: 2, regular: 7999, promo: 7999, advertisedDay: 1111.04 },
-  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Duo', tier: 'GOLD', variant: 'duo', term: 13, maxPersons: 2, regular: 7999, promo: 7999, advertisedDay: 1012.69 },
-
-  // VIP Lash & Nail - Family
-  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Family', tier: 'GOLD', variant: 'family', term: 6, maxPersons: 3, regular: 8999, promo: 8999, advertisedDay: 1499.83 },
-  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Family', tier: 'GOLD', variant: 'family', term: 12, maxPersons: 3, regular: 8999, promo: 8999, advertisedDay: 1249.86 },
-  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Family', tier: 'GOLD', variant: 'family', term: 13, maxPersons: 3, regular: 8999, promo: 8999, advertisedDay: 1140.90 },
-
-  // VIP Lash & Nail - Add-On
-  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Add-On', tier: 'GOLD', variant: 'add_on', term: 6, maxPersons: 1, regular: 1999, promo: 1999, advertisedDay: 333.17 },
-  { familyCode: 'VIP_LASH_NAIL', name: 'VIP Lash & Nail - Add-On', tier: 'GOLD', variant: 'add_on', term: 12, maxPersons: 1, regular: 1999, promo: 1999, advertisedDay: 274.88 },
-
-  // Silver Access - Single
-  { familyCode: 'SILVER_ACCESS', name: 'Silver Access - Single', tier: 'SILVER', variant: 'single', term: 13, maxPersons: 1, regular: 1999, promo: 1999, advertisedDay: 153.77 },
-
-  // Silver Access - Duo
-  { familyCode: 'SILVER_ACCESS', name: 'Silver Access - Duo', tier: 'SILVER', variant: 'duo', term: 13, maxPersons: 2, regular: 2999, promo: 2999, advertisedDay: 230.69 },
+  // ── Silver Access Membership (Single + Duo only) ──────────
+  { familyCode: 'SILVER_ACCESS', name: 'Silver Access - Single', tier: 'SILVER', variant: 'single', term: 12, maxPersons: 1, regular: 8543, promo: 2990, advertisedDay: 7.57 },
+  { familyCode: 'SILVER_ACCESS', name: 'Silver Access - Duo', tier: 'SILVER', variant: 'duo', term: 12, maxPersons: 2, regular: 14257, promo: 4990, advertisedDay: 12.63 },
 ];
 
 const baseBenefits = [

@@ -30,7 +30,7 @@ export class TreatmentRecordsController {
 
   async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const record = await treatmentRecordsService.create(req.body, req.user!.userId);
+      const record = await treatmentRecordsService.create(req.body, req.user!);
       res.status(201).json({
         success: true,
         message: 'Treatment record created successfully',

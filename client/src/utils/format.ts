@@ -13,6 +13,24 @@ export function formatNumber(value: number | null | undefined): string {
   return new Intl.NumberFormat('en-PH').format(n);
 }
 
+export function formatAmountInput(value: string): string {
+  const cleaned = value.replace(/[^0-9.]/g, '');
+  const firstDot = cleaned.indexOf('.');
+  const digitsAndDot = firstDot === -1
+    ? cleaned
+    : cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
+  const [intPart, decPart] = digitsAndDot.split('.');
+  const intDigits = intPart.replace(/^0+(?=\d)/, '');
+  const intFormatted = intDigits ? Number(intDigits).toLocaleString('en-US') : '';
+  return decPart !== undefined ? `${intFormatted}.${decPart}` : intFormatted;
+}
+
+export function parseAmountInput(value: unknown): number | undefined {
+  if (value === null || value === undefined) return undefined;
+  const n = parseFloat(String(value).replace(/,/g, ''));
+  return Number.isNaN(n) ? undefined : n;
+}
+
 export function formatPercent(value: number | null | undefined): string {
   const n = Number(value || 0);
   return `${Math.round(n * 10) / 10}%`;

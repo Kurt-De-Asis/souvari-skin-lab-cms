@@ -125,18 +125,18 @@ async function main() {
 
   // Services
   const servicesData = [
-    { name: 'Classic Facial Treatment', description: 'Deep cleansing facial tailored to your skin type. Includes extraction, massage, and hydrating mask.', category: ServiceCategory.facial, price: 2500, duration_minutes: 60 },
-    { name: 'Acne Treatment', description: 'Specialized treatment targeting acne and breakouts. Includes deep cleansing, extraction, and medicated mask.', category: ServiceCategory.facial, price: 3500, duration_minutes: 75 },
-    { name: 'HydraFacial', description: 'Advanced hydrating facial using vortex technology to cleanse, exfoliate, and hydrate the skin.', category: ServiceCategory.facial, price: 4500, duration_minutes: 60 },
-    { name: 'Chemical Peel', description: 'Professional chemical exfoliation to improve skin texture, tone, and reduce fine lines.', category: ServiceCategory.skin_rejuvenation, price: 3000, duration_minutes: 45 },
-    { name: 'Skin Consultation', description: 'Comprehensive skin analysis and personalized treatment plan by our dermatologist.', category: ServiceCategory.consultation, price: 1000, duration_minutes: 30 },
-    { name: 'Botox Treatment', description: 'Anti-wrinkle injection treatment to smooth fine lines and achieve a youthful appearance.', category: ServiceCategory.injection, price: 15000, duration_minutes: 45 },
-    { name: 'Dermal Filler', description: 'Hyaluronic acid filler treatment for lip enhancement, cheek augmentation, or wrinkle correction.', category: ServiceCategory.injection, price: 18000, duration_minutes: 60 },
-    { name: 'Laser Hair Removal', description: 'Permanent hair reduction using advanced laser technology. Per area pricing.', category: ServiceCategory.hair_removal, price: 5000, duration_minutes: 45 },
-    { name: 'Skin Rejuvenation Laser', description: 'Non-invasive laser treatment to improve skin tone, texture, and stimulate collagen production.', category: ServiceCategory.laser, price: 8000, duration_minutes: 60 },
-    { name: 'Body Contouring', description: 'Non-svasive body sculpting treatment to reduce stubborn fat and reshape body contours.', category: ServiceCategory.body, price: 12000, duration_minutes: 90 },
-    { name: 'Anti-Aging Facial', description: 'Premium anti-aging facial combining advanced serums, LED therapy, and firming massage.', category: ServiceCategory.facial, price: 5500, duration_minutes: 75 },
-    { name: 'Diamond Peel', description: 'Microdermabrasion treatment using diamond tips to exfoliate and reveal fresh, glowing skin.', category: ServiceCategory.skin_rejuvenation, price: 3500, duration_minutes: 50 },
+    { name: 'Classic Facial Treatment', description: 'Deep cleansing facial tailored to your skin type. Includes extraction, massage, and hydrating mask.', category: ServiceCategory.facial, service_type: 'Individual', price: 2500, duration_minutes: 60 },
+    { name: 'Acne Treatment', description: 'Specialized treatment targeting acne and breakouts. Includes deep cleansing, extraction, and medicated mask.', category: ServiceCategory.facial, service_type: 'Individual', price: 3500, duration_minutes: 75 },
+    { name: 'HydraFacial', description: 'Advanced hydrating facial using vortex technology to cleanse, exfoliate, and hydrate the skin.', category: ServiceCategory.facial, service_type: 'Individual', price: 4500, duration_minutes: 60 },
+    { name: 'Chemical Peel', description: 'Professional chemical exfoliation to improve skin texture, tone, and reduce fine lines.', category: ServiceCategory.skin_rejuvenation, service_type: 'Individual', price: 3000, duration_minutes: 45 },
+    { name: 'Skin Consultation', description: 'Comprehensive skin analysis and personalized treatment plan by our dermatologist.', category: ServiceCategory.consultation, service_type: 'Individual', price: 1000, duration_minutes: 30 },
+    { name: 'Botox Treatment', description: 'Anti-wrinkle injection treatment to smooth fine lines and achieve a youthful appearance.', category: ServiceCategory.injection, service_type: 'Individual', price: 15000, duration_minutes: 45 },
+    { name: 'Dermal Filler', description: 'Hyaluronic acid filler treatment for lip enhancement, cheek augmentation, or wrinkle correction.', category: ServiceCategory.injection, service_type: 'Individual', price: 18000, duration_minutes: 60 },
+    { name: 'Laser Hair Removal', description: 'Permanent hair reduction using advanced laser technology. Per area pricing.', category: ServiceCategory.hair_removal, service_type: 'Individual', price: 5000, duration_minutes: 45 },
+    { name: 'Skin Rejuvenation Laser', description: 'Non-invasive laser treatment to improve skin tone, texture, and stimulate collagen production.', category: ServiceCategory.laser, service_type: 'Individual', price: 8000, duration_minutes: 60 },
+    { name: 'Body Contouring', description: 'Non-svasive body sculpting treatment to reduce stubborn fat and reshape body contours.', category: ServiceCategory.body, service_type: 'Individual', price: 12000, duration_minutes: 90 },
+    { name: 'Anti-Aging Facial', description: 'Premium anti-aging facial combining advanced serums, LED therapy, and firming massage.', category: ServiceCategory.facial, service_type: 'Individual', price: 5500, duration_minutes: 75 },
+    { name: 'Diamond Peel', description: 'Microdermabrasion treatment using diamond tips to exfoliate and reveal fresh, glowing skin.', category: ServiceCategory.skin_rejuvenation, service_type: 'Individual', price: 3500, duration_minutes: 50 },
   ];
 
   const services = [];

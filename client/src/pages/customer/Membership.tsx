@@ -18,6 +18,7 @@ import {
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
 import formatPaymentMethod from '../../utils/formatPaymentMethod';
+import { formatAmountInput, parseAmountInput } from '../../utils/format';
 import { useAuth } from '@/context/AuthContext';
 import {
   membershipsApi,
@@ -55,10 +56,11 @@ export default function Membership() {
   const [availPaymentOpen, setAvailPaymentOpen] = useState(false);
   const [availPaymentPlan, setAvailPaymentPlan] = useState<any>(null);
   const [availSubmitting, setAvailSubmitting] = useState(false);
-  const [availPaymentMethod, setAvailPaymentMethod] = useState('cash');
+  const [availPaymentMethod, setAvailPaymentMethod] = useState('gcash');
   const [availPaymentType, setAvailPaymentType] = useState<'FULL' | 'DOWN_PAYMENT'>('FULL');
   const [availAmountPaid, setAvailAmountPaid] = useState(0);
-  const PAYMENT_METHODS = ['cash', 'gcash', 'gotyme', 'rcbc', 'paid_on_us'];
+  const [payInStoreSubmitting, setPayInStoreSubmitting] = useState(false);
+  const PAYMENT_METHODS = ['gcash', 'gotyme', 'rcbc'];
 
   useEffect(() => {
     const fetchPlans = async () => {
@@ -81,6 +83,20 @@ export default function Membership() {
       setAvailPaymentPlan(plan);
       setAvailAmountPaid(Number(plan.promo_price ?? plan.regular_price ?? 0));
       setAvailPaymentOpen(true);
+    }
+  };
+
+  const handleRequestPayInStore = async () => {
+    if (!membership?.id) return;
+    setPayInStoreSubmitting(true);
+    try {
+      await membershipsApi.requestPayInStore(membership.id);
+      toast.success('We\'ll expect you! Our staff will process your payment at the store.');
+      await fetchData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to submit your request');
+    } finally {
+      setPayInStoreSubmitting(false);
     }
   };
 
@@ -149,7 +165,7 @@ export default function Membership() {
   }, [fetchData]);
 
   const copyCode = () => {
-    const code = membership?.membership_code || referralCode;
+    const code = membership?.code || membership?.membership_code || referralCode;
     if (code) {
       navigator.clipboard.writeText(code);
       setCopied(true);
@@ -359,7 +375,7 @@ export default function Membership() {
 
           <div className="flex items-center gap-3 mb-6 p-3 bg-white/10 rounded-xl">
             <p className="text-sm font-mono tracking-wider flex-1">
-              {membership.membership_code || 'SOUVARI-VIP-XXXXXX'}
+              {membership.code || 'SOUVARI-VIP-XXXXXX'}
             </p>
             <button onClick={copyCode} className="p-1.5 hover:bg-white/10 rounded-lg transition">
               {copied ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
@@ -386,6 +402,46 @@ export default function Membership() {
           </div>
         </div>
       </div>
+
+      {/* Balance / Pay-in-store banner */}
+      {membership.payment_status === 'partial' && Number(membership.balance) > 0 && (
+        <div className={`rounded-xl border p-4 ${membership.status === 'failed' ? 'bg-red-50 border-red-200' : 'bg-neutral-50 border-neutral-200'}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex-1">
+              <p className={`text-sm font-semibold ${membership.status === 'failed' ? 'text-red-700' : 'text-neutral-900'}`}>
+                {membership.status === 'failed'
+                  ? 'Membership marked as failed — overdue balance'
+                  : 'Remaining Balance Due'}
+              </p>
+              <p className={`text-xs mt-1 ${membership.status === 'failed' ? 'text-red-600' : 'text-neutral-500'}`}>
+                {membership.pay_in_store_requested
+                  ? `You'll settle the remaining ₱${Number(membership.balance || 0).toLocaleString()} at the store. Our staff will assist you.`
+                  : `Please settle the remaining ₱${Number(membership.balance || 0).toLocaleString()}${
+                      membership.down_payment_due_date
+                        ? ` by ${dayjs(membership.down_payment_due_date).format('MMM D, YYYY')}`
+                        : ''
+                    }.${membership.status === 'failed' ? ' Contact us to reactivate.' : ' Pay online now, or let us know you will pay at the store.'}`}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className={`text-2xl font-bold ${membership.status === 'failed' ? 'text-red-700' : 'text-neutral-900'}`}>
+                  ₱{Number(membership.balance || 0).toLocaleString()}
+                </p>
+              </div>
+              {!membership.pay_in_store_requested && (
+                <button
+                  onClick={handleRequestPayInStore}
+                  disabled={payInStoreSubmitting}
+                  className="btn-secondary text-sm whitespace-nowrap"
+                >
+                  {payInStoreSubmitting ? 'Requesting...' : 'I\'ll pay at the store'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -799,13 +855,11 @@ export default function Membership() {
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-neutral-700">Amount Paid</label>
                 <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max={Number(availPaymentPlan.promo_price ?? availPaymentPlan.regular_price ?? 0)}
-                  value={availAmountPaid}
-                  onChange={e => setAvailAmountPaid(parseFloat(e.target.value) || 0)}
-                  className="input-field"
+                  type="text"
+                  inputMode="decimal"
+                  className="input-field hide-number-spinners"
+                  value={availAmountPaid ? formatAmountInput(String(availAmountPaid)) : ''}
+                  onChange={e => setAvailAmountPaid(parseAmountInput(e.target.value) || 0)}
                 />
               </div>
             </div>

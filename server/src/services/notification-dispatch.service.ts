@@ -282,6 +282,191 @@ class NotificationDispatchService {
     });
     return admins.map((a) => a.id);
   }
+
+  async dispatchMembershipDownpayment(params: {
+    customerUserId: number;
+    planName: string;
+    planPrice: number;
+    amountPaid: number;
+    balance: number;
+    dueDate: Date | null;
+    customerPhone?: string;
+    adminUserIds: number[];
+  }): Promise<void> {
+    const { customerUserId, planName, planPrice, amountPaid, balance, dueDate, customerPhone, adminUserIds } = params;
+    const balanceStr = `₱${balance.toLocaleString()}`;
+    const dueStr = dueDate ? new Date(dueDate).toLocaleDateString() : 'soon';
+
+    await this.dispatch({
+      userId: customerUserId,
+      type: 'payment',
+      title: 'Membership Activated — Balance Due',
+      message: `Your ${planName} membership is now active. You paid ₱${amountPaid.toLocaleString()} of ₱${planPrice.toLocaleString()}. Balance of ${balanceStr} is due by ${dueStr}.`,
+      data: { plan: planName, balance, due_date: dueDate },
+      sendSMS: true,
+      smsPhone: customerPhone,
+    });
+
+    for (const adminId of adminUserIds) {
+      await this.dispatch({
+        userId: adminId,
+        type: 'payment',
+        title: 'Membership Downpayment Received',
+        message: `A customer activated ${planName} with a downpayment. Remaining balance: ${balanceStr} due by ${dueStr}.`,
+        data: { balance, due_date: dueDate },
+        sendSMS: false,
+      });
+    }
+  }
+
+  async dispatchMembershipFull(params: {
+    customerUserId: number;
+    planName: string;
+    planPrice: number;
+    customerPhone?: string;
+    adminUserIds: number[];
+  }): Promise<void> {
+    const { customerUserId, planName, planPrice, customerPhone, adminUserIds } = params;
+
+    await this.dispatch({
+      userId: customerUserId,
+      type: 'payment',
+      title: 'Membership Activated',
+      message: `Your ${planName} membership is now active. Full payment of ₱${planPrice.toLocaleString()} received. Welcome to Souvari Skin Lab!`,
+      data: { plan: planName, amount: planPrice },
+      sendSMS: true,
+      smsPhone: customerPhone,
+    });
+
+    for (const adminId of adminUserIds) {
+      await this.dispatch({
+        userId: adminId,
+        type: 'payment',
+        title: 'Membership Fully Paid',
+        message: `A customer paid in full for ${planName} — ₱${planPrice.toLocaleString()}.`,
+        data: { plan: planName, amount: planPrice },
+        sendSMS: false,
+      });
+    }
+  }
+
+  async dispatchPayInStoreRequest(params: {
+    customerUserId: number;
+    customerName: string;
+    planName: string;
+    balance: number;
+    adminUserIds: number[];
+  }): Promise<void> {
+    const { customerUserId, customerName, planName, balance, adminUserIds } = params;
+    const balanceStr = `₱${balance.toLocaleString()}`;
+
+    await this.dispatch({
+      userId: customerUserId,
+      type: 'payment',
+      title: 'Payment at Store Requested',
+      message: `We've noted you'll settle your remaining ${balanceStr} balance for ${planName} at the clinic. Please visit us — the clinic has been notified.`,
+      data: { balance, plan: planName },
+      sendSMS: false,
+    });
+
+    for (const adminId of adminUserIds) {
+      await this.dispatch({
+        userId: adminId,
+        type: 'payment',
+        title: 'Balance Payment At Store',
+        message: `${customerName} requested to pay their ${planName} remaining balance (${balanceStr}) at the store. Collect it from Memberships.`,
+        data: { balance, plan: planName },
+        sendSMS: false,
+      });
+    }
+  }
+
+  async dispatchMembershipBalanceSettled(params: {
+    customerUserId: number;
+    customerName: string;
+    planName: string;
+    collectedAmount: number;
+    customerPhone?: string;
+    adminUserIds: number[];
+  }): Promise<void> {
+    const { customerUserId, customerName, planName, collectedAmount, customerPhone, adminUserIds } = params;
+    const amountStr = `₱${collectedAmount.toLocaleString()}`;
+
+    await this.dispatch({
+      userId: customerUserId,
+      type: 'payment',
+      title: 'Membership Balance Settled',
+      message: `Thank you! Your ${planName} membership is now fully paid.`,
+      data: { plan: planName },
+      sendSMS: true,
+      smsPhone: customerPhone,
+    });
+
+    for (const adminId of adminUserIds) {
+      await this.dispatch({
+        userId: adminId,
+        type: 'payment',
+        title: 'Membership Balance Collected',
+        message: `${customerName}'s ${planName} membership balance was collected in-store — ${amountStr}.`,
+        data: { plan: planName, amount: collectedAmount },
+        sendSMS: false,
+      });
+    }
+  }
+
+  async dispatchMembershipBalanceReminder(params: {
+    customerUserId: number;
+    planName: string;
+    balance: number;
+    dueDate: Date | null;
+    customerPhone?: string;
+  }): Promise<void> {
+    const { customerUserId, planName, balance, dueDate, customerPhone } = params;
+    const balanceStr = `₱${balance.toLocaleString()}`;
+    const dueStr = dueDate ? new Date(dueDate).toLocaleDateString() : 'today';
+
+    await this.dispatch({
+      userId: customerUserId,
+      type: 'payment',
+      title: 'Membership Balance Due Today',
+      message: `Your remaining ${balanceStr} balance for ${planName} is due today (${dueStr}). Please pay to keep your membership active, or it will be marked failed.`,
+      data: { balance, due_date: dueDate, plan: planName },
+      sendSMS: true,
+      smsPhone: customerPhone,
+    });
+  }
+
+  async dispatchMembershipFailed(params: {
+    customerUserId: number;
+    customerName: string;
+    planName: string;
+    balance: number;
+    adminUserIds: number[];
+  }): Promise<void> {
+    const { customerUserId, customerName, planName, balance, adminUserIds } = params;
+    const balanceStr = `₱${balance.toLocaleString()}`;
+
+    await this.dispatch({
+      userId: customerUserId,
+      type: 'payment',
+      title: 'Membership Failed — Balance Unpaid',
+      message: `Your ${planName} membership was marked failed because the remaining balance (${balanceStr}) was not paid by the due date. Please contact the clinic to make arrangements.`,
+      data: { balance, plan: planName },
+      sendSMS: true,
+      smsPhone: undefined,
+    });
+
+    for (const adminId of adminUserIds) {
+      await this.dispatch({
+        userId: adminId,
+        type: 'payment',
+        title: 'Membership Marked Failed',
+        message: `${customerName}'s ${planName} membership was marked failed — ${balanceStr} balance was unpaid past the due date.`,
+        data: { balance, plan: planName },
+        sendSMS: false,
+      });
+    }
+  }
 }
 
 export const notificationDispatch = new NotificationDispatchService();

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CreditCard, DollarSign, Loader2, Minus, Plus, X } from 'lucide-react';
 import { posApi, transactionsApi } from '../../api';
+import { formatAmountInput, parseAmountInput } from '../../utils/format';
 import type { ServiceOption } from '../booking/admin/types';
 
 interface CheckoutModalProps {
@@ -96,13 +97,13 @@ export default function CheckoutModal({
   }, [quote, computedDiscount]);
 
   const change = useMemo(() => {
-    const tendered = parseFloat(amountTendered) || 0;
+    const tendered = parseAmountInput(amountTendered) || 0;
     return Math.max(0, tendered - finalTotal);
   }, [amountTendered, finalTotal]);
 
   const handleSubmit = async () => {
     if (!quote) return;
-    if (paymentMethod === 'cash' && parseFloat(amountTendered) < finalTotal) {
+    if (paymentMethod === 'cash' && (parseAmountInput(amountTendered) || 0) < finalTotal) {
       setError('Amount tendered is less than total');
       return;
     }
@@ -266,12 +267,11 @@ export default function CheckoutModal({
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400">₱</span>
               <input
-                type="number"
-                step="0.01"
-                min={finalTotal}
+                type="text"
+                inputMode="decimal"
                 value={amountTendered}
-                onChange={e => setAmountTendered(e.target.value)}
-                className="input-field pl-7 text-right text-lg"
+                onChange={e => setAmountTendered(formatAmountInput(e.target.value))}
+                className="input-field pl-7 text-right text-lg hide-number-spinners"
                 placeholder="0.00"
                 disabled={paymentMethod !== 'cash'}
               />
@@ -292,7 +292,7 @@ export default function CheckoutModal({
         </div>
 
         <div className="p-4 border-t border-neutral-200 flex gap-3 justify-end">
-          <button onClick={onClose} disabled={loading} className="btn-outline-light">
+          <button onClick={onClose} disabled={loading} className="btn-secondary">
             Cancel
           </button>
           <button onClick={handleSubmit} disabled={loading} className="btn-gold">

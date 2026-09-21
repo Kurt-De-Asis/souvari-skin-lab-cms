@@ -1,14 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useForm } from 'react-hook-form';
-import { Plus, Pencil, AlertTriangle, ShoppingCart, Trash2, X, Check } from 'lucide-react';
+import { ShoppingCart, AlertTriangle, Trash2, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { productsApi, customersApi, transactionsApi } from '@/api';
 import { formatAmountInput } from '../../utils/format';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
 import Pagination from '@/components/ui/Pagination';
-import StatusBadge from '@/components/ui/StatusBadge';
-import Modal from '@/components/ui/Modal';
 import Drawer from '@/components/ui/Drawer';
 
 interface Category {
@@ -26,22 +23,8 @@ interface Product {
   current_stock: number | string;
   minimum_stock: number | string;
   unit_price: number | string;
-  unit_cost: number | string;
   status: string;
 }
-
-interface ProductForm {
-  product_category_id: number | string;
-  name: string;
-  unit: string;
-  unit_price: number;
-  unit_cost: number;
-  current_stock: number;
-  minimum_stock: number;
-  status: string;
-}
-
-const UNIT_OPTIONS = ['piece', 'ml', 'mg', 'unit', 'vial', 'tablet', 'bottle', 'box'];
 
 export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -51,15 +34,7 @@ export default function Products() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [categoryFilter, setCategoryFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [lowStockOnly, setLowStockOnly] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<ProductForm>({
-    defaultValues: { product_category_id: '', name: '', unit: 'piece', unit_price: 0, unit_cost: 0, current_stock: 0, minimum_stock: 0, status: 'active' },
-  });
+  const [search, setSearch] = useState('');
 
   const [cartOpen, setCartOpen] = useState(false);
   const [cartItems, setCartItems] = useState<{ product: Product; quantity: number }[]>([]);
@@ -94,7 +69,7 @@ export default function Products() {
       }
       return [...prev, { product: p, quantity: 1 }];
     });
-    toast.success(`Added ${p.name} to POS cart`);
+    toast.success(`Added ${p.name} to cart`);
   };
 
   const updateCartQty = (productId: number, qty: number) => {
@@ -119,7 +94,7 @@ export default function Products() {
   const handleCheckout = async () => {
     if (cartItems.length === 0) return;
     if (paymentMethod === 'cash' && tendered < cartSubtotal) {
-      toast.error('Amount tendered is less than total');
+      toast.error('Cash amount is less than total');
       return;
     }
     setCheckingOut(true);
@@ -137,10 +112,10 @@ export default function Products() {
           unit_price: Number(item.product.unit_price),
           line_total: Number(item.product.unit_price) * item.quantity,
         })),
-        notes: 'Walk-in retail purchase via Products POS',
+        notes: 'Walk-in retail purchase via POS',
       };
       await transactionsApi.create(payload);
-      toast.success('Retail POS checkout completed successfully');
+      toast.success('Checkout completed successfully');
       setCartItems([]);
       setCartOpen(false);
       setSelectedCustomerId('');
@@ -156,10 +131,9 @@ export default function Products() {
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = { page: String(page), limit: '10' };
+      const params: Record<string, string> = { page: String(page), limit: '12', status: 'active' };
       if (categoryFilter) params.product_category_id = categoryFilter;
-      if (statusFilter) params.status = statusFilter;
-      if (lowStockOnly) params.low_stock = 'true';
+      if (search) params.search = search;
       const { data } = await productsApi.list(params);
       setProducts(data.data?.products || data.data || []);
       setTotalPages(data.pagination?.totalPages || 1);
@@ -169,7 +143,7 @@ export default function Products() {
     } finally {
       setLoading(false);
     }
-  }, [page, categoryFilter, statusFilter, lowStockOnly]);
+  }, [page, categoryFilter, search]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -182,53 +156,7 @@ export default function Products() {
     fetchProducts();
     fetchCategories();
   }, [fetchProducts, fetchCategories]);
-  useEffect(() => { setPage(1); }, [categoryFilter, statusFilter, lowStockOnly]);
-
-  const openAddModal = () => {
-    setEditingProduct(null);
-    reset({ product_category_id: '', name: '', unit: 'piece', unit_price: 0, unit_cost: 0, current_stock: 0, minimum_stock: 0, status: 'active' });
-    setModalOpen(true);
-  };
-
-  const openEditModal = (p: Product) => {
-    setEditingProduct(p);
-    reset({
-      product_category_id: p.product_category_id ?? '',
-      name: p.name,
-      unit: p.unit,
-      unit_price: Number(p.unit_price) || 0,
-      unit_cost: Number(p.unit_cost) || 0,
-      current_stock: Number(p.current_stock) || 0,
-      minimum_stock: Number(p.minimum_stock) || 0,
-      status: p.status,
-    });
-    setModalOpen(true);
-  };
-
-  const onSubmit = async (values: ProductForm) => {
-    setSubmitting(true);
-    try {
-      const payload = {
-        ...values,
-        product_category_id: values.product_category_id ? Number(values.product_category_id) : null,
-        is_retail: true,
-        is_consumable: false,
-      };
-      if (editingProduct) {
-        await productsApi.update(editingProduct.id, payload);
-        toast.success('Product updated');
-      } else {
-        await productsApi.create(payload);
-        toast.success('Product created');
-      }
-      setModalOpen(false);
-      fetchProducts();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Operation failed');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  useEffect(() => { setPage(1); }, [categoryFilter, search]);
 
   const isLowStock = (p: Product) => Number(p.current_stock) <= Number(p.minimum_stock);
 
@@ -244,129 +172,91 @@ export default function Products() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-sans font-semibold text-neutral-900">Products</h1>
-          <p className="text-sm text-neutral-500 mt-1">Manage inventory products and process walk-in retail sales</p>
+          <p className="text-sm text-neutral-500 mt-1">Browse products and process walk-in retail sales</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setCartOpen(true)}
-            className="btn-secondary relative flex items-center gap-2"
-          >
-            <ShoppingCart size={18} />
-            Cart
-            {cartItems.length > 0 && (
-              <span className="absolute -top-2 -right-2 bg-primary-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
-              </span>
-            )}
-          </button>
-          <button onClick={openAddModal} className="btn-primary">
-            <Plus size={18} />
-            Add Product
-          </button>
-        </div>
+        <button
+          onClick={() => setCartOpen(true)}
+          className="btn-secondary relative flex items-center gap-2"
+        >
+          <ShoppingCart size={18} />
+          Cart
+          {cartItems.length > 0 && (
+            <span className="absolute -top-2 -right-2 bg-primary-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+              {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Filters */}
       <div className="card pb-0">
         <div className="flex flex-wrap items-center gap-3 pb-4">
+          <div className="relative flex-1 min-w-[200px] max-w-xs">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search products..."
+              className="input-field pl-10"
+            />
+          </div>
           <select className="select-field w-auto" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
             <option value="">All Categories</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
-          <select className="select-field w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="discontinued">Discontinued</option>
-          </select>
-          <label className="flex items-center gap-2 text-sm text-neutral-600 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={lowStockOnly}
-              onChange={(e) => setLowStockOnly(e.target.checked)}
-              className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
-            />
-            <AlertTriangle size={14} className="text-red-500" />
-            Low stock only
-          </label>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="card overflow-hidden !p-0">
-        {loading ? (
-          <LoadingSpinner fullScreen={false} />
-        ) : products.length === 0 ? (
-          <EmptyState title="No products found" description="Add a new product or adjust your filters." />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Name</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">SKU</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Category</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Unit</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Stock</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Min Stock</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Price</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Status</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100">
-                {products.map((p) => {
-                  const low = isLowStock(p);
-                  return (
-                    <tr key={p.id} className={`hover:bg-neutral-50/50 ${low ? 'bg-red-50/30' : ''}`}>
-                      <td className="px-6 py-4 font-medium text-neutral-900">
-                        <div className="flex items-center gap-2">
-                          {low && <AlertTriangle size={14} className="text-red-500 shrink-0" />}
-                          {p.name}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-neutral-500 font-mono text-xs">{p.sku}</td>
-                      <td className="px-6 py-4 text-neutral-600 capitalize">{getCategoryName(p)}</td>
-                      <td className="px-6 py-4 text-neutral-600">{p.unit}</td>
-                      <td className="px-6 py-4">
-                        <span className={`font-medium ${low ? 'text-red-600' : 'text-neutral-900'}`}>
-                          {Number(p.current_stock)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-neutral-500">{Number(p.minimum_stock)}</td>
-                      <td className="px-6 py-4 text-neutral-600">{formatPrice(p.unit_price)}</td>
-                      <td className="px-6 py-4"><StatusBadge status={p.status} /></td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => addToCart(p)}
-                            title="Add to POS Cart"
-                            className="btn-primary !py-1.5 !px-2.5 text-xs flex items-center gap-1"
-                            disabled={Number(p.current_stock) <= 0 || Number(p.unit_price) <= 0}
-                          >
-                            <ShoppingCart size={16} />
-                            Add
-                          </button>
-                          <button onClick={() => openEditModal(p)} title="Edit" className="p-2 text-neutral-500 hover:text-primary-600 hover:bg-primary-50 rounded-md transition">
-                            <Pencil size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {!loading && products.length > 0 && (
-          <div className="px-6 pb-4">
-            <Pagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
-          </div>
-        )}
-      </div>
+      {/* Product grid */}
+      {loading ? (
+        <LoadingSpinner fullScreen={false} />
+      ) : products.length === 0 ? (
+        <EmptyState title="No products found" description="Adjust your filters or search terms." />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {products.map((p) => {
+            const low = isLowStock(p);
+            const outOfStock = Number(p.current_stock) <= 0;
+            return (
+              <div key={p.id} className="card p-4 flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-neutral-900 truncate">{p.name}</p>
+                    <p className="text-[11px] text-neutral-500 capitalize">{getCategoryName(p)}</p>
+                  </div>
+                  {low && <AlertTriangle size={16} className="text-red-500 shrink-0" />}
+                </div>
+
+                <div className="flex items-end justify-between gap-2">
+                  <div>
+                    <p className="text-lg font-semibold text-neutral-900">{formatPrice(p.unit_price)}</p>
+                    <p className="text-xs text-neutral-500">
+                      Stock: <span className={low ? 'font-medium text-red-600' : 'font-medium text-neutral-900'}>{Number(p.current_stock)}</span> {p.unit}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => addToCart(p)}
+                    disabled={outOfStock || Number(p.unit_price) <= 0}
+                    title={outOfStock ? 'Out of stock' : 'Add to Cart'}
+                    className="btn-primary !py-2 !px-3 text-xs flex items-center gap-1.5"
+                  >
+                    <ShoppingCart size={16} />
+                    Add
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {!loading && products.length > 0 && (
+        <div className="flex justify-center">
+          <Pagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+        </div>
+      )}
 
       {/* POS Cart Drawer */}
       <Drawer
@@ -440,11 +330,9 @@ export default function Products() {
 
           {cartItems.length > 0 && (
             <div className="space-y-4 border-t border-neutral-200 pt-4">
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between font-semibold text-neutral-900 text-base border-t border-neutral-200 pt-2">
-                  <span>Total Amount</span>
-                  <span>₱{cartSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </div>
+              <div className="flex justify-between font-semibold text-neutral-900 text-base border-t border-neutral-200 pt-2">
+                <span>Total Amount</span>
+                <span>₱{cartSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
 
               <div>
@@ -507,8 +395,6 @@ export default function Products() {
           )}
         </div>
       </Drawer>
-
-      {/* Add/Edit Modal */}
     </div>
   );
 }

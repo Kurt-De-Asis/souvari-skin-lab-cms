@@ -138,14 +138,16 @@ class TreatmentRecordsService {
     return record;
   }
 
-  async create(data: CreateTreatmentRecordInput, userId: number) {
+  async create(data: CreateTreatmentRecordInput, user: { userId: number; role: string }) {
     const staff = await prisma.staff.findUnique({
-      where: { user_id: userId },
+      where: { user_id: user.userId },
     });
 
-    if (!staff) {
+    if (!staff && user.role !== 'admin') {
       throw new AppError('Staff profile not found', 404);
     }
+
+    const staffId = staff?.id ?? null;
 
     if (data.appointment_id) {
       const appointment = await prisma.appointments.findUnique({
@@ -196,7 +198,7 @@ class TreatmentRecordsService {
       const record = await prisma.treatment_records.create({
         data: {
           appointment_id: data.appointment_id,
-          staff_id: staff.id,
+          staff_id: staffId,
           customer_id: appointment.customer_id,
           service_id: appointment.service_id,
           treatment_date: appointment.appointment_date,
@@ -230,7 +232,7 @@ class TreatmentRecordsService {
     // Handle general clinical notes (no appointment_id)
     const record = await prisma.treatment_records.create({
       data: {
-        staff_id: staff.id,
+        staff_id: staffId,
         customer_id: data.customer_id,
         treatment_date: data.treatment_date ? new Date(data.treatment_date) : new Date(),
         notes: data.notes ?? null,

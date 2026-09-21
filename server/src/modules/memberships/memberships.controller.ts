@@ -139,6 +139,38 @@ export class MembershipsController {
     }
   }
 
+  async requestPayInStore(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      const membership = await membershipService.requestPayInStore(
+        id,
+        req.user!.role,
+        req.user!.userId
+      );
+      res.json({
+        success: true,
+        message: 'Payment at store requested. The clinic has been notified.',
+        data: membership,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async listMyPayments(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      await membershipService.ensureOwnership(id, req.user!.role, req.user!.userId);
+      const payments = await membershipService.listPayments(id);
+      res.json({
+        success: true,
+        data: payments,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async validateCode(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { code } = req.params as { code: string };

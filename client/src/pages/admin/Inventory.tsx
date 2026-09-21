@@ -8,6 +8,7 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
 import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
+import { registerMoney } from '@/utils/money';
 
 interface Movement {
   id: number;
@@ -468,7 +469,7 @@ export default function Inventory() {
           </div>
           <div>
             <label className="label">Unit Cost (₱)</label>
-            <input type="number" step="0.01" min="0" className="input-field" {...registerPurchase('unit_cost', { required: 'Required', valueAsNumber: true, min: { value: 0, message: 'Must be 0 or more' } })} />
+            <input type="text" inputMode="decimal" className="input-field hide-number-spinners" {...registerMoney(registerPurchase, 'unit_cost', { required: 'Required' })} />
             {purchaseErrors.unit_cost && <p className="text-xs text-red-600 mt-1">{purchaseErrors.unit_cost.message}</p>}
           </div>
           <div className="flex justify-end gap-3 pt-2">

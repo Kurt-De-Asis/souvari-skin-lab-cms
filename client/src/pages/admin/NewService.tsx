@@ -5,6 +5,8 @@ import { X, Save, Package, Plug, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { servicesApi, serviceCategoriesApi, resourcesApi, serviceAddonsApi } from '@/api';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import { registerMoney } from '@/utils/money';
+import { formatAmountInput, parseAmountInput } from '@/utils/format';
 
 interface ServiceForm {
   name: string;
@@ -294,7 +296,7 @@ export default function NewService() {
                     </div>
                     <div>
                       <label className="label">Price (₱)</label>
-                      <input type="number" step="0.01" min="0" className="input-field" {...register('price', { min: { value: 0, message: 'Price cannot be negative' } })} />
+                      <input type="text" inputMode="decimal" className="input-field hide-number-spinners" {...registerMoney(register, 'price', { min: { value: 0, message: 'Price cannot be negative' } })} />
                       {errors.price && <p className="text-xs text-red-600 mt-1">{errors.price.message}</p>}
                     </div>
                     <div>
@@ -371,7 +373,7 @@ export default function NewService() {
                           </div>
                           <div>
                             <label className="label">Price (₱)</label>
-                            <input type="number" min="0" step="0.01" className="input-field" value={addon.price} onChange={e => updateAddon(idx, 'price', Number(e.target.value))} />
+                            <input type="text" inputMode="decimal" className="input-field hide-number-spinners" value={addon.price ? formatAmountInput(String(addon.price)) : ''} onChange={e => updateAddon(idx, 'price', parseAmountInput(e.target.value) || 0)} />
                           </div>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

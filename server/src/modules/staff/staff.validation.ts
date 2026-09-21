@@ -2,6 +2,22 @@ import { z } from 'zod';
 
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+const staffPositions = [
+  'doctor',
+  'nurse',
+  'aesthetician',
+  'therapist',
+  'receptionist',
+  'manager',
+  'head_admin',
+  'nail_technician',
+  'facialist',
+  'nail_and_skin_care_specialist',
+  'clinic_head_nurse',
+] as const;
+
+const permissionLevels = ['low', 'medium', 'high', 'manager', 'owner'] as const;
+
 const toMinutes = (time: string): number => {
   const [h, m] = time.split(':').map(Number);
   return h * 60 + m;
@@ -75,9 +91,9 @@ export const createStaffSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters').optional(),
   first_name: z.string().min(1, 'First name is required').max(100),
   last_name: z.string().min(1, 'Last name is required').max(100),
-  position: z.enum(['doctor', 'nurse', 'aesthetician', 'therapist', 'receptionist', 'manager']).optional().default('aesthetician'),
+  position: z.enum(staffPositions).optional().default('aesthetician'),
   job_title: z.string().max(100).optional().nullable(),
-  permission_level: z.enum(['manager', 'medium', 'owner']).optional().default('medium'),
+  permission_level: z.enum(permissionLevels).optional().default('medium'),
   status: z.enum(['active', 'on_leave', 'inactive', 'terminated']).optional().default('active'),
   hire_date: z.string().optional().nullable(),
   date_of_birth: z.string().optional().nullable(),
@@ -94,9 +110,9 @@ export const updateStaffSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters').optional(),
   first_name: z.string().min(1).max(100).optional(),
   last_name: z.string().min(1).max(100).optional(),
-  position: z.enum(['doctor', 'nurse', 'aesthetician', 'therapist', 'receptionist', 'manager']).optional(),
+  position: z.enum(staffPositions).optional(),
   job_title: z.string().max(100).optional().nullable(),
-  permission_level: z.enum(['manager', 'medium', 'owner']).optional(),
+  permission_level: z.enum(permissionLevels).optional(),
   status: z.enum(['active', 'on_leave', 'inactive', 'terminated']).optional(),
   hire_date: z.string().optional().nullable(),
   date_of_birth: z.string().optional().nullable(),
@@ -111,7 +127,7 @@ export const staffQuerySchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
   search: z.string().optional(),
-  position: z.enum(['doctor', 'nurse', 'aesthetician', 'therapist', 'receptionist', 'manager']).optional(),
+  position: z.enum(staffPositions).optional(),
   status: z.enum(['active', 'on_leave', 'inactive', 'terminated']).optional(),
 });
 

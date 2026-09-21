@@ -105,7 +105,6 @@ interface BookingDraft {
   mode: Mode;
   serviceCategory: string;
   selectedGroup: string;
-  selectedService: Service | null;
   selectedServices: Service[];
   selectedDate: string;
   selectedSlot: TimeSlot | null;
@@ -164,7 +163,6 @@ export default function BookingPage() {
   const [loadingServices, setLoadingServices] = useState(true);
 
   const [selectedGroup, setSelectedGroup] = useState<string>(() => restore?.selectedGroup || '');
-  const [selectedService, setSelectedService] = useState<Service | null>(() => restore?.selectedService || null);
   const [serviceCategory, setServiceCategory] = useState(() => restore?.serviceCategory || 'All');
   const [selectedServices, setSelectedServices] = useState<Service[]>(() => restore?.selectedServices || []);
 
@@ -209,16 +207,14 @@ export default function BookingPage() {
   const activeGroup = useMemo(() => GROUPS.find((g) => g.key === selectedGroup) || null, [selectedGroup]);
 
   const bookingServices = useMemo<Service[]>(() => {
-    if (isSingle) return selectedService ? [selectedService] : [];
     return selectedServices;
-  }, [isSingle, selectedService, selectedServices]);
+  }, [selectedServices]);
 
   useEffect(() => {
     saveDraft({
       mode,
       serviceCategory,
       selectedGroup,
-      selectedService,
       selectedServices,
       selectedDate,
       selectedSlot,
@@ -227,7 +223,7 @@ export default function BookingPage() {
       step,
       notes: customerInfo.notes,
     });
-  }, [mode, serviceCategory, selectedGroup, selectedService, selectedServices, selectedDate, selectedSlot, membership, membershipCode, step, customerInfo.notes]);
+  }, [mode, serviceCategory, selectedGroup, selectedServices, selectedDate, selectedSlot, membership, membershipCode, step, customerInfo.notes]);
 
   useEffect(() => {
     const fetchServices = async () => {
@@ -257,7 +253,7 @@ export default function BookingPage() {
           if (found) {
             const g = GROUPS.find((grp) => grp.categories.includes(found.category));
             setSelectedGroup(g?.key || '');
-            setSelectedService(found);
+            setSelectedServices([found]);
           }
         }
       } catch {
@@ -296,77 +292,21 @@ export default function BookingPage() {
         const totalDur = bookingServices.reduce((sum, s) => sum + s.duration, 0);
         const allSlots: TimeSlot[] = [];
 
-        if (bookingServices.length === 1) {
-          const { data } = await appointmentsApi.getAvailability({
-            service_id: bookingServices[0].id,
-            date: selectedDate,
-            duration_minutes: totalDur,
-          });
-          const raw = data.data?.available_slots || data.data?.slots || data.data || [];
-          if (Array.isArray(raw)) {
-            for (const s of raw) {
-              allSlots.push({
-                start: s.start,
-                end: s.end,
-                staff_id: s.staff_id,
-                staff_name: s.staff_name || '',
-              });
-            }
-          }
-        } else {
-          const perService = await Promise.all(
-            bookingServices.map((svc) =>
-              appointmentsApi.getAvailability({ service_id: svc.id, date: selectedDate })
-            )
-          );
-
-          const perStaffStartSets = perService.map(({ data }) => {
-            const raw = data.data?.available_slots || data.data?.slots || data.data || [];
-            const map = new Map<number, Set<string>>();
-            for (const slot of Array.isArray(raw) ? raw : []) {
-              if (!slot?.start || !slot?.staff_id) continue;
-              if (!map.has(slot.staff_id)) map.set(slot.staff_id, new Set());
-              map.get(slot.staff_id)!.add(slot.start);
-            }
-            return map;
-          });
-
-          const staffIds = new Set<number>();
-          perStaffStartSets.forEach((m) => m.forEach((_, id) => staffIds.add(id)));
-          const staffNameMap = new Map<number, string>();
-          for (const { data } of perService) {
-            const raw = data.data?.available_slots || data.data?.slots || data.data || [];
-            for (const slot of Array.isArray(raw) ? raw : []) {
-              if (slot?.staff_id && slot?.staff_name && !staffNameMap.has(slot.staff_id)) {
-                staffNameMap.set(slot.staff_id, slot.staff_name);
-              }
-            }
-          }
-
-          const offsetUpTo = (i: number) =>
-            bookingServices.slice(0, i).reduce((sum, s) => sum + s.duration, 0);
-
-          for (const staffId of staffIds) {
-            const staffSets = perStaffStartSets.map((m) => m.get(staffId) || new Set<string>());
-            if (staffSets.some((s) => s.size === 0)) continue;
-
-            const feasible: string[] = [];
-            for (const t of [...staffSets[0]].sort()) {
-              let ok = true;
-              for (let i = 1; i < bookingServices.length && ok; i++) {
-                if (!staffSets[i].has(addMinutes(t, offsetUpTo(i)))) ok = false;
-              }
-              if (ok) feasible.push(t);
-            }
-
-            for (const t of feasible) {
-              allSlots.push({
-                start: t,
-                end: addMinutes(t, totalDur),
-                staff_id: staffId,
-                staff_name: staffNameMap.get(staffId) || '',
-              });
-            }
+        const { data } = await appointmentsApi.getAvailability({
+          service_id: bookingServices[0].id,
+          date: selectedDate,
+          duration_minutes: totalDur,
+        });
+        const raw = data.data?.available_slots || data.data?.slots || data.data || [];
+        if (Array.isArray(raw)) {
+          for (const s of raw) {
+            if (!s?.start || !s?.staff_id) continue;
+            allSlots.push({
+              start: s.start,
+              end: s.end,
+              staff_id: s.staff_id,
+              staff_name: s.staff_name || '',
+            });
           }
         }
 
@@ -418,7 +358,6 @@ export default function BookingPage() {
           mode,
           serviceCategory,
           selectedGroup,
-          selectedService,
           selectedServices,
           selectedDate,
           selectedSlot,
@@ -432,7 +371,7 @@ export default function BookingPage() {
       /* ignore storage errors */
     }
     navigate(path);
-  }, [navigate, mode, serviceCategory, selectedGroup, selectedService, selectedServices, selectedDate, selectedSlot, membership, membershipCode, step, customerInfo.notes]);
+  }, [navigate, mode, serviceCategory, selectedGroup, selectedServices, selectedDate, selectedSlot, membership, membershipCode, step, customerInfo.notes]);
 
   const formatDate = (dateStr: string): string => {
     return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
@@ -450,11 +389,7 @@ export default function BookingPage() {
     return `${displayHour}:${String(minutes).padStart(2, '0')} ${period}`;
   };
 
-  const addMinutes = (time: string, minutes: number): string => {
-    const [hours, mins] = time.split(':').map(Number);
-    const total = hours * 60 + mins + minutes;
-    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
-  };
+  
 
   const categories = useMemo(() => {
     const cats = [...new Set(allServices.map((s) => s.category))];
@@ -507,17 +442,17 @@ export default function BookingPage() {
     });
   }, []);
 
+  const removeService = useCallback((service: Service) => {
+    setSelectedServices((prev) => prev.filter((s) => s.id !== service.id));
+  }, []);
+
   const selectGroup = useCallback((key: string) => {
     setSelectedGroup(key);
     setStep(SINGLE_TREATMENT_STEP);
   }, []);
 
-  const selectTreatment = useCallback((service: Service) => {
-    setSelectedService(service);
-  }, []);
-
   const switchToMulti = useCallback(() => {
-    setSelectedService(null);
+    setSelectedServices([]);
     setSelectedGroup('');
     setServiceCategory('All');
     setMode('multi');
@@ -582,7 +517,7 @@ export default function BookingPage() {
   const canNext = () => {
     const maxStep = isSingle ? SINGLE_DETAILS_STEP : MULTI_DETAILS_STEP;
     if (step === 0) return isSingle ? !!selectedGroup : selectedServices.length > 0;
-    if (isSingle && step === SINGLE_TREATMENT_STEP) return !!selectedService;
+    if (isSingle && step === SINGLE_TREATMENT_STEP) return selectedServices.length > 0;
     if (isScheduleStep(step)) return !!selectedDate && !!selectedSlot;
     return step <= maxStep;
   };
@@ -647,8 +582,9 @@ export default function BookingPage() {
               <TreatmentSelector
                 groupLabel={activeGroup.label}
                 services={treatmentServices}
-                selectedService={selectedService}
-                onSelect={selectTreatment}
+                selectedServices={selectedServices}
+                onToggle={toggleService}
+                onRemove={removeService}
                 onBack={() => setStep(SINGLE_SERVICE_STEP)}
                 membershipPrice={!!membership}
               />

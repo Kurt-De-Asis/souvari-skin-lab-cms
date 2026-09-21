@@ -23,7 +23,7 @@ router.get('/:id', treatmentRecordsController.getById);
 
 router.post(
   '/',
-  authorize('staff'),
+  authorize('admin', 'staff'),
   validate(createTreatmentRecordSchema),
   treatmentRecordsController.create
 );

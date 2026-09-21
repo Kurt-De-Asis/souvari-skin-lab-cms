@@ -231,7 +231,6 @@ export default function Staff() {
             <option value="therapist">Therapist</option>
             <option value="aesthetician">Aesthetician</option>
             <option value="receptionist">Receptionist</option>
-            <option value="admin">Admin</option>
           </select>
           <select className="select-field w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">All Status</option>

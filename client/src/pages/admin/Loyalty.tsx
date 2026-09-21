@@ -8,6 +8,7 @@ import EmptyState from '@/components/shared/EmptyState';
 import Pagination from '@/components/ui/Pagination';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Modal from '@/components/ui/Modal';
+import { registerMoney } from '@/utils/money';
 
 interface Milestone {
   id: number;
@@ -263,7 +264,7 @@ export default function Loyalty() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Spend Threshold (₱)</label>
-              <input type="number" step="0.01" className="input-field" {...register('spend_threshold', { required: 'Required', valueAsNumber: true })} />
+              <input type="text" inputMode="decimal" className="input-field hide-number-spinners" {...registerMoney(register, 'spend_threshold', { required: 'Required' })} />
               {errors.spend_threshold && <p className="text-xs text-red-600 mt-1">{errors.spend_threshold.message}</p>}
             </div>
             <div>

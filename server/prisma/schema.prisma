@@ -541,10 +541,10 @@ model appointment_status_history {
 
 model treatment_records {
   id                   Int     @id @default(autoincrement())
-  appointment_id       Int     @unique
-  staff_id             Int
+  appointment_id       Int?    @unique
+  staff_id             Int?
   customer_id          Int
-  service_id           Int
+  service_id           Int?
   treatment_date       DateTime @db.Date
   start_time           String?  @db.VarChar(5)
   end_time             String?  @db.VarChar(5)
@@ -556,10 +556,10 @@ model treatment_records {
   created_at           DateTime @default(now())
   updated_at           DateTime @updatedAt
 
-  appointment appointments @relation(fields: [appointment_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  staff       staff        @relation(fields: [staff_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  customer    customers    @relation(fields: [customer_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  service     services     @relation(fields: [service_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  appointment appointments? @relation(fields: [appointment_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  staff       staff?        @relation(fields: [staff_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  customer    customers     @relation(fields: [customer_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  service     services?     @relation(fields: [service_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([treatment_date])
   @@index([customer_id])
@@ -890,6 +890,8 @@ model memberships {
   amount_paid     Decimal  @default(0) @db.Decimal(12, 2)
   balance         Decimal  @default(0) @db.Decimal(12, 2)
   payment_status  PaymentStatus @default(pending)
+  down_payment_due_date DateTime? @db.Date
+  pay_in_store_requested Boolean @default(false)
   notes           String?  @db.Text
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
@@ -914,6 +916,7 @@ enum MembershipStatus {
   suspended
   cancelled
   pending
+  failed
 }
 
 // ─── Membership Benefits ─────────────────────────────────

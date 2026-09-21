@@ -1,6 +1,7 @@
 import { Decimal } from '@prisma/client/runtime/library';
 import prisma from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
+import { notificationDispatch } from '../../services/notification-dispatch.service';
 import { getPaginationParams, createPaginatedResult, PaginatedResult } from '../../utils/pagination';
 import {
   CreateMembershipInput,
@@ -21,6 +22,21 @@ const customerInclude = {
           phone: true,
           role: true,
           status: true,
+        },
+      },
+    },
+  },
+};
+
+const overdueInclude = {
+  plan: true,
+  customer: {
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          phone: true,
         },
       },
     },
@@ -48,6 +64,8 @@ export class MembershipService {
   }
 
   async list(query: MembershipQuery): Promise<PaginatedResult<any>> {
+    await this.processOverdueMemberships(false);
+
     const { page, limit, skip } = getPaginationParams(query);
     const { status, customer_id, search } = query;
 
@@ -107,6 +125,8 @@ export class MembershipService {
   }
 
   async getById(id: number) {
+    await this.processOverdueMemberships(false);
+
     const membership = await prisma.memberships.findUnique({
       where: { id },
       include: {
@@ -129,6 +149,9 @@ export class MembershipService {
           orderBy: { year_month: 'desc' },
         },
         gifts: true,
+        payments: {
+          orderBy: { created_at: 'desc' },
+        },
       },
     });
 
@@ -140,10 +163,12 @@ export class MembershipService {
   }
 
   async getByCustomerId(customerId: number) {
+    await this.processOverdueMemberships(false);
+
     const membership = await prisma.memberships.findFirst({
       where: {
         customer_id: customerId,
-        status: 'active',
+        status: { not: 'cancelled' },
       },
       include: {
         plan: {
@@ -169,22 +194,7 @@ export class MembershipService {
   async getByCode(code: string) {
     const membership = await prisma.memberships.findUnique({
       where: { code },
-      include: {
-        customer: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                phone: true,
-                role: true,
-                status: true,
-              },
-            },
-          },
-        },
-        plan: true,
-      },
+      include: customerInclude,
     });
 
     if (!membership) {
@@ -205,10 +215,6 @@ export class MembershipService {
 
     const membership = await this.create({ customer_id: customer.id, ...data });
 
-    // If fully paid, it's already active; otherwise stays pending
-    if (membership.status === 'pending' && membership.payment_status === 'paid') {
-      return this.activate(membership.id);
-    }
     return membership;
   }
 
@@ -216,22 +222,53 @@ export class MembershipService {
     return prisma.memberships.update({
       where: { id },
       data: { status: 'active' },
-      include: {
-        customer: {
-          include: {
-            user: {
-              select: { id: true, email: true, phone: true, role: true, status: true },
-            },
-          },
-        },
-        plan: true,
-      },
+      include: customerInclude,
     });
+  }
+
+  private resolveStaffId(userId: number): Promise<number | null> {
+    return prisma.staff
+      .findFirst({
+        where: { user_id: userId, deleted_at: null },
+        select: { id: true },
+      })
+      .then((staff) => staff?.id ?? null)
+      .catch(() => null);
+  }
+
+  async ensureOwnership(membershipId: number, role: string, userId: number) {
+    if (role !== 'customer') return;
+
+    const membership = await prisma.memberships.findUnique({
+      where: { id: membershipId },
+      select: { customer_id: true },
+    });
+
+    if (!membership) {
+      throw new AppError('Membership not found', 404);
+    }
+
+    const customer = await prisma.customers.findUnique({
+      where: { user_id: userId },
+    });
+
+    if (!customer || membership.customer_id !== customer.id) {
+      throw new AppError('You can only view your own membership', 403);
+    }
   }
 
   async create(data: CreateMembershipInput, userId?: number) {
     const customer = await prisma.customers.findUnique({
       where: { id: data.customer_id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            phone: true,
+            email: true,
+          },
+        },
+      },
     });
 
     if (!customer) {
@@ -270,10 +307,13 @@ export class MembershipService {
     const paymentMethod = data.payment_method ?? 'cash';
     const paymentType = data.payment_type ?? (amountPaid >= planPrice ? 'FULL' : 'DOWN_PAYMENT');
 
-    // Compute payment status and membership status
+    // Compute payment status and membership status.
+    // A downpayment activates the membership immediately but keeps a balance
+    // which must be settled by down_payment_due_date or the membership fails.
     let paymentStatus: 'pending' | 'partial' | 'paid' = 'pending';
     let membershipStatus: 'pending' | 'active' = 'pending';
     let balance = planPrice - amountPaid;
+    let downPaymentDueDate: Date | null = null;
 
     if (amountPaid >= planPrice) {
       paymentStatus = 'paid';
@@ -281,11 +321,20 @@ export class MembershipService {
       balance = 0;
     } else if (amountPaid > 0) {
       paymentStatus = 'partial';
-      membershipStatus = 'pending';
+      membershipStatus = 'active';
+      downPaymentDueDate = data.down_payment_due_date
+        ? new Date(data.down_payment_due_date)
+        : defaultDueDate();
+      if (Number.isNaN(downPaymentDueDate.getTime())) {
+        downPaymentDueDate = defaultDueDate();
+      }
     } else {
       paymentStatus = 'pending';
       membershipStatus = 'pending';
     }
+
+    const receivedById = userId ? await this.resolveStaffId(userId) : null;
+    const customerUserId = customer.user_id;
 
     const membership = await prisma.$transaction(async (tx) => {
       const newMembership = await tx.memberships.create({
@@ -300,24 +349,10 @@ export class MembershipService {
           amount_paid: amountPaid,
           balance,
           payment_status: paymentStatus,
+          down_payment_due_date: downPaymentDueDate,
           notes: data.notes ?? null,
         },
-        include: {
-          customer: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  email: true,
-                  phone: true,
-                  role: true,
-                  status: true,
-                },
-              },
-            },
-          },
-          plan: true,
-        },
+        include: customerInclude,
       });
 
       // Record initial payment if any
@@ -329,7 +364,7 @@ export class MembershipService {
             payment_method: paymentMethod,
             payment_type: paymentType as any,
             installment_no: paymentType === 'INSTALLMENT' ? 1 : null,
-            received_by: userId ?? null,
+            received_by: receivedById,
             notes: data.notes ?? `Initial ${paymentType.toLowerCase().replace('_', ' ')} payment`,
           },
         });
@@ -355,6 +390,30 @@ export class MembershipService {
       return newMembership;
     });
 
+    // Notifications
+    if (membershipStatus === 'active' && paymentStatus === 'partial') {
+      const adminIds = await notificationDispatch.getAdminUserIds();
+      await notificationDispatch.dispatchMembershipDownpayment({
+        customerUserId,
+        planName: plan.name,
+        planPrice,
+        amountPaid,
+        balance,
+        dueDate: downPaymentDueDate,
+        customerPhone: customer.user.phone ?? undefined,
+        adminUserIds: adminIds,
+      });
+    } else if (membershipStatus === 'active') {
+      const adminIds = await notificationDispatch.getAdminUserIds();
+      await notificationDispatch.dispatchMembershipFull({
+        customerUserId,
+        planName: plan.name,
+        planPrice,
+        customerPhone: customer.user.phone ?? undefined,
+        adminUserIds: adminIds,
+      });
+    }
+
     return membership;
   }
 
@@ -368,22 +427,7 @@ export class MembershipService {
     const membership = await prisma.memberships.update({
       where: { id },
       data: { status: status as any },
-      include: {
-        customer: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                phone: true,
-                role: true,
-                status: true,
-              },
-            },
-          },
-        },
-        plan: true,
-      },
+      include: customerInclude,
     });
 
     if (reason) {
@@ -443,16 +487,7 @@ export class MembershipService {
           payment_status: newPaymentStatus,
           status: newMembershipStatus,
         },
-        include: {
-          customer: {
-            include: {
-              user: {
-                select: { id: true, email: true, phone: true, role: true, status: true },
-              },
-            },
-          },
-          plan: true,
-        },
+        include: customerInclude,
       });
 
       if (paid > 0) {
@@ -463,6 +498,7 @@ export class MembershipService {
             payment_method: (payment_method as any) ?? 'cash',
             payment_type: (payment_type as any) ?? 'FULL',
             installment_no: null,
+            received_by: null,
             notes: reason ?? `Extension payment (${months} months)`,
           },
         });
@@ -490,22 +526,11 @@ export class MembershipService {
   }
 
   async validateCode(code: string) {
+    await this.processOverdueMemberships(false);
+
     const membership = await prisma.memberships.findUnique({
       where: { code },
-      include: {
-        customer: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                phone: true,
-              },
-            },
-          },
-        },
-        plan: true,
-      },
+      include: customerInclude,
     });
 
     if (!membership) {
@@ -526,7 +551,19 @@ export class MembershipService {
   async recordPayment(membershipId: number, data: MembershipPaymentInput, userId?: number) {
     const membership = await prisma.memberships.findUnique({
       where: { id: membershipId },
-      include: { plan: true },
+      include: {
+        plan: true,
+        customer: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                phone: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!membership) {
@@ -534,7 +571,7 @@ export class MembershipService {
     }
 
     const newAmountPaid = Number(membership.amount_paid) + data.amount;
-    const newBalance = Number(membership.price ?? 0) - newAmountPaid;
+    let newBalance = Number(membership.price ?? 0) - newAmountPaid;
 
     let newPaymentStatus = membership.payment_status;
     let newMembershipStatus = membership.status;
@@ -542,11 +579,14 @@ export class MembershipService {
     if (newAmountPaid >= Number(membership.price ?? 0)) {
       newPaymentStatus = 'paid';
       newMembershipStatus = 'active';
+      newBalance = 0;
     } else if (newAmountPaid > 0) {
       newPaymentStatus = 'partial';
     }
 
-    return prisma.$transaction(async (tx) => {
+    const receivedById = userId ? await this.resolveStaffId(userId) : null;
+
+    const result = await prisma.$transaction(async (tx) => {
       const payment = await tx.membership_payments.create({
         data: {
           membership_id: membershipId,
@@ -554,7 +594,7 @@ export class MembershipService {
           payment_method: data.payment_method,
           payment_type: data.payment_type as any,
           installment_no: data.installment_no ?? null,
-          received_by: userId ?? null,
+          received_by: receivedById,
           notes: data.notes ?? null,
         },
       });
@@ -566,6 +606,8 @@ export class MembershipService {
           balance: newBalance,
           payment_status: newPaymentStatus,
           status: newMembershipStatus,
+          down_payment_due_date: newPaymentStatus === 'paid' ? null : membership.down_payment_due_date,
+          pay_in_store_requested: newPaymentStatus === 'paid' ? false : membership.pay_in_store_requested,
         },
       });
 
@@ -575,13 +617,28 @@ export class MembershipService {
             membership_id: membershipId,
             action: 'activated_via_payment',
             details: JSON.stringify({ fully_paid: true }),
-            performed_by: userId ?? null,
+            performed_by: receivedById ?? null,
           },
         });
       }
 
       return { payment, membership: updatedMembership };
     });
+
+    // Notifications
+    if (newPaymentStatus === 'paid') {
+      const adminUserIds = await notificationDispatch.getAdminUserIds();
+      await notificationDispatch.dispatchMembershipBalanceSettled({
+        customerUserId: membership.customer.user.id,
+        customerName: `${membership.customer.first_name} ${membership.customer.last_name}`,
+        planName: membership.plan?.name ?? 'Membership',
+        collectedAmount: data.amount,
+        customerPhone: membership.customer.user.phone ?? undefined,
+        adminUserIds,
+      });
+    }
+
+    return result;
   }
 
   async listPayments(membershipId: number) {
@@ -595,6 +652,166 @@ export class MembershipService {
       },
     });
   }
+
+  /**
+   * Customer opts to settle their remaining balance at the clinic. This raises a
+   * flag surfaced to admins/staff so they can process the balance via POS.
+   */
+  async requestPayInStore(membershipId: number, role: string, userId: number) {
+    await this.processOverdueMemberships(false);
+
+    const membership = await prisma.memberships.findUnique({
+      where: { id: membershipId },
+      include: {
+        plan: true,
+        customer: {
+          include: {
+            user: {
+              select: { id: true, phone: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!membership) {
+      throw new AppError('Membership not found', 404);
+    }
+
+    if (role === 'customer') {
+      const customer = await prisma.customers.findUnique({ where: { user_id: userId } });
+      if (!customer || membership.customer_id !== customer.id) {
+        throw new AppError('You can only request this on your own membership', 403);
+      }
+    }
+
+    if (Number(membership.balance) <= 0 || membership.payment_status === 'paid') {
+      throw new AppError('This membership has no remaining balance', 400);
+    }
+
+    if (membership.status === 'failed' || membership.status === 'cancelled') {
+      throw new AppError('This membership is no longer collectible', 400);
+    }
+
+    const updated = await prisma.memberships.update({
+      where: { id: membershipId },
+      data: { pay_in_store_requested: true },
+      include: customerInclude,
+    });
+
+    const adminIds = await notificationDispatch.getAdminUserIds();
+    await notificationDispatch.dispatchPayInStoreRequest({
+      customerUserId: membership.customer.user.id,
+      customerName: `${membership.customer.first_name} ${membership.customer.last_name}`,
+      planName: membership.plan?.name ?? 'Membership',
+      balance: Number(membership.balance),
+      adminUserIds: adminIds,
+    });
+
+    return updated;
+  }
+
+  /**
+   * Balance-due enforcement. Runs in three places so the rule holds even when
+   * the Node process is down: (1) MySQL event (db/overdue.sql), (2) Node hourly
+   * scheduler in server.ts, (3) lazily on membership reads.
+   *
+   * - Due date == today  -> send reminder (only from the scheduler, deduplicated)
+   * - Due date passed    -> mark membership failed + notify
+   */
+  async processOverdueMemberships(includeReminders = true) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    let reminded = 0;
+    let failed = 0;
+
+    if (includeReminders) {
+      const dueToday = await prisma.memberships.findMany({
+        where: {
+          status: 'active',
+          payment_status: 'partial',
+          down_payment_due_date: today,
+        },
+        include: overdueInclude,
+      });
+
+      for (const m of dueToday) {
+        const already = await prisma.membership_activity_logs.count({
+          where: {
+            membership_id: m.id,
+            action: 'balance_reminder_sent',
+            created_at: { gte: today },
+          },
+        });
+        if (already > 0) continue;
+
+        await notificationDispatch.dispatchMembershipBalanceReminder({
+          customerUserId: m.customer.user.id,
+          planName: m.plan?.name ?? 'Membership',
+          balance: Number(m.balance),
+          dueDate: m.down_payment_due_date,
+          customerPhone: m.customer.user.phone ?? undefined,
+        });
+
+        await prisma.membership_activity_logs.create({
+          data: {
+            membership_id: m.id,
+            action: 'balance_reminder_sent',
+            details: JSON.stringify({ due_date: m.down_payment_due_date, balance: Number(m.balance) }),
+          },
+        });
+        reminded += 1;
+      }
+    }
+
+    const overdue = await prisma.memberships.findMany({
+      where: {
+        status: 'active',
+        payment_status: 'partial',
+        down_payment_due_date: { lt: today },
+      },
+      include: overdueInclude,
+    });
+
+    for (const m of overdue) {
+      const adminIds = await notificationDispatch.getAdminUserIds();
+      await notificationDispatch.dispatchMembershipFailed({
+        customerUserId: m.customer.user.id,
+        customerName: `${m.customer.first_name} ${m.customer.last_name}`,
+        planName: m.plan?.name ?? 'Membership',
+        balance: Number(m.balance),
+        adminUserIds: adminIds,
+      });
+
+      await prisma.memberships.update({
+        where: { id: m.id },
+        data: { status: 'failed' },
+      });
+
+      await prisma.membership_activity_logs.create({
+        data: {
+          membership_id: m.id,
+          action: 'status_changed_to_failed',
+          details: JSON.stringify({
+            reason: 'Downpayment balance unpaid past due date',
+            due_date: m.down_payment_due_date,
+            balance: Number(m.balance),
+          }),
+        },
+      });
+      failed += 1;
+    }
+
+    return { reminded, failed };
+  }
+}
+
+function defaultDueDate(): Date {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
 export const membershipService = new MembershipService();
