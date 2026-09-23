@@ -2,7 +2,13 @@ import prisma from '../../config/database';
 import { hashPassword } from '../../utils/password';
 import { AppError } from '../../middleware/errorHandler';
 import { PaginationParams, getPaginationParams, createPaginatedResult } from '../../utils/pagination';
-import { CreateCustomerInput, UpdateCustomerInput, CustomerQuery } from './customers.validation';
+import {
+  CreateCustomerInput,
+  UpdateCustomerInput,
+  WalkInCustomerInput,
+  CustomerQuery,
+} from './customers.validation';
+import { randomBytes } from 'crypto';
 
 const userInclude = {
   user: {
@@ -104,6 +110,45 @@ export class CustomerService {
     });
 
     return customer;
+  }
+
+  // Creates a customer record for a walk-in booking. A validated email is used
+  // when provided, otherwise an internal placeholder email is generated. These
+  // customers never log in (random password), so the clinic only supplies the
+  // name (required) plus optional phone/notes.
+  async createWalkIn(data: WalkInCustomerInput) {
+    const rawEmail = data.email?.trim();
+    let email: string;
+    if (rawEmail) {
+      const existingUser = await prisma.users.findUnique({ where: { email: rawEmail } });
+      if (existingUser) {
+        throw new AppError('Email already registered', 409);
+      }
+      email = rawEmail;
+    } else {
+      email = `walkin.${Date.now()}.${randomBytes(4).toString('hex')}@souvariskinlab.local`;
+    }
+
+    const passwordHash = await hashPassword(randomBytes(12).toString('hex'));
+
+    const user = await prisma.users.create({
+      data: {
+        email,
+        password_hash: passwordHash,
+        role: 'customer',
+        phone: data.phone || null,
+        customer: {
+          create: {
+            first_name: data.first_name,
+            last_name: data.last_name,
+            notes: data.notes || null,
+          },
+        },
+      },
+      include: { customer: true },
+    });
+
+    return user.customer;
   }
 
   async update(id: number, data: UpdateCustomerInput) {

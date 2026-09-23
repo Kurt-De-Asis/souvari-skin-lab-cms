@@ -31,6 +31,14 @@ export const updateCustomerSchema = z.object({
   avatar_url: z.string().max(500).optional(),
 });
 
+export const walkInCustomerSchema = z.object({
+  first_name: z.string().min(1, 'First name is required').max(100),
+  last_name: z.string().min(1, 'Last name is required').max(100),
+  phone: z.string().max(20).optional(),
+  email: z.string().email('Invalid email address').optional(),
+  notes: z.string().optional(),
+});
+
 export const customerQuerySchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
@@ -42,4 +50,5 @@ export const customerQuerySchema = z.object({
 
 export type CreateCustomerInput = z.infer<typeof createCustomerSchema>;
 export type UpdateCustomerInput = z.infer<typeof updateCustomerSchema>;
+export type WalkInCustomerInput = z.infer<typeof walkInCustomerSchema>;
 export type CustomerQuery = z.infer<typeof customerQuerySchema>;

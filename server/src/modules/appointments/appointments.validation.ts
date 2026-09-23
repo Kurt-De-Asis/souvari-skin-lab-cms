@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { walkInCustomerSchema } from '../customers/customers.validation';
 
 const appointmentStatusEnum = z.enum([
   'pending',
@@ -21,21 +22,34 @@ export const createAppointmentSchema = z.object({
   notes: z.string().nullable().optional(),
 });
 
-export const createGroupAppointmentSchema = z.object({
-  customer_id: z.number().int().positive('Customer ID is required'),
-  staff_id: z.number().int().positive('Staff ID is required').optional(),
-  service_ids: z.array(z.number().int().positive('Service ID is required')).min(1, 'At least one service is required'),
-  appointment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
-  start_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Start time must be in HH:MM format'),
-  membership_code: z.string().min(1).optional(),
-  notes: z.string().nullable().optional(),
-  payment: z
-    .object({
-      payment_method: z.enum(['cash', 'gcash', 'gotyme', 'rcbc', 'paid_on_us']),
-      amount_tendered: z.number().nonnegative().optional(),
-    })
-    .optional(),
-});
+export const createGroupAppointmentSchema = z
+  .object({
+    customer_id: z.number().int().positive('Customer ID is required').optional(),
+    walk_in: walkInCustomerSchema.optional(),
+    staff_id: z.number().int().positive('Staff ID is required').optional(),
+    service_ids: z.array(z.number().int().positive('Service ID is required')).min(1, 'At least one service is required'),
+    appointment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
+    start_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Start time must be in HH:MM format'),
+    membership_code: z.string().min(1).optional(),
+    notes: z.string().nullable().optional(),
+    payment: z
+      .object({
+        payment_method: z.enum(['cash', 'gcash', 'gotyme', 'rcbc', 'paid_on_us']),
+        amount_tendered: z.number().nonnegative().optional(),
+      })
+      .optional(),
+  })
+  .superRefine((val, ctx) => {
+    const hasCustomerId = val.customer_id !== undefined;
+    const hasWalkIn = val.walk_in !== undefined;
+    if (hasCustomerId === hasWalkIn) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['customer_id'],
+        message: 'Provide either a customer_id or walk_in client information',
+      });
+    }
+  });
 
 export const updateAppointmentSchema = z.object({
   staff_id: z.number().int().positive().optional(),

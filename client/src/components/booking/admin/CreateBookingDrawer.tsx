@@ -65,6 +65,13 @@ export default function CreateBookingDrawer({
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerOption | null>(null);
 
+  const [clientMode, setClientMode] = useState<'existing' | 'walk-in'>('existing');
+  const [walkInFirst, setWalkInFirst] = useState('');
+  const [walkInLast, setWalkInLast] = useState('');
+  const [walkInPhone, setWalkInPhone] = useState('');
+  const [walkInEmail, setWalkInEmail] = useState('');
+  const [walkInNotes, setWalkInNotes] = useState('');
+
   const [serviceQuery, setServiceQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedServices, setSelectedServices] = useState<ServiceOption[]>([]);
@@ -94,6 +101,12 @@ export default function CreateBookingDrawer({
     setCustomerQuery('');
     setCustomerResults([]);
     setSelectedCustomer(null);
+    setClientMode('existing');
+    setWalkInFirst('');
+    setWalkInLast('');
+    setWalkInPhone('');
+    setWalkInEmail('');
+    setWalkInNotes('');
     setServiceQuery('');
     setActiveCategory('all');
     setSelectedServices([]);
@@ -154,7 +167,7 @@ export default function CreateBookingDrawer({
 
   // Live POS quote whenever the customer + services are set
   useEffect(() => {
-    if (!open || !selectedCustomer || selectedServices.length === 0) {
+    if (!open || clientMode !== 'existing' || selectedServices.length === 0 || !selectedCustomer) {
       setQuote(null);
       setQuoteLoading(false);
       return;
@@ -177,7 +190,7 @@ export default function CreateBookingDrawer({
     return () => {
       cancelled = true;
     };
-  }, [open, selectedCustomer, selectedServices]);
+  }, [open, selectedCustomer, selectedServices, clientMode]);
 
   // Availability for the combined block (all services back-to-back)
   useEffect(() => {
@@ -288,11 +301,23 @@ export default function CreateBookingDrawer({
   const tendered = parseAmountInput(amountTendered) || 0;
   const change = Math.max(0, tendered - finalTotal);
 
+  const clientReady =
+    clientMode === 'walk-in'
+      ? !!walkInFirst.trim() && !!walkInLast.trim()
+      : !!selectedCustomer;
+
   const canSubmit =
-    !!selectedCustomer && selectedServices.length > 0 && !!selectedSlot && !submitting;
+    clientReady && selectedServices.length > 0 && !!selectedSlot && !submitting;
+
+  const selectClientMode = (mode: 'existing' | 'walk-in') => {
+    setClientMode(mode);
+    if (mode === 'walk-in') {
+      setSelectedCustomer(null);
+    }
+  };
 
   const handleSubmit = async (action: 'checkout' | 'save') => {
-    if (!selectedCustomer || selectedServices.length === 0 || !selectedSlot) return;
+    if (!clientReady || selectedServices.length === 0 || !selectedSlot) return;
     if (action === 'checkout' && paymentMethod === 'cash' && tendered < finalTotal) {
       setPayError('Amount tendered is less than total');
       return;
@@ -301,7 +326,17 @@ export default function CreateBookingDrawer({
     setSubmitting(true);
     try {
       const base = {
-        customer_id: selectedCustomer.id,
+        ...(clientMode === 'walk-in'
+          ? {
+              walk_in: {
+                first_name: walkInFirst.trim(),
+                last_name: walkInLast.trim(),
+                ...(walkInPhone.trim() ? { phone: walkInPhone.trim() } : {}),
+                ...(walkInEmail.trim() ? { email: walkInEmail.trim() } : {}),
+                ...(walkInNotes.trim() ? { notes: walkInNotes.trim() } : {}),
+              },
+            }
+          : { customer_id: selectedCustomer!.id }),
         service_ids: selectedServices.map((s) => s.id),
         staff_id: selectedSlot.staff_id,
         appointment_date: appointmentDate,
@@ -356,7 +391,84 @@ export default function CreateBookingDrawer({
               <p className="text-[13px] font-semibold text-white uppercase tracking-wide">Client</p>
             </div>
             <div className="p-3 space-y-2.5">
-              {selectedCustomer ? (
+              {/* Existing client vs Walk-in toggle */}
+              <div className="grid grid-cols-2 gap-1.5 p-1 rounded-md bg-neutral-100">
+                <button
+                  type="button"
+                  onClick={() => selectClientMode('existing')}
+                  className={`rounded px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition ${
+                    clientMode === 'existing' ? 'bg-neutral-900 text-white' : 'text-neutral-500 hover:text-neutral-700'
+                  }`}
+                >
+                  Existing client
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectClientMode('walk-in')}
+                  className={`rounded px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition ${
+                    clientMode === 'walk-in' ? 'bg-neutral-900 text-white' : 'text-neutral-500 hover:text-neutral-700'
+                  }`}
+                >
+                  Walk-in client
+                </button>
+              </div>
+
+              {clientMode === 'walk-in' ? (
+                <div className="space-y-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="label">First Name *</label>
+                      <input
+                        className="input-field !py-1.5 !text-xs"
+                        placeholder="First name"
+                        value={walkInFirst}
+                        onChange={(e) => setWalkInFirst(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Last Name *</label>
+                      <input
+                        className="input-field !py-1.5 !text-xs"
+                        placeholder="Last name"
+                        value={walkInLast}
+                        onChange={(e) => setWalkInLast(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Phone</label>
+                      <input
+                        className="input-field !py-1.5 !text-xs"
+                        placeholder="0981 xxx xxxx"
+                        value={walkInPhone}
+                        onChange={(e) => setWalkInPhone(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Email</label>
+                      <input
+                        type="email"
+                        className="input-field !py-1.5 !text-xs"
+                        placeholder="name@email.com"
+                        value={walkInEmail}
+                        onChange={(e) => setWalkInEmail(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">Client Notes</label>
+                    <textarea
+                      className="input-field"
+                      rows={2}
+                      placeholder="Optional notes for the client profile"
+                      value={walkInNotes}
+                      onChange={(e) => setWalkInNotes(e.target.value)}
+                    />
+                  </div>
+                  <p className="text-[11px] text-neutral-400">
+                    A client profile will be created automatically for this walk-in booking.
+                  </p>
+                </div>
+              ) : selectedCustomer ? (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2 p-2.5 rounded-md border border-neutral-900 bg-neutral-50">
                     <div className="flex items-center gap-2 min-w-0">
@@ -640,7 +752,7 @@ export default function CreateBookingDrawer({
         )}
 
         {/* POS / Payment */}
-        {!!selectedCustomer && selectedServices.length > 0 && (
+        {clientReady && selectedServices.length > 0 && (
           <div className="bg-white border border-neutral-200 rounded-md">
             <div className="flex items-center justify-between px-3 py-2 bg-neutral-900">
               <div className="flex items-center gap-2">

@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, Plus } from 'lucide-react';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
-import { appointmentsApi, staffApi } from '@/api';
+import { appointmentsApi, servicesApi, staffApi } from '@/api';
 import StatusBadge from '@/components/ui/StatusBadge';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import CustomerDetailDrawer from '@/components/admin/CustomerDetailDrawer';
+import CreateBookingDrawer from '@/components/booking/admin/CreateBookingDrawer';
+import type { ServiceOption } from '@/components/booking/admin/types';
 
 dayjs.extend(isoWeek);
 
@@ -38,12 +40,46 @@ export default function Schedule() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
+  const [createServices, setCreateServices] = useState<ServiceOption[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createDate, setCreateDate] = useState('');
+  const [createPrefill, setCreatePrefill] = useState<{ staff_id: number; start_time: string } | null>(null);
 
   const staffId = user?.staff?.id;
 
   useEffect(() => {
     if (staffId) fetchData();
   }, [staffId, weekStart]);
+
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const all: any[] = [];
+        let page = 1;
+        let totalPages = 1;
+        do {
+          const { data } = await servicesApi.list({ page: String(page), limit: '100', status: 'active' });
+          const pag = data.data?.pagination;
+          totalPages = pag?.totalPages || 1;
+          const list = data.data?.data || data.data?.services || [];
+          if (Array.isArray(list)) all.push(...list);
+          page++;
+        } while (page <= totalPages);
+        setCreateServices(all.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          description: s.description ?? null,
+          price: Number(s.price) || 0,
+          duration: Number(s.duration_minutes) || 0,
+          category: s.category || 'other',
+          staff: (s.service_staff ?? []).map((ss: any) => ss.staff).filter(Boolean),
+        })));
+      } catch {
+        setCreateServices([]);
+      }
+    };
+    fetchServices();
+  }, []);
 
   const fetchData = async () => {
     if (!staffId) return;
@@ -80,6 +116,28 @@ export default function Schedule() {
 
   const formatTime = (time: string) => dayjs(`2000-01-01 ${time}`).format('h:mm A');
 
+  const openCreateFor = (date?: dayjs.Dayjs) => {
+    setCreateDate((date ?? dayjs()).format('YYYY-MM-DD'));
+    setCreatePrefill(staffId ? { staff_id: staffId, start_time: '' } : null);
+    setCreateOpen(true);
+  };
+
+  const handleCreate = async (payload: any): Promise<boolean> => {
+    try {
+      await appointmentsApi.createGroup({
+        ...payload,
+        service_ids: Array.isArray(payload.service_ids) ? payload.service_ids : [payload.service_id],
+      });
+      toast.success(payload.payment ? 'Appointment created and payment recorded' : 'Appointment created');
+      setCreateOpen(false);
+      fetchData();
+      return true;
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to create appointment');
+      return false;
+    }
+  };
+
   if (loading) return <LoadingSpinner fullScreen />;
 
   return (
@@ -101,6 +159,10 @@ export default function Schedule() {
           <button onClick={goToNextWeek} className="btn-secondary p-2">
             <ChevronRight size={16} />
           </button>
+          <button onClick={() => openCreateFor()} className="btn-primary">
+            <Plus size={16} />
+            New Appointment
+          </button>
         </div>
       </div>
 
@@ -113,10 +175,18 @@ export default function Schedule() {
           return (
             <div
               key={day.format('YYYY-MM-DD')}
-              className={`card p-4 min-h-[300px] ${
+              className={`card p-4 min-h-[300px] relative ${
                 isToday ? 'ring-2 ring-primary-500 border-primary-200' : ''
               }`}
             >
+              <button
+                type="button"
+                onClick={() => openCreateFor(day)}
+                className="absolute top-2 right-2 w-6 h-6 rounded-full border border-neutral-200 text-neutral-400 hover:text-neutral-900 hover:border-neutral-900 flex items-center justify-center transition"
+                title="Book an appointment for this day"
+              >
+                <Plus size={12} />
+              </button>
               <div className="text-center mb-3">
                 <p className="text-xs font-medium text-neutral-500 uppercase">
                   {day.format('ddd')}
@@ -194,6 +264,16 @@ export default function Schedule() {
         open={selectedCustomer !== null}
         onClose={() => setSelectedCustomer(null)}
         customer={selectedCustomer}
+      />
+
+      {/* Create booking drawer (walk-in / existing client) */}
+      <CreateBookingDrawer
+        open={createOpen}
+        date={createDate}
+        prefill={createPrefill}
+        services={createServices}
+        onClose={() => setCreateOpen(false)}
+        onCreate={handleCreate}
       />
     </div>
   );

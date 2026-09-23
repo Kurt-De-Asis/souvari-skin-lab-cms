@@ -3,6 +3,7 @@ import { AppError } from '../../middleware/errorHandler';
 import pricingService from '../../services/pricing.service';
 import { notificationDispatch } from '../../services/notification-dispatch.service';
 import posService from '../pos/pos.service';
+import { customerService } from '../customers/customers.service';
 import { getPaginationParams, createPaginatedResult, PaginatedResult } from '../../utils/pagination';
 import {
   CreateAppointmentInput,
@@ -247,13 +248,6 @@ export class AppointmentService {
   }
 
   async createGroup(data: CreateGroupAppointmentInput) {
-    const customer = await prisma.customers.findFirst({
-      where: { id: data.customer_id, deleted_at: null },
-    });
-    if (!customer) {
-      throw new AppError('Customer not found', 404);
-    }
-
     const services = await prisma.services.findMany({
       where: { id: { in: data.service_ids }, deleted_at: null },
     });
@@ -276,6 +270,24 @@ export class AppointmentService {
       );
     }
 
+    // Resolve the client: an existing customer by id, or a new customer record
+    // for a walk-in. Walk-in customers are created only after the services and
+    // operating-day checks pass, so invalid bookings do not leave orphan rows.
+    let customer: any;
+    let customerId: number;
+    if (data.walk_in) {
+      customer = await customerService.createWalkIn(data.walk_in);
+      customerId = customer.id;
+    } else {
+      customer = await prisma.customers.findFirst({
+        where: { id: data.customer_id, deleted_at: null },
+      });
+      if (!customer) {
+        throw new AppError('Customer not found', 404);
+      }
+      customerId = customer.id;
+    }
+
     // Combined block [start_time, end_time] spanning all services
     const [startHours, startMins] = data.start_time.split(':').map(Number);
     const startTotal = startHours * 60 + startMins;
@@ -293,7 +305,7 @@ export class AppointmentService {
       try {
         const pricing = await pricingService.calculatePrice(
           { serviceId: svc.id, membershipCode: data.membership_code ?? undefined },
-          data.customer_id
+          customerId
         );
         pricingList.push(pricing);
         quotedPrice += pricing.finalTotal;
@@ -306,7 +318,7 @@ export class AppointmentService {
     // ONE appointment holding all services
     const appointment = await prisma.appointments.create({
       data: {
-        customer_id: data.customer_id,
+        customer_id: customerId,
         staff_id: staff.id,
         service_id: orderedServices[0].id,
         appointment_date: new Date(data.appointment_date),
@@ -366,12 +378,12 @@ export class AppointmentService {
     if (data.payment) {
       try {
         const quote = await posService.getQuote({
-          customer_id: data.customer_id,
+          customer_id: customerId,
           items: orderedServices.map((s) => ({ service_id: s.id, quantity: 1 })),
         });
         const { transaction: tx } = await posService.createSale(
           {
-            customer_id: data.customer_id,
+            customer_id: customerId,
             staff_id: staff.id,
             payment_method: data.payment.payment_method,
             amount_tendered: data.payment.amount_tendered,

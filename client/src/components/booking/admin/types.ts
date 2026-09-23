@@ -65,8 +65,17 @@ export interface CreateAppointmentPayload {
   notes?: string;
 }
 
+export interface WalkInCustomerPayload {
+  first_name: string;
+  last_name: string;
+  phone?: string;
+  email?: string;
+  notes?: string;
+}
+
 export interface CreateGroupAppointmentPayload {
-  customer_id: number;
+  customer_id?: number;
+  walk_in?: WalkInCustomerPayload;
   service_ids: number[];
   staff_id: number;
   appointment_date: string;
