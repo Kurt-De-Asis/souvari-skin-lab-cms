@@ -201,9 +201,14 @@ npm run db:seed:all
 ```
 
 > **Note:** `setup.bat` (the one-click installer) runs this full chain for you
-> automatically on a fresh install. If the system is **already running** and you
-> just want to update it with the real data without losing customers, see
-> **UPGRADE-GUIDE.md** (or double-click `update-data.bat`).
+> automatically on a fresh install. 
+
+> **Fastest option (recommended for clients):** if the owner provides
+> **`souvari_full.sql`** (created by running `export-database.bat`), `setup.bat`
+> will import the owner's entire database automatically instead of seeding —
+> an exact copy in under a minute. On an already-running machine, use
+> **`import-database.bat`** to replace the database, or `update-data.bat` to
+> refresh services/staff without losing customers. See **UPGRADE-GUIDE.md**.
 
 > On a brand-new setup you may also run `npx prisma migrate reset`, which recreates the tables and auto-runs the seed. **This erases all data**, so only do it on a fresh machine.
 

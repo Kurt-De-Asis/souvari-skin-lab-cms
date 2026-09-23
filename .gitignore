@@ -7,4 +7,6 @@ dist/
 Thumbs.db
 coverage/
 *.tsbuildinfo
+souvari_full.sql
+*.sql.bak
 server/prisma/migrations/**/migration_lock.toml

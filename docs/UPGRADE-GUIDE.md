@@ -11,9 +11,41 @@ There are two situations:
 |-----------|------------|
 | **A. The computer already has the system and you want to keep its data** | Follow **Path A** below. It adds the real services, staff, and schedules without wiping existing customers/appointments. |
 | **B. The computer is a demo/old test install with nothing important in it** | Follow **Path B** below. A full reset is faster and cleaner. |
+| **Fast: the owner gave you `souvari_full.sql`** | Follow **Path 0** below. This is the fastest and most accurate — an exact copy of the owner's database. |
 
-> **Golden rule:** NEVER run `npx prisma migrate reset` (or re-run `setup.bat`)
-> on a machine that has real data in it — that deletes everything. Use Path A.
+> **Golden rule:** NEVER run `npx prisma migrate reset` (or re-run `setup.bat`
+> with real data) on a machine that has data in it — that deletes everything.
+
+---
+
+## Path 0 — Fast: Import the owner's database snapshot (Recommended)
+
+The owner can export their entire database to one file with
+**`export-database.bat`** (creates `souvari_full.sql`). Copy that file **together
+with the project folder** to this computer, then:
+
+### For a brand-new install
+Drop `souvari_full.sql` next to `setup.bat` and run **`setup.bat`** — it detects
+the file and imports it automatically in under a minute (it skips the long seed
+scripts).
+
+### For a computer that is already running
+Double-click **`import-database.bat`**. It will:
+
+1. Check that `souvari_full.sql` is present.
+2. Ask for this computer's MySQL details.
+3. Warn you that it **deletes the whole `iave_clinic` database and replaces it**
+   with the owner's snapshot (type `YES` to continue; back up first if needed).
+4. Import the snapshot and verify it (prints service/staff/schedule counts).
+
+> ⚠️ This is a **full replace** — anything already in the database is lost.
+> If this computer has data you need, back it up first:
+> `mysqldump -u root -p iave_clinic > backup-current.sql`
+
+### What you get
+An exact copy of the owner's database: the full service catalog, the real staff
+with their schedules, staff↔service assignments, memberships, loyalty, products,
+customers, appointments, transactions, and system settings — all in one import.
 
 ---
 
@@ -135,14 +167,17 @@ matches the owner's database exactly:
 
 ```bat
 copy the new project folder over the old one
-run setup.bat        (creates a fresh database with ALL the real data)
+run setup.bat        (creates a fresh database)
 ```
 
-`setup.bat` now runs the complete data chain automatically, so after it you're
-done. See **docs/SETUP-QUICK.md**.
+- `setup.bat` **automatically imports `souvari_full.sql`** if the file is in the
+  project folder (fastest, exact copy of the owner's database).
+- If there is no `souvari_full.sql`, `setup.bat` runs the complete data chain
+  instead. See **docs/SETUP-QUICK.md**.
 
 If the system is already installed and you just want to wipe and rebuild the
-database in place:
+database in place, the fastest way is `import-database.bat` (see Path 0). The
+slower manual way:
 
 ```bat
 cd server
@@ -170,6 +205,8 @@ cd ..
 
 | Problem | Fix |
 |---------|-----|
+| `import-database.bat` says `souvari_full.sql was not found` | The snapshot file is missing or not in the same folder as the script. Ask the owner for `souvari_full.sql` (created by `export-database.bat`). |
+| Import fails with an access/table error | Run it as a MySQL user with full rights on the `iave_clinic` database, and make sure MySQL 8.0 is running. |
 | `Can't connect to MySQL` / `ECONNREFUSED` | MySQL isn't running, or the credentials in `server\.env` are wrong. Start MySQL first, then check `server\.env`. |
 | `npm run db:seed:all` fails mid-way | Run the individual commands to see which step failed: `npm run db:seed:catalog`, then `npm run db:seed:employees`, then `npm run db:seed:service-staff`. Fix the error and re-run from that step. |
 | `npx prisma migrate deploy` fails | Check the `DATABASE_URL` in `server\.env`. MySQL must be running. |
@@ -187,7 +224,10 @@ cd ..
 [ ] New project files copied + npm install (root, server, client)
 [ ] cd server && npx prisma generate
 [ ] npx prisma migrate deploy
-[ ] npm run db:seed:all     (real services, staff, schedules, assignments)
+[ ] Data loaded — EITHER:
+      - souvari_full.sql present → auto-imported by setup.bat / import-database.bat
+        (fastest, exact copy of the owner's database), OR
+      - npm run db:seed:all   (real services, staff, schedules, assignments)
 [ ] Admin → Settings → address/phone/email updated
 [ ] Restart + Ctrl+F5, verify map + services + staff on the Contact page
 ```

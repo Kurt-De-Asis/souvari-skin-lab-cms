@@ -125,13 +125,26 @@ if errorlevel 1 (
 )
 
 echo.
-echo  [3/3] Adding the full Souvari Skin Lab data (demo + real services/staff)...
-call npx prisma db seed
-call npm run db:seed:catalog
-call npm run db:seed:memberships
-call npm run db:seed:loyalty
-call npm run db:seed:employees
-call npm run db:seed:service-staff
+if exist "..\souvari_full.sql" (
+  echo  [3/3] Found souvari_full.sql - importing the owner's database snapshot...
+  mysql -h "%DBHOST%" -P "%DBPORT%" -u "%DBUSER%" -p"%DBPASS%" "%DBNAME%" < "..\souvari_full.sql"
+  if errorlevel 1 (
+    echo.
+    echo  [ERROR] Could not import souvari_full.sql. See the message above.
+    echo  You can also try:  import-database.bat
+    call cd ..
+    pause
+    exit /b 1
+  )
+) else (
+  echo  [3/3] Adding the full Souvari Skin Lab data (demo + real services/staff)...
+  call npx prisma db seed
+  call npm run db:seed:catalog
+  call npm run db:seed:memberships
+  call npm run db:seed:loyalty
+  call npm run db:seed:employees
+  call npm run db:seed:service-staff
+)
 call cd ..
 
 echo.
