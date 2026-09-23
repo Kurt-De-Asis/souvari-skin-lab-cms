@@ -12,7 +12,7 @@
     "db:seed:catalog": "ts-node --project tsconfig.seed.json prisma/seed-catalog.ts",
     "db:seed:memberships": "ts-node --project tsconfig.seed.json prisma/seed-memberships.ts",
     "db:seed:loyalty": "ts-node --project tsconfig.seed.json prisma/seed-loyalty.ts",
-    "db:seed:all": "npx prisma db seed && ts-node --project tsconfig.seed.json prisma/seed-catalog.ts && ts-node --project tsconfig.seed.json prisma/seed-memberships.ts",
+    "db:seed:all": "npx prisma db seed && ts-node --project tsconfig.seed.json prisma/seed-catalog.ts && ts-node --project tsconfig.seed.json prisma/seed-memberships.ts && ts-node --project tsconfig.seed.json prisma/seed-loyalty.ts && ts-node --project tsconfig.seed.json prisma/seed-employees.ts && ts-node --project tsconfig.seed.json prisma/seed-service-staff.ts",
     "db:seed:employees": "ts-node --project tsconfig.seed.json prisma/seed-employees.ts",
     "db:seed:service-staff": "ts-node --project tsconfig.seed.json prisma/seed-service-staff.ts",
     "db:studio": "npx prisma studio",

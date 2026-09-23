@@ -47,3 +47,16 @@ Double-check it contains `setup.bat` and `start.bat`.
 
 If something goes wrong during `setup.bat`, just re-run it once. Troubleshooting
 details are in **setup-tutorial.md** (Section 13).
+
+---
+
+## Updating a machine that's already running
+
+If the system is **already installed and running** on a computer and you need to
+load the real services, staff, schedules, and contact details (not reinstall):
+
+1. Copy the new project folder over the old one.
+2. Double-click **`update-data.bat`** (in the project folder).
+3. Restart with **`start.bat`** and press **Ctrl+F5** in the browser.
+
+See **UPGRADE-GUIDE.md** for the full step-by-step (including backing up first).

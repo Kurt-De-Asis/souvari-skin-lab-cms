@@ -39,9 +39,9 @@ async function main() {
   // System Settings
   const settings = [
     { setting_key: 'clinic_name', setting_value: '"Souvari Skin Lab"', description: 'Clinic display name' },
-    { setting_key: 'clinic_phone', setting_value: '"+63 917 123 4567"', description: 'Clinic contact phone' },
-    { setting_key: 'clinic_email', setting_value: '"info@iavebeauty.com"', description: 'Clinic email' },
-    { setting_key: 'clinic_address', setting_value: '"123 Beauty Ave, Makati City, Metro Manila, Philippines"', description: 'Clinic address' },
+    { setting_key: 'clinic_phone', setting_value: '"+63 981 689 9909"', description: 'Clinic contact phone' },
+    { setting_key: 'clinic_email', setting_value: '"souvariskinlab@gmail.com"', description: 'Clinic email' },
+    { setting_key: 'clinic_address', setting_value: '"2nd Floor, The District Dasmariñas, Molino-Paliparan Rd., Dasmariñas, Cavite"', description: 'Clinic address' },
     { setting_key: 'business_hours_start', setting_value: '"09:00"', description: 'Default opening time' },
     { setting_key: 'business_hours_end', setting_value: '"18:00"', description: 'Default closing time' },
     { setting_key: 'business_days', setting_value: '["monday","tuesday","wednesday","thursday","friday","saturday"]', description: 'Operating days' },

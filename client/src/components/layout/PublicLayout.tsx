@@ -156,9 +156,9 @@ export default function PublicLayout() {
             <div>
               <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-100 mb-5">Contact</h4>
               <ul className="space-y-3 text-sm text-neutral-400">
-                <li>123 Beauty Ave, Makati City</li>
-                <li>Metro Manila, Philippines</li>
-                <li>+63 917 123 4567</li>
+                <li>2nd Floor, The District Dasmariñas</li>
+                <li>Molino-Paliparan Rd., Dasmariñas, Cavite</li>
+                <li>0981-689-9909</li>
                 <li>souvariskinlab@gmail.com</li>
               </ul>
             </div>

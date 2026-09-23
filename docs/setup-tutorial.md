@@ -192,10 +192,18 @@ cd server
 npx prisma db seed
 ```
 
-Optional: add membership plans, benefits, and the full treatment catalog:
+To load the **full Souvari Skin Lab data** — the complete service catalog,
+membership plans, loyalty rules, the real staff with their schedules, and the
+staff↔service assignments — run the single command:
+
 ```bash
 npm run db:seed:all
 ```
+
+> **Note:** `setup.bat` (the one-click installer) runs this full chain for you
+> automatically on a fresh install. If the system is **already running** and you
+> just want to update it with the real data without losing customers, see
+> **UPGRADE-GUIDE.md** (or double-click `update-data.bat`).
 
 > On a brand-new setup you may also run `npx prisma migrate reset`, which recreates the tables and auto-runs the seed. **This erases all data**, so only do it on a fresh machine.
 

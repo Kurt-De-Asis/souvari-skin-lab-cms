@@ -125,8 +125,13 @@ if errorlevel 1 (
 )
 
 echo.
-echo  [3/3] Adding the sample/demo data...
+echo  [3/3] Adding the full Souvari Skin Lab data (demo + real services/staff)...
 call npx prisma db seed
+call npm run db:seed:catalog
+call npm run db:seed:memberships
+call npm run db:seed:loyalty
+call npm run db:seed:employees
+call npm run db:seed:service-staff
 call cd ..
 
 echo.
@@ -138,8 +143,8 @@ echo   To start the system, double-click:  start.bat
 echo   Then open your browser at:           http://localhost:5173
 echo.
 echo   Demo logins (all passwords: password123):
-echo     Admin:    admin@iave.local
-echo     Staff:    maria.santos@iave.local
+echo     Admin:    souvariskinlab@gmail.com
+echo     Staff:    gianheartdaygon24@gmail.com
 echo     Customer: juan.delacruz@email.com
 echo.
 pause

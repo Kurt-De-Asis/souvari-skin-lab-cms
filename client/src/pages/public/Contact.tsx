@@ -102,8 +102,8 @@ export default function Contact() {
 
               <div className="border-t border-neutral-200">
                 {[
-                  { icon: MapPin, label: 'Address', value: '123 Beauty Ave, Makati City\nMetro Manila, Philippines' },
-                  { icon: Phone, label: 'Phone', value: '+63 917 123 4567' },
+                  { icon: MapPin, label: 'Address', value: '2nd Floor, The District Dasmariñas\nMolino-Paliparan Rd., Dasmariñas, Cavite' },
+                  { icon: Phone, label: 'Phone', value: '0981-689-9909' },
                   { icon: Mail, label: 'Email', value: 'souvariskinlab@gmail.com' },
                 ].map((item) => (
                   <div key={item.label} className="flex items-start gap-4 py-5 border-b border-neutral-200">
@@ -158,7 +158,7 @@ export default function Contact() {
                 <div className="bg-neutral-100 border border-neutral-200 h-56 rounded-md overflow-hidden">
                   <iframe
                     title="Souvari Skin Lab Location Map"
-                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3858.749557!2d121.1114905!3d14.6510417!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b9c677000b3f%3A0x59fe7f0fff75a6cb!2sIAVE%20Beauty%20%26%20Co%20-%20Marikina%20Heights!5e0!3m2!1sen!2sph!4v1!5m2!1sen!2sph"
+                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3858.749557!2d120.9819336!3d14.3599099!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397d5adefd3c8bb%3A0xa4d65f3723c69665!2sSouvari%20Skin%20Lab!5e0!3m2!1sen!2sph!4v1!5m2!1sen!2sph"
                     width="100%"
                     height="100%"
                     style={{ border: 0 }}
@@ -168,7 +168,7 @@ export default function Contact() {
                 </div>
                 <div className="text-center">
                   <a
-                    href="https://www.google.com/maps/place/IAVE+Beauty+%26+Co+-+Marikina+Heights/@14.6510469,121.1089102,17z/data=!3m1!4b1!4m6!3m5!1s0x3397b9c677000b3f:0x59fe7f0fff75a6cb!8m2!3d14.6510417!4d121.1114905!16s%2Fg%2F11p6wqw65_?hl=en&entry=ttu&g_ep=EgoyMDI2MDkxNi4wIKXMDSoASAFQAw%3D%3D"
+                    href="https://www.google.com/maps/place/Souvari+Skin+Lab/@14.3599099,120.9793587,17z/data=!3m1!4b1!4m6!3m5!1s0x3397d5adefd3c8bb:0xa4d65f3723c69665!8m2!3d14.3599099!4d120.9819336!16s%2Fg%2F11zdbw702l"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs font-semibold text-primary-600 hover:text-primary-700 underline"
