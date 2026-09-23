@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { CheckCircle, Calendar, Clock } from 'lucide-react';
 import ChatbotWidget from '../../components/chatbot/ChatbotWidget';
+import { formatServicePrice } from '../../utils/format';
 
 interface LocationState {
   services: { name: string; price: number; duration: number }[];
@@ -67,7 +68,7 @@ export default function BookingConfirmation() {
                           ) : null}
                         </span>
                         <span className="font-sans text-sm text-neutral-700 whitespace-nowrap">
-                          ₱{svc.price.toLocaleString()}
+                          {formatServicePrice(svc.price)}
                         </span>
                       </li>
                     ))}
@@ -92,7 +93,7 @@ export default function BookingConfirmation() {
               {state.totalPrice != null && (
                 <div className="border-t border-neutral-200 mt-5 pt-4 flex justify-between items-center">
                   <span className="text-sm font-medium text-neutral-900">Total</span>
-                  <span className="font-sans text-xl font-semibold text-neutral-900">₱{state.totalPrice.toLocaleString()}</span>
+                  <span className="font-sans text-xl font-semibold text-neutral-900">{formatServicePrice(state.totalPrice)}</span>
                 </div>
               )}
             </div>

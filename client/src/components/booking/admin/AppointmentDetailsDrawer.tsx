@@ -3,6 +3,7 @@ import { Clock, Loader2 } from 'lucide-react';
 import dayjs from 'dayjs';
 import Drawer from '../../ui/Drawer';
 import StatusBadge from '../../ui/StatusBadge';
+import { formatServicePrice } from '../../../utils/format';
 import type { BookingAppointment, ServiceOption, StaffMember } from './types';
 
 interface AppointmentDetailsDrawerProps {
@@ -169,7 +170,7 @@ export default function AppointmentDetailsDrawer({
                       {s.name}
                       {(s.duration_minutes !== undefined || s.price !== undefined) && (
                         <span className="block text-xs font-normal text-neutral-400 mt-0.5">
-                          {[s.duration_minutes ? `${s.duration_minutes} min` : null, s.price !== undefined ? `₱${s.price.toLocaleString()}` : null].filter(Boolean).join(' · ')}
+                          {[s.duration_minutes ? `${s.duration_minutes} min` : null, s.price !== undefined ? formatServicePrice(s.price) : null].filter(Boolean).join(' · ')}
                         </span>
                       )}
                     </div>
@@ -178,7 +179,7 @@ export default function AppointmentDetailsDrawer({
               ) : (
                 <>
                   {appointment.service.name}
-                  {service && <span className="block text-xs font-normal text-neutral-400 mt-0.5">{service.duration} min · ₱{service.price.toLocaleString()}</span>}
+                  {service && <span className="block text-xs font-normal text-neutral-400 mt-0.5">{service.duration} min · {formatServicePrice(service.price)}</span>}
                 </>
               )}
             </dd>

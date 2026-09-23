@@ -1,4 +1,5 @@
 import { ArrowLeft, Check, Clock, X } from 'lucide-react';
+import { formatServicePrice } from '../../utils/format';
 
 interface Treatment {
   id: number;
@@ -19,6 +20,7 @@ interface TreatmentSelectorProps {
   onRemove: (service: Treatment) => void;
   onBack: () => void;
   membershipPrice?: boolean;
+  featuredServiceId?: number;
 }
 
 export default function TreatmentSelector({
@@ -29,6 +31,7 @@ export default function TreatmentSelector({
   onRemove,
   onBack,
   membershipPrice,
+  featuredServiceId,
 }: TreatmentSelectorProps) {
   const isSelected = (id: number) => selectedServices.some((s) => s.id === id);
   const totalDuration = selectedServices.reduce((sum, s) => sum + s.duration, 0);
@@ -87,12 +90,19 @@ export default function TreatmentSelector({
         {services.map((s) => {
           const selected = isSelected(s.id);
           const showVipPrice = membershipPrice && s.vip_price && s.vip_price < s.price;
+          const isFeatured = s.id === featuredServiceId;
           return (
             <button
               key={s.id}
               onClick={() => onToggle(s)}
               className={`w-full text-left p-4 border transition ${
-                selected ? 'border-primary-600 bg-white' : 'border-neutral-200 bg-white hover:border-neutral-300'
+                isFeatured
+                  ? selected
+                    ? 'border-primary-600 bg-primary-50'
+                    : 'border-primary-500 bg-primary-50/60 hover:border-primary-600'
+                  : selected
+                    ? 'border-primary-600 bg-white'
+                    : 'border-neutral-200 bg-white hover:border-neutral-300'
               }`}
             >
               <div className="flex items-start justify-between gap-4">
@@ -106,6 +116,11 @@ export default function TreatmentSelector({
                       {selected && <Check size={12} className="text-white" />}
                     </div>
                     <p className="text-sm font-medium text-neutral-900">{s.name}</p>
+                    {isFeatured && (
+                      <span className="inline-flex items-center px-2 py-0.5 bg-primary-600 text-white text-[10px] font-semibold uppercase tracking-[0.12em] whitespace-nowrap">
+                        Recommended for New Clients
+                      </span>
+                    )}
                   </div>
                   {s.description && (
                     <p className="text-xs text-neutral-500 mt-1.5 ml-8 line-clamp-1">{s.description}</p>
@@ -116,13 +131,15 @@ export default function TreatmentSelector({
                   </div>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  {showVipPrice ? (
+                  {isFeatured || Number(s.price) === 0 ? (
+                    <span className="text-sm font-semibold text-primary-700 whitespace-nowrap">FREE</span>
+                  ) : showVipPrice ? (
                     <>
                       <span className="text-sm font-semibold text-primary-700 whitespace-nowrap">₱{s.vip_price!.toLocaleString()}</span>
                       <span className="block text-xs text-neutral-400 line-through">₱{s.price.toLocaleString()}</span>
                     </>
                   ) : (
-                    <span className="text-sm font-semibold text-neutral-900 whitespace-nowrap">₱{s.price.toLocaleString()}</span>
+                    <span className="text-sm font-semibold text-neutral-900 whitespace-nowrap">{formatServicePrice(s.price)}</span>
                   )}
                 </div>
               </div>

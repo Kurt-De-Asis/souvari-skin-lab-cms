@@ -5,7 +5,7 @@ import { appointmentsApi, customersApi, posApi } from '../../../api';
 import Drawer from '../../ui/Drawer';
 import CustomerDetailDrawer from '../../admin/CustomerDetailDrawer';
 import formatCategory from '../../../utils/formatCategory';
-import { formatAmountInput, parseAmountInput } from '../../../utils/format';
+import { formatAmountInput, formatServicePrice, parseAmountInput } from '../../../utils/format';
 import type {
   CreateGroupAppointmentPayload,
   CustomerOption,
@@ -574,7 +574,7 @@ export default function CreateBookingDrawer({
               <p className="text-[11px] text-neutral-400">
                 {selectedServices.length === 0
                   ? 'Add one or more services'
-                  : `${selectedServices.length} ${selectedServices.length === 1 ? 'service' : 'services'} · ${totalDuration} min · ₱${totalPrice.toLocaleString()}`}
+                  : `${selectedServices.length} ${selectedServices.length === 1 ? 'service' : 'services'} · ${totalDuration} min · ${formatServicePrice(totalPrice)}`}
               </p>
 
               {selectedServices.length > 0 && (
@@ -648,7 +648,7 @@ export default function CreateBookingDrawer({
                               <span className="truncate">{formatCategory(s.category)}</span>
                             </div>
                           </div>
-                          <span className="text-[13px] font-semibold text-neutral-900 whitespace-nowrap">₱{s.price.toLocaleString()}</span>
+                          <span className="text-[13px] font-semibold text-neutral-900 whitespace-nowrap">{formatServicePrice(s.price)}</span>
                           <button
                             onClick={() => (added ? removeService(s.id) : addService(s))}
                             className={`shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition ${
@@ -774,14 +774,14 @@ export default function CreateBookingDrawer({
                     <div key={s.id} className="flex justify-between text-xs">
                       <span className="text-neutral-600">{s.name} <span className="text-neutral-400">· {s.duration} min</span></span>
                       <span className="font-medium text-neutral-900 whitespace-nowrap">
-                        {line !== undefined ? `₱${line.toLocaleString()}` : `₱${s.price.toLocaleString()}`}
+                        {line !== undefined ? formatServicePrice(line) : formatServicePrice(s.price)}
                       </span>
                     </div>
                   );
                 })}
                 <div className="flex justify-between text-xs pt-1.5 border-t border-neutral-100">
                   <span className="text-neutral-500">Subtotal</span>
-                  <span className="text-neutral-900 font-medium">₱{(quote?.subtotal ?? totalPrice).toLocaleString()}</span>
+                  <span className="text-neutral-900 font-medium">{formatServicePrice(quote?.subtotal ?? totalPrice)}</span>
                 </div>
                 {memberDiscount > 0 && (
                   <div className="flex justify-between text-xs">
@@ -791,7 +791,7 @@ export default function CreateBookingDrawer({
                 )}
                 <div className="flex justify-between text-sm pt-1.5 border-t border-neutral-200">
                   <span className="font-semibold text-neutral-900">Total</span>
-                  <span className="font-bold text-neutral-900">₱{finalTotal.toLocaleString()}</span>
+                  <span className="font-bold text-neutral-900">{formatServicePrice(finalTotal)}</span>
                 </div>
                 <div className="flex justify-between text-[11px] text-neutral-400 pt-1">
                   <span>Duration</span>

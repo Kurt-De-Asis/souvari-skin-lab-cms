@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
-import { Search, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, Eye, EyeOff, KeyRound } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { customersApi, staffApi } from '@/api';
 import EmptyState from '@/components/shared/EmptyState';
@@ -46,10 +46,11 @@ export default function Customers() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [staffList, setStaffList] = useState<Array<{ id: number; first_name: string; last_name: string }>>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<CustomerForm>();
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<CustomerForm>();
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
@@ -85,12 +86,14 @@ export default function Customers() {
 
   const openAddModal = () => {
     setEditingCustomer(null);
+    setShowPassword(false);
     reset({ first_name: '', last_name: '', email: '', password: '', phone: '', gender: 'male', date_of_birth: '', address: '', preferred_staff_id: null });
     setModalOpen(true);
   };
 
   const openEditModal = (c: Customer) => {
     setEditingCustomer(c);
+    setShowPassword(false);
     reset({
       first_name: c.first_name,
       last_name: c.last_name,
@@ -104,18 +107,29 @@ export default function Customers() {
     setModalOpen(true);
   };
 
+  const generatePassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+    let pw = '';
+    const random = crypto.getRandomValues(new Uint32Array(16));
+    for (let i = 0; i < 12; i++) pw += chars[random[i] % chars.length];
+    setValue('password', pw, { shouldValidate: true });
+    setShowPassword(true);
+  };
+
   const onSubmit = async (values: CustomerForm) => {
     setSubmitting(true);
     try {
+      const { password, ...rest } = values;
       const payload = {
-        ...values,
+        ...rest,
         preferred_staff_id: values.preferred_staff_id ? Number(values.preferred_staff_id) : null,
       };
       if (editingCustomer) {
+        if (password?.trim()) (payload as CustomerForm).password = password.trim();
         await customersApi.update(editingCustomer.id, payload);
         toast.success('Customer updated');
       } else {
-        await customersApi.create({ ...payload, password: payload.password || 'password123' });
+        await customersApi.create({ ...payload, password: password || 'password123' });
         toast.success('Customer created');
       }
       setModalOpen(false);
@@ -244,13 +258,45 @@ export default function Customers() {
             <input type="email" className="input-field" placeholder="email@example.com" {...register('email', { required: 'Required' })} />
             {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email.message}</p>}
           </div>
-          {!editingCustomer && (
-            <div>
-              <label className="label">Password</label>
-              <input type="password" className="input-field" placeholder="Min. 8 characters" {...register('password', { required: 'Required', minLength: { value: 8, message: 'Must be at least 8 characters' } })} />
-              {errors.password && <p className="text-xs text-red-600 mt-1">{errors.password.message}</p>}
+          <div>
+            <label className="label">{editingCustomer ? 'Reset Password (optional)' : 'Password'}</label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  className="input-field pr-10"
+                  placeholder={editingCustomer ? 'Leave blank to keep current password' : 'Min. 8 characters'}
+                  {...register('password', {
+                    ...(editingCustomer
+                      ? { minLength: { value: 8, message: 'Must be at least 8 characters' } }
+                      : { required: 'Required', minLength: { value: 8, message: 'Must be at least 8 characters' } }),
+                  })}
+                />
+                {watch('password') && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((s) => !s)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-neutral-400 hover:text-neutral-700 transition"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={generatePassword}
+                className="btn-secondary whitespace-nowrap"
+                title="Generate a strong password"
+              >
+                <KeyRound size={15} /> Generate
+              </button>
             </div>
-          )}
+            {errors.password && <p className="text-xs text-red-600 mt-1">{errors.password.message}</p>}
+            {editingCustomer && (
+              <p className="text-xs text-neutral-400 mt-1">Setting a new password resets the customer's login credentials.</p>
+            )}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Phone</label>

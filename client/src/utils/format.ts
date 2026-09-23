@@ -1,3 +1,9 @@
+export function formatServicePrice(value: number | null | undefined): string {
+  const n = Number(value);
+  if (!n || Number.isNaN(n)) return 'Free';
+  return `₱${n.toLocaleString()}`;
+}
+
 export function formatCurrency(value: number | null | undefined): string {
   const n = Number(value || 0);
   return new Intl.NumberFormat('en-PH', {

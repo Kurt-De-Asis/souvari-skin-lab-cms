@@ -25,6 +25,7 @@ import hotWax from './seed-data/catalog/hot-wax';
 import advanceAestheticSolutions from './seed-data/catalog/advance-aesthetic-solutions';
 import premiumIvDrips from './seed-data/catalog/premium-iv-drips';
 import premiumIvAddons from './seed-data/catalog/premium-iv-addons';
+import consultation from './seed-data/catalog/consultation';
 
 const prisma = new PrismaClient();
 
@@ -53,6 +54,7 @@ const allSections: SectionDef[] = [
   advanceAestheticSolutions,
   premiumIvDrips,
   premiumIvAddons,
+  consultation,
 ];
 
 async function seedGroups() {

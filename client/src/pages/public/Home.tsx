@@ -5,6 +5,7 @@ import { servicesApi } from '../../api';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import Reveal from '../../components/ui/Reveal';
 import formatCategory from '../../utils/formatCategory';
+import { formatServicePrice } from '../../utils/format';
 
 interface Service {
   id: number;
@@ -291,7 +292,7 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="flex items-center gap-5 flex-shrink-0">
-                    <span className="font-sans text-lg text-primary-300 whitespace-nowrap">₱{service.price.toLocaleString()}</span>
+                    <span className="font-sans text-lg text-primary-300 whitespace-nowrap">{formatServicePrice(service.price)}</span>
                     <ArrowRight size={18} className="text-neutral-500 transition group-hover:translate-x-1 group-hover:text-primary-300" />
                   </div>
                 </Link>
@@ -340,7 +341,7 @@ export default function Home() {
                   <div className="mt-3 flex items-center gap-3 text-xs uppercase tracking-wide text-neutral-400">
                     <span className="flex items-center gap-1.5"><Clock size={12} /> {f.service.duration} min</span>
                     <span className="text-neutral-600">·</span>
-                    <span className="font-sans text-base text-primary-300 normal-case tracking-normal">₱{f.service.price.toLocaleString()}</span>
+                    <span className="font-sans text-base text-primary-300 normal-case tracking-normal">{formatServicePrice(f.service.price)}</span>
                     <span className="text-neutral-600">·</span>
                     <span>{formatCategory(f.service.category)}</span>
                   </div>

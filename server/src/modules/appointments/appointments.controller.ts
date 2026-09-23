@@ -17,6 +17,18 @@ export class AppointmentsController {
         }
       }
 
+      if (req.user!.role === 'staff') {
+        const staff = await prisma.staff.findFirst({
+          where: { user_id: req.user!.userId, deleted_at: null },
+          select: { id: true },
+        });
+        if (!staff) {
+          res.status(403).json({ success: false, message: 'Staff record not found' });
+          return;
+        }
+        query.staff_id = staff.id;
+      }
+
       const result = await appointmentService.list(query);
       res.json({
         success: true,
@@ -39,6 +51,17 @@ export class AppointmentsController {
           select: { id: true },
         });
         if (!customer || appointment.customer_id !== customer.id) {
+          res.status(404).json({ success: false, message: 'Appointment not found' });
+          return;
+        }
+      }
+
+      if (req.user!.role === 'staff') {
+        const staff = await prisma.staff.findFirst({
+          where: { user_id: req.user!.userId, deleted_at: null },
+          select: { id: true },
+        });
+        if (!staff || appointment.staff_id !== staff.id) {
           res.status(404).json({ success: false, message: 'Appointment not found' });
           return;
         }

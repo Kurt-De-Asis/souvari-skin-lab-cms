@@ -64,6 +64,7 @@ export default function Appointments() {
       const params: Record<string, string> = {};
       if (dateFilter) params.date = dateFilter;
       if (statusFilter) params.status = statusFilter;
+      if (user?.staff?.id) params.staff_id = String(user.staff.id);
       const { data } = await appointmentsApi.list(params);
       setAppointments(data.data || []);
     } catch {

@@ -4,7 +4,7 @@ import { Clock, ArrowLeft } from 'lucide-react';
 import { servicesApi } from '../../api';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import formatCategory from '../../utils/formatCategory';
-import { formatPosition } from '../../utils/format';
+import { formatPosition, formatServicePrice } from '../../utils/format';
 import categoryImage from '../../utils/categoryImages';
 
 interface ServiceStaff {
@@ -119,8 +119,8 @@ export default function ServiceDetail() {
                   className="w-full aspect-[4/5] object-cover rounded-lg shadow-sm mb-6"
                 />
                 <div className="bg-white border border-neutral-200 rounded-lg p-7 shadow-sm">
-                  <p className="font-sans text-4xl font-semibold text-neutral-900">₱{service.price.toLocaleString()}</p>
-                  <p className="text-xs uppercase tracking-[0.2em] text-neutral-400 mt-1">per session</p>
+                  <p className="font-sans text-4xl font-semibold text-neutral-900">{formatServicePrice(service.price)}</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-neutral-400 mt-1">{Number(service.price) === 0 ? 'complimentary' : 'per session'}</p>
                   <div className="mt-6 space-y-3 pt-6 border-t border-neutral-200">
                     <div className="flex items-center gap-2.5 text-sm text-neutral-600">
                       <Clock size={15} className="text-primary-600" />

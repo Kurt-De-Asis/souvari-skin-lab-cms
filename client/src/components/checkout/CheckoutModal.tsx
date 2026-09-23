@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CreditCard, DollarSign, Loader2, Minus, Plus, X } from 'lucide-react';
 import { posApi, transactionsApi } from '../../api';
-import { formatAmountInput, parseAmountInput } from '../../utils/format';
+import { formatAmountInput, formatServicePrice, parseAmountInput } from '../../utils/format';
 import type { ServiceOption } from '../booking/admin/types';
 
 interface CheckoutModalProps {
@@ -168,7 +168,7 @@ export default function CheckoutModal({
             {services.map(s => (
               <div key={s.id} className="flex justify-between text-sm py-1">
                 <span>{s.name}</span>
-                <span className="font-medium">₱{s.price.toLocaleString()}</span>
+                <span className="font-medium">{formatServicePrice(s.price)}</span>
               </div>
             ))}
           </div>
@@ -178,7 +178,7 @@ export default function CheckoutModal({
               <div className="border border-neutral-200 p-3 space-y-1">
                 <div className="flex justify-between text-sm">
                   <span className="text-neutral-600">Subtotal</span>
-                  <span>₱{quote.subtotal.toLocaleString()}</span>
+                  <span>{formatServicePrice(quote.subtotal)}</span>
                 </div>
                 {(quote.membership_discount || quote.monthly_perk_discount) && (
                   <div className="flex justify-between text-sm text-green-600">
@@ -196,7 +196,7 @@ export default function CheckoutModal({
                 )}
                 <div className="border-t border-neutral-200 pt-2 flex justify-between text-base font-semibold">
                   <span>Total</span>
-                  <span>₱{finalTotal.toLocaleString()}</span>
+                  <span>{formatServicePrice(finalTotal)}</span>
                 </div>
               </div>
             </>

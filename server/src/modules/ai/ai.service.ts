@@ -80,6 +80,12 @@ class AiService {
       targets: ['laser hair removal', 'underarms', 'upper arms', 'lower arms'],
     },
     {
+      label: 'weak or brittle nails',
+      tokens: ['weak', 'brittle', 'peeling', 'breakage', 'breaking', 'soft', 'thin', 'damaged'],
+      phrases: ['weak nails', 'brittle nails', 'peeling nails', 'breaking nails', 'thin nails', 'soft nails', 'nail health', 'nail care'],
+      targets: ['manicure', 'pedicure', 'biab', 'gel', 'consultation'],
+    },
+    {
       label: 'body fat and contouring',
       tokens: ['fat', 'belly', 'tummy', 'contour', 'contours', 'lipo', 'slim', 'slimming', 'cellulite'],
       phrases: ['body contour', 'body contouring', 'belly fat', 'double chin', 'stubborn fat', 'body shaping'],
@@ -358,7 +364,7 @@ class AiService {
       .map((s) => ({ service: s, score: scores.get(s.id) || 0, reasons: reasons.get(s.id) || [] }))
       .filter((r) => r.score > 0)
       .filter((r) => !(r.service.category === 'other' && r.score < 8))
-      .filter((r) => !(AiService.NAIL_PATTERN.test(r.service.name.toLowerCase()) && r.score < 12))
+      .filter((r) => !(AiService.NAIL_PATTERN.test(r.service.name.toLowerCase()) && r.score < 12 && !AiService.NAIL_PATTERN.test(lowerMessage)))
       .sort((a, b) => b.score - a.score)
       .slice(0, 3);
 
@@ -380,7 +386,7 @@ class AiService {
     "What would you like to know?";
 
   private greetingResponse(): string {
-    return `Hello! Welcome to Souvari Skin Lab. I can help you with:\n- Service information and pricing\n- Best-selling and recommended services\n- Clinic hours and contact details\n- Booking appointments\n\nHow can I assist you today?\n\nPlease consult with our clinic professionals for personalized advice.`;
+    return `Hello! Welcome to Souvari Skin Lab. I can help you with:\n- Service information and pricing\n- Best-selling and recommended services\n- Clinic hours and contact details\n- Booking appointments\n\nNew to Souvari? We recommend starting with a free Consultation First (recommended for new clients).\n\nHow can I assist you today?\n\nPlease consult with our clinic professionals for personalized advice.`;
   }
 
   private thanksResponse(): string {
@@ -431,12 +437,12 @@ class AiService {
     const serviceList = services
       .map(
         (s) =>
-          `- ${s.name} (${s.category}): ₱${Number(s.price).toLocaleString()} - ${s.duration_minutes} minutes. ${s.description || ''}`
+          `- ${s.name} (${s.category}): ${this.formatPrice(s.price)} - ${s.duration_minutes} minutes. ${s.description || ''}`
       )
       .join('\n');
 
     const popularList = popular
-      .map((s) => `- ${s.name}: ₱${Number(s.price).toLocaleString()} (${s.duration_minutes} minutes)`)
+      .map((s) => `- ${s.name}: ${this.formatPrice(s.price)} (${s.duration_minutes} minutes)`)
       .join('\n');
 
     this.systemPrompt = `You are a helpful AI assistant for ${clinicName}, a beauty and aesthetics clinic.
@@ -449,6 +455,9 @@ CLINIC INFORMATION:
 
 AVAILABLE SERVICES:
 ${serviceList || 'No services currently listed. Please contact the clinic directly.'}
+
+FREE CONSULTATION:
+- The "Consultation First (Recommended for New Clients)" service is FREE (₱0). Always describe it as free.
 
 BEST-SELLING SERVICES (most booked):
 ${popularList || 'Booking data not yet available.'}
@@ -646,7 +655,27 @@ You should be friendly, professional, and helpful while staying within these bou
   }
 
   private formatServiceLine(s: any): string {
-    return `- ${s.name}: ₱${Number(s.price).toLocaleString()} (${s.duration_minutes} min)`;
+    return `- ${s.name}: ${this.formatPrice(s.price)} (${s.duration_minutes} min)`;
+  }
+
+  private formatPrice(price: any): string {
+    const n = Number(price);
+    if (!n || Number.isNaN(n)) return 'Free';
+    return `₱${n.toLocaleString()}`;
+  }
+
+  /** Group a service list by category with readable headers. */
+  private formatServicesByCategory(services: any[]): string {
+    const byCat = new Map<string, any[]>();
+    for (const s of services) {
+      const key = (s.category || 'other').replace(/_/g, ' ');
+      if (!byCat.has(key)) byCat.set(key, []);
+      byCat.get(key)!.push(s);
+    }
+    return [...byCat.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([cat, list]) => `[${cat.charAt(0).toUpperCase()}${cat.slice(1)}]\n${list.map((s) => this.formatServiceLine(s)).join('\n')}`)
+      .join('\n');
   }
 
   /** Returns the category name if one is mentioned in the message, else undefined. */
@@ -700,9 +729,15 @@ You should be friendly, professional, and helpful while staying within these bou
       }
       const lines = popular.map((s, i) => {
         const desc = s.description ? ` — ${s.description.trim()}` : '';
-        return `${i + 1}. ${s.name} (${s.duration_minutes} min, ₱${s.price.toLocaleString()})${desc}`;
+        return `${i + 1}. ${s.name} (${s.duration_minutes} min, ${this.formatPrice(s.price)})${desc}`;
       });
       return `Here are our best-selling services based on most-booked treatments:\n\n${lines.join('\n')}\n\nThese are our clients' most trusted treatments. Please consult with our clinic professionals for personalized advice.`;
+    }
+
+    // --- New clients: free consultation nudge ---
+    const newClientTriggers = ['first time', 'new client', 'new to souvari', 'never been', 'first visit', 'new here', 'first appointment'];
+    if (newClientTriggers.some((t) => lowerMessage.includes(t))) {
+      return `If you're new to Souvari Skin Lab, we recommend starting with a free Consultation First (recommended for new clients). Our professionals will assess your skin and build a personalized treatment plan before you commit to any service.\n\nWould you like to see our best-selling treatments, or would you prefer to book the consultation?\n\nPlease consult with our clinic professionals for personalized advice.`;
     }
 
     // --- Recommendations (NLP retrieval engine) ---
@@ -721,10 +756,10 @@ You should be friendly, professional, and helpful while staying within these bou
     if (isRecommendation) {
       const recommended = this.recommend(lowerMessage, services);
       if (recommended.length === 0) {
-        return `Based on what we offer, I'd recommend booking a free consultation first so our professionals can create a personalized plan for you. We'll match you with the right treatment.\n\nPlease consult with our clinic professionals for personalized advice.`;
+        return `Based on what we offer, I'd recommend booking a free Consultation First (recommended for new clients) so our professionals can create a personalized plan for you. We'll match you with the right treatment.\n\nPlease consult with our clinic professionals for personalized advice.`;
       }
       return `I'd be happy to recommend a treatment just for you! Based on your needs, here are my top recommendations:\n\n${recommended
-        .map((r) => `- ${r.service.name} (₱${Number(r.service.price).toLocaleString()}, ${r.service.duration_minutes} min) ${r.reasons[0] ? `— ${r.reasons[0]}` : ''}`)
+        .map((r) => `- ${r.service.name} (${this.formatPrice(r.service.price)}, ${r.service.duration_minutes} min) ${r.reasons[0] ? `— ${r.reasons[0]}` : ''}`)
         .join('\n')}\n\nFor the most accurate recommendation, please consult with our clinic professionals for personalized advice.`;
     }
 
@@ -750,8 +785,7 @@ You should be friendly, professional, and helpful while staying within these bou
     const fuzzyHit = this.findServiceByMessage(lowerMessage, services);
     const nameHit = directHit || (fuzzyHit ? fuzzyHit.service : undefined);
     if (nameHit) {
-      const price = Number(nameHit.price).toLocaleString();
-      return `${nameHit.name}:\n- Price: ₱${price}\n- Duration: ${nameHit.duration_minutes} minutes\n- Category: ${nameHit.category}\n${nameHit.description ? `- About: ${nameHit.description.trim()}\n` : ''}\nPlease consult with our clinic professionals for personalized advice.`;
+      return `${nameHit.name}:\n- Price: ${this.formatPrice(nameHit.price)}\n- Duration: ${nameHit.duration_minutes} minutes\n- Category: ${nameHit.category}\n${nameHit.description ? `- About: ${nameHit.description.trim()}\n` : ''}\nPlease consult with our clinic professionals for personalized advice.`;
     }
 
     // --- Prices ---
@@ -761,7 +795,7 @@ You should be friendly, professional, and helpful while staying within these bou
       }
       const priceSvc = this.findServiceByMessage(lowerMessage, services);
       if (priceSvc) {
-        return `The price for ${priceSvc.service.name} is ₱${Number(priceSvc.service.price).toLocaleString()} (${priceSvc.service.duration_minutes} min).\n\nPlease consult with our clinic professionals for personalized advice.`;
+        return `The price for ${priceSvc.service.name} is ${this.formatPrice(priceSvc.service.price)} (${priceSvc.service.duration_minutes} min).\n\nPlease consult with our clinic professionals for personalized advice.`;
       }
       const category = this.mentionedCategory(lowerMessage, services);
       const filtered = category ? services.filter((s) => s.category === category) : services;
@@ -769,7 +803,8 @@ You should be friendly, professional, and helpful while staying within these bou
       if (filtered.length === 0) {
         return `I don't have pricing information for that yet. Please contact the clinic directly.\n\nPlease consult with our clinic professionals for personalized advice.`;
       }
-      return `Our ${scope} pricing:\n${filtered.map((s) => this.formatServiceLine(s)).join('\n')}\n\nPlease consult with our clinic professionals for personalized advice.`;
+      const listed = category ? filtered.map((s) => this.formatServiceLine(s)).join('\n') : this.formatServicesByCategory(services);
+      return `Our ${scope} pricing:\n${listed}\n\nPlease consult with our clinic professionals for personalized advice.`;
     }
 
     // --- Contact / location ---
@@ -794,7 +829,10 @@ You should be friendly, professional, and helpful while staying within these bou
       if (filtered.length === 0) {
         return `We currently don't offer that service. Please contact the clinic directly to learn more.\n\nPlease consult with our clinic professionals for personalized advice.`;
       }
-      return `We offer the following ${scope}:\n${filtered.map((s) => `${this.formatServiceLine(s)} (${s.category})`).join('\n')}\n\nPlease consult with our clinic professionals for personalized advice.`;
+      const listed = category
+        ? filtered.map((s) => `${this.formatServiceLine(s)} (${s.category.replace(/_/g, ' ')})`).join('\n')
+        : this.formatServicesByCategory(services);
+      return `We offer the following ${scope}:\n${listed}\n\nPlease consult with our clinic professionals for personalized advice.`;
     }
 
     return this.HELP_REPLY;

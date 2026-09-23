@@ -157,7 +157,7 @@ export class CustomerService {
       throw new AppError('Customer not found', 404);
     }
 
-    const { phone, email, ...customerData } = data;
+    const { phone, email, password, ...customerData } = data;
 
     const nullableFields = ['date_of_birth', 'address', 'city', 'state', 'postal_code', 'notes', 'avatar_url', 'gender'];
     const updateData: any = {};
@@ -173,10 +173,11 @@ export class CustomerService {
       }
     }
 
-    if (phone !== undefined || email !== undefined) {
+    if (phone !== undefined || email !== undefined || password !== undefined) {
       const userUpdate: any = {};
       if (phone !== undefined) userUpdate.phone = phone || null;
       if (email !== undefined) userUpdate.email = email;
+      if (password !== undefined) userUpdate.password_hash = await hashPassword(password);
       await prisma.users.update({ where: { id: customer.user_id }, data: userUpdate });
     }
 

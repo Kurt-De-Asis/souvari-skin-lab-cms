@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 import { servicesApi, appointmentsApi, settingsApi } from '@/api';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import { formatServicePrice } from '@/utils/format';
 
 interface Service {
   id: number;
@@ -260,7 +261,7 @@ export default function BookAppointment() {
                   <p className="font-medium text-neutral-900">{svc.name}</p>
                   {svc.description && <p className="text-sm text-neutral-500 mt-1 line-clamp-2">{svc.description}</p>}
                   <div className="flex items-center gap-3 mt-2 text-sm text-neutral-600">
-                    {svc.price != null && <span>₱{Number(svc.price).toLocaleString()}</span>}
+                    {svc.price != null && <span>{formatServicePrice(svc.price)}</span>}
                     {svc.duration_minutes && <span>{svc.duration_minutes} min</span>}
                   </div>
                 </button>
@@ -434,7 +435,7 @@ export default function BookAppointment() {
                   <div className="flex justify-between border-t border-neutral-200 pt-2 mt-2">
                     <span className="text-neutral-500">Price</span>
                     <span className={quote.vipSavings > 0 || quote.membershipDiscount > 0 ? 'text-neutral-400 line-through' : 'font-semibold text-neutral-900'}>
-                      ₱{Number(quote.basePrice).toLocaleString()}
+                      {formatServicePrice(quote.basePrice)}
                     </span>
                   </div>
                   {quote.vipSavings > 0 && (
@@ -451,13 +452,13 @@ export default function BookAppointment() {
                   )}
                   <div className="flex justify-between border-t border-neutral-200 pt-2 mt-2">
                     <span className="text-neutral-700 font-medium">Total</span>
-                    <span className="font-bold text-neutral-900">₱{Number(quote.finalTotal).toLocaleString()}</span>
+                    <span className="font-bold text-neutral-900">{formatServicePrice(quote.finalTotal)}</span>
                   </div>
                 </>
               ) : selectedService?.price != null && (
                 <div className="flex justify-between border-t border-neutral-200 pt-2 mt-2">
                   <span className="text-neutral-500">Price</span>
-                  <span className="font-semibold text-neutral-900">₱{Number(selectedService.price).toLocaleString()}</span>
+                  <span className="font-semibold text-neutral-900">{formatServicePrice(selectedService.price)}</span>
                 </div>
               )}
             </div>

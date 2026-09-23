@@ -9,6 +9,7 @@ import EmptyState from '@/components/shared/EmptyState';
 import Pagination from '@/components/ui/Pagination';
 import StatusBadge from '@/components/ui/StatusBadge';
 import formatPaymentMethod from '@/utils/formatPaymentMethod';
+import { formatServicePrice } from '@/utils/format';
 
 type TabKey = 'transactions' | 'history';
 
@@ -243,7 +244,7 @@ export default function Transactions() {
                         {(rec.price ?? rec.service?.price) != null && (
                           <div>
                             <p className="text-neutral-500">Price</p>
-                            <p className="font-medium text-neutral-900">₱{Number(rec.price ?? rec.service?.price).toLocaleString()}</p>
+                            <p className="font-medium text-neutral-900">{formatServicePrice(rec.price ?? rec.service?.price)}</p>
                           </div>
                         )}
                       </div>

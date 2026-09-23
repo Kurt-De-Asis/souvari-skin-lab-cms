@@ -17,6 +17,7 @@ export const createCustomerSchema = z.object({
 });
 
 export const updateCustomerSchema = z.object({
+  password: z.string().min(8, 'Password must be at least 8 characters').max(128).optional(),
   first_name: z.string().min(1).max(100).optional(),
   last_name: z.string().min(1).max(100).optional(),
   phone: z.string().max(20).optional(),

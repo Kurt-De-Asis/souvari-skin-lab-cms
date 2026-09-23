@@ -7,6 +7,7 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
 import Pagination from '@/components/ui/Pagination';
 import StatusBadge from '@/components/ui/StatusBadge';
+import { formatServicePrice } from '@/utils/format';
 
 interface Service {
   id: number;
@@ -75,7 +76,7 @@ export default function Services() {
     }
   };
 
-  const formatPrice = (price: number) => `₱${Number(price).toLocaleString()}`;
+  const formatPrice = (price: number) => formatServicePrice(price);
 
   return (
     <div className="space-y-6">

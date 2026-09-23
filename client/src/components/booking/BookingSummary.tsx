@@ -1,4 +1,5 @@
 import { Clock, Crown, Tag } from 'lucide-react';
+import { formatServicePrice } from '../../utils/format';
 
 interface BookingSummaryProps {
   clinicName?: string;
@@ -62,7 +63,7 @@ export default function BookingSummary({
               </div>
             </div>
             <div className="text-right">
-              <span className="text-sm font-medium text-neutral-900 whitespace-nowrap">₱{s.price.toLocaleString()}</span>
+              <span className="text-sm font-medium text-neutral-900 whitespace-nowrap">{formatServicePrice(s.price)}</span>
               {s.originalPrice && s.originalPrice > s.price && (
                 <span className="block text-xs text-neutral-400 line-through">₱{s.originalPrice.toLocaleString()}</span>
               )}
@@ -119,7 +120,7 @@ export default function BookingSummary({
           )}
           <div className="border-t border-neutral-200 pt-3 flex justify-between items-center">
             <span className="text-sm font-semibold text-neutral-900">Total</span>
-            <span className="font-sans text-xl font-semibold text-neutral-900">₱{totalPrice.toLocaleString()}</span>
+            <span className="font-sans text-xl font-semibold text-neutral-900">{formatServicePrice(totalPrice)}</span>
           </div>
         </>
       )}

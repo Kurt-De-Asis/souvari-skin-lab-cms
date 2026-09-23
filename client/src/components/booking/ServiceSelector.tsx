@@ -1,5 +1,6 @@
 import { Clock, Crown } from 'lucide-react';
 import formatCategory from '../../utils/formatCategory';
+import { formatServicePrice } from '../../utils/format';
 
 interface Service {
   id: number;
@@ -102,13 +103,15 @@ export default function ServiceSelector({
                   </div>
                 </div>
                 <div className="text-right">
-                  {showVipPrice ? (
+                  {Number(s.price) === 0 ? (
+                    <span className="text-sm font-semibold text-primary-700 whitespace-nowrap">Free</span>
+                  ) : showVipPrice ? (
                     <>
                       <span className="text-sm font-semibold text-primary-700 whitespace-nowrap">₱{s.vip_price!.toLocaleString()}</span>
                       <span className="block text-xs text-neutral-400 line-through">₱{s.price.toLocaleString()}</span>
                     </>
                   ) : (
-                    <span className="text-sm font-semibold text-neutral-900 whitespace-nowrap">₱{s.price.toLocaleString()}</span>
+                    <span className="text-sm font-semibold text-neutral-900 whitespace-nowrap">{formatServicePrice(s.price)}</span>
                   )}
                 </div>
               </div>

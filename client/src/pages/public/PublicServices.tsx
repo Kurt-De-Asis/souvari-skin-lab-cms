@@ -6,6 +6,7 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import EmptyState from '../../components/shared/EmptyState';
 import Reveal from '../../components/ui/Reveal';
 import formatCategory from '../../utils/formatCategory';
+import { formatServicePrice } from '../../utils/format';
 
 interface Service {
   id: number;
@@ -122,7 +123,7 @@ export default function PublicServices() {
                     </div>
                   </div>
                   <div className="flex items-center gap-5 flex-shrink-0">
-                    <span className="font-sans text-lg text-primary-700 whitespace-nowrap">₱{service.price.toLocaleString()}</span>
+                    <span className="font-sans text-lg text-primary-700 whitespace-nowrap">{formatServicePrice(service.price)}</span>
                     <ArrowRight size={18} className="text-neutral-300 transition group-hover:translate-x-1 group-hover:text-primary-600" />
                   </div>
                 </Link>

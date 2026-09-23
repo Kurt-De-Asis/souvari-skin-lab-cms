@@ -401,10 +401,16 @@ export default function BookingPage() {
     return allServices.filter((s) => s.category === serviceCategory);
   }, [allServices, serviceCategory]);
 
+  const consultationService = useMemo<Service | undefined>(() => {
+    return allServices.find((s) => s.category === 'consultation' && Number(s.price) === 0);
+  }, [allServices]);
+
   const treatmentServices = useMemo(() => {
     if (!activeGroup) return [];
-    return allServices.filter((s) => activeGroup.categories.includes(s.category));
-  }, [activeGroup, allServices]);
+    const grouped = allServices.filter((s) => activeGroup.categories.includes(s.category));
+    if (!consultationService) return grouped;
+    return [consultationService, ...grouped.filter((s) => s.id !== consultationService.id)];
+  }, [activeGroup, allServices, consultationService]);
 
   const availableStaff = useMemo(() => {
     const seen = new Map<number, string>();
@@ -587,6 +593,7 @@ export default function BookingPage() {
                 onRemove={removeService}
                 onBack={() => setStep(SINGLE_SERVICE_STEP)}
                 membershipPrice={!!membership}
+                featuredServiceId={consultationService?.id}
               />
             )}
 
