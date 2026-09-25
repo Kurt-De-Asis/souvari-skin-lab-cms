@@ -13,7 +13,7 @@ class ServicePackagesController {
 
   async getById(req: Request, res: Response) {
     try {
-      const result = await servicePackagesService.getById(parseInt(req.params.id));
+      const result = await servicePackagesService.getById(parseInt(String(req.params.id)));
       if (!result) return res.status(404).json({ success: false, message: 'Package not found' });
       res.json({ success: true, data: result });
     } catch (error: any) {
@@ -32,7 +32,7 @@ class ServicePackagesController {
 
   async update(req: Request, res: Response) {
     try {
-      const result = await servicePackagesService.update(parseInt(req.params.id), req.body);
+      const result = await servicePackagesService.update(parseInt(String(req.params.id)), req.body);
       res.json({ success: true, data: result });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -41,7 +41,7 @@ class ServicePackagesController {
 
   async remove(req: Request, res: Response) {
     try {
-      await servicePackagesService.remove(parseInt(req.params.id));
+      await servicePackagesService.remove(parseInt(String(req.params.id)));
       res.status(204).send();
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });

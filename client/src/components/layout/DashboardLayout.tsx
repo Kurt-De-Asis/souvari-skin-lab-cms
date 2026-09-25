@@ -229,7 +229,7 @@ export default function DashboardLayout({ role }: { role: string }) {
   };
 
   return (
-    <div className="min-h-screen flex bg-neutral-50">
+    <div className="h-screen overflow-hidden flex bg-neutral-50">
       {/* Sidebar */}
       <aside className={`bg-neutral-900 text-white transition-all duration-300 ease-smooth flex flex-col relative ${
         sidebarOpen ? 'w-64' : 'w-16'
@@ -237,8 +237,8 @@ export default function DashboardLayout({ role }: { role: string }) {
         <div className="p-4 overflow-hidden">
           <Link to={publicLink} title="Souvari Skin Lab" className="block whitespace-nowrap transition-all">
             {sidebarOpen
-              ? <img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-14 w-auto object-contain" />
-              : <img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-10 w-auto object-contain" />}
+              ? <img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-8 w-auto object-contain" />
+              : <img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-7 w-auto object-contain" />}
           </Link>
           {sidebarOpen && <span className="block text-xs text-neutral-400 mt-2">{roleLabel}</span>}
         </div>
@@ -271,7 +271,7 @@ export default function DashboardLayout({ role }: { role: string }) {
             >
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-14 w-auto object-contain" />
+                  <img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-8 w-auto object-contain" />
                   <span className="block text-xs text-neutral-400 mt-2">{roleLabel}</span>
                 </div>
                 <button onClick={() => setMobileOpen(false)}><X size={20} /></button>
@@ -285,7 +285,7 @@ export default function DashboardLayout({ role }: { role: string }) {
       </Transition>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-h-screen min-w-0">
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {/* Header */}
         <header className="bg-white border-b border-neutral-200 h-16 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-40">
           <button className="md:hidden p-2" onClick={() => setMobileOpen(true)}>
@@ -335,7 +335,7 @@ export default function DashboardLayout({ role }: { role: string }) {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-4 sm:p-6">
+        <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
           <div key={location.pathname} className="anim-page-enter">
             <Outlet />
           </div>

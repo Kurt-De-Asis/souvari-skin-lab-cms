@@ -45,7 +45,7 @@ export default function PublicLayout() {
             {/* Centered Logo */}
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
               <Link to="/" className="flex items-center">
-                <img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-14 sm:h-16 w-auto object-contain" />
+                <img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-10 sm:h-12 w-auto object-contain" />
               </Link>
             </div>
 
@@ -72,8 +72,8 @@ export default function PublicLayout() {
                 {mobileOpen ? <X size={22} /> : <Menu size={22} />}
               </button>
               <Link to="/" className="absolute left-1/2 -translate-x-1/2">
-                <img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-12 w-auto object-contain" />
-              </Link>
+<img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-9 w-auto object-contain" />
+                </Link>
               <div className="w-8" />
             </div>
           </div>
@@ -130,7 +130,7 @@ export default function PublicLayout() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-10">
             <div className="md:col-span-1">
               <Link to="/" className="inline-block">
-                <img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-16 w-auto object-contain" />
+                <img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-12 w-auto object-contain" />
               </Link>
               <p className="text-sm text-neutral-400 mt-5 leading-relaxed">
                 Premium aesthetic clinic offering advanced beauty treatments and personalized care.

@@ -48,9 +48,9 @@ JWT_REFRESH_EXPIRES_IN=7d
 FRONTEND_URL=https://your-domain.com
 BACKEND_URL=https://api.your-domain.com
 AI_API_KEY=<your-openai-api-key>
-SMS_PROVIDER=twilio
-SMS_API_KEY=<your-twilio-api-key>
-SMS_SENDER=IAVE Beauty
+SMS_PROVIDER=semaphore
+SMS_API_KEY=<your-semaphore-api-key>
+SMS_SENDER=SOUVARI
 ```
 
 ### Start Production Server
@@ -59,8 +59,16 @@ SMS_SENDER=IAVE Beauty
 cd server
 npm start
 # Serves API on PORT
-# Also serves static frontend from client/dist if configured
+# Also serves the built frontend (client/dist) automatically when it exists
+# (SPA fallback included), so the UI + API share one origin.
 ```
+
+### Easy online option: Cloudflare Tunnel (own clinic PC)
+
+To put this system online with a stable URL at zero hosting cost, expose the
+machine it already runs on through a **Cloudflare named tunnel** (PM2 for the
+server + `cloudflared` as a Windows service). Full step-by-step kit (batch
+scripts + guide): `deploy/cloudflare-clinic/README.md`.
 
 ## Production Recommendations
 

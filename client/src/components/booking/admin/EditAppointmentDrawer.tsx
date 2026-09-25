@@ -43,6 +43,8 @@ export default function EditAppointmentDrawer({
   const [rescheduleReason, setRescheduleReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const TODAY = dayjs().format('YYYY-MM-DD');
+
   useEffect(() => {
     if (!appointment) return;
     setServiceId(appointment.service.id);
@@ -153,7 +155,16 @@ export default function EditAppointmentDrawer({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="sm:col-span-1">
             <label className="label">Date</label>
-            <input type="date" className="input-field" value={date} onChange={(e) => setDate(e.target.value)} />
+            <input
+              type="date"
+              className="input-field"
+              min={TODAY}
+              value={date}
+              onChange={(e) => {
+                const v = e.target.value;
+                setDate(v && v < TODAY ? TODAY : v);
+              }}
+            />
           </div>
           <div>
             <label className="label">Start</label>

@@ -9,7 +9,7 @@ export class TextBeeSMSProvider implements ISMSProvider {
 
   constructor() {
     this.apiKey = env.SMS_API_KEY;
-    this.deviceId = (env as any).TEXTBEE_DEVICE_ID || '';
+    this.deviceId = env.TEXTBEE_DEVICE_ID || '';
     this.sender = env.SMS_SENDER;
   }
 

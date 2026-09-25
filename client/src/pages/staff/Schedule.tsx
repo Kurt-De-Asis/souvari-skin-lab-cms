@@ -117,7 +117,9 @@ export default function Schedule() {
   const formatTime = (time: string) => dayjs(`2000-01-01 ${time}`).format('h:mm A');
 
   const openCreateFor = (date?: dayjs.Dayjs) => {
-    setCreateDate((date ?? dayjs()).format('YYYY-MM-DD'));
+    const today = dayjs();
+    const target = date && date.isBefore(today, 'day') ? today : (date ?? today);
+    setCreateDate(target.format('YYYY-MM-DD'));
     setCreatePrefill(staffId ? { staff_id: staffId, start_time: '' } : null);
     setCreateOpen(true);
   };

@@ -18,10 +18,13 @@ async function main() {
     select: { id: true, first_name: true, last_name: true, position: true },
   });
 
-  const aestheticians = staff.filter((s) => s.position === 'aesthetician');
-  const therapist = staff.find((s) => s.position === 'therapist');
-  const manager = staff.find((s) => s.position === 'manager');
-  const nurse = staff.find((s) => s.position === 'nurse');
+  const matches = (position: string, pattern: RegExp) => position && pattern.test(position);
+  const role = (pattern: RegExp) => staff.filter((s) => matches(s.position, pattern));
+
+  const aestheticians = role(/facialist|aesthetician|skin\s*_?\s*care/i);
+  const therapist = role(/therapist|nail_technician|nail\s*_?\s*tech/i);
+  const manager = role(/admin|manager/i);
+  const nurse = role(/nurse/i);
 
   const services = await prisma.services.findMany({
     where: { deleted_at: null, is_active: true },
@@ -41,17 +44,13 @@ async function main() {
     let assignees: number[] = [];
 
     if (isComplicatedService(svc)) {
-      assignees = nurse ? [nurse.id] : [];
+      assignees = nurse.map((s) => s.id);
     } else if (CONSULT_PATTERN.test(svc.name)) {
-      assignees = manager ? [manager.id] : [];
+      assignees = manager.map((s) => s.id);
     } else if (NAIL_SPA_PATTERN.test(svc.name)) {
-      assignees = [therapist?.id, ...aestheticians.slice(0, 2).map((s) => s.id)].filter(
-        (id): id is number => typeof id === 'number'
-      );
+      assignees = [...therapist.map((s) => s.id), ...aestheticians.slice(0, 2).map((s) => s.id)];
     } else {
-      assignees = [...aestheticians.map((s) => s.id), manager?.id].filter(
-        (id): id is number => typeof id === 'number'
-      );
+      assignees = [...aestheticians.map((s) => s.id), ...manager.map((s) => s.id)];
     }
 
     for (const staffId of assignees) {
@@ -69,7 +68,7 @@ async function main() {
   const total = await prisma.service_staff.count();
   console.log(`Total assignments now: ${total}`);
 
-  const nurseCount = data.filter((d) => d.staff_id === nurse?.id).length;
+  const nurseCount = data.filter((d) => d.staff_id === nurse[0]?.id).length;
   console.log(`Complicated services assigned to nurse only: ${nurseCount}`);
 
   const orphanServices = await prisma.services.count({

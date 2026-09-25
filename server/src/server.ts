@@ -3,8 +3,10 @@ import { env } from './config/env';
 import prisma from './config/database';
 import logger from './utils/logger';
 import { membershipService } from './modules/memberships/memberships.service';
+import { appointmentService } from './modules/appointments/appointments.service';
 
 const OVERDUE_CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
+const REMINDER_CHECK_INTERVAL_MS = 60 * 60 * 1000; // hourly
 
 async function runOverdueCheck() {
   try {
@@ -14,6 +16,20 @@ async function runOverdueCheck() {
     }
   } catch (error: any) {
     logger.error(`[MEMBERSHIP] Overdue check failed: ${error.message}`);
+  }
+}
+
+// Runs the daily appointment-reminder batch at the configured local hour.
+async function runReminderCheck() {
+  if (!env.REMINDERS_ENABLED) return;
+  if (new Date().getHours() !== env.REMINDER_RUN_HOUR) return;
+  try {
+    const { reminded, failed } = await appointmentService.processAppointmentReminders();
+    if (reminded > 0 || failed > 0) {
+      logger.info(`[REMINDER] Batch complete: ${reminded} reminded, ${failed} failed`);
+    }
+  } catch (error: any) {
+    logger.error(`[REMINDER] Batch failed: ${error.message}`);
   }
 }
 
@@ -28,6 +44,8 @@ async function main() {
       logger.info(`Frontend URL: ${env.FRONTEND_URL}`);
       void runOverdueCheck();
       setInterval(() => { void runOverdueCheck(); }, OVERDUE_CHECK_INTERVAL_MS);
+      void runReminderCheck();
+      setInterval(() => { void runReminderCheck(); }, REMINDER_CHECK_INTERVAL_MS);
     });
 
     // Keep process alive for the overdue scheduler even if the HTTP server errors.

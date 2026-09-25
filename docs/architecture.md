@@ -115,7 +115,8 @@ IAIProvider interface
 ```
 ISMSProvider interface
 ├── MockSMSProvider (development - logs to console)
-└── TwilioProvider (production - ready for integration)
+├── SemaphoreSMSProvider (production - Philippine SMS gateway)
+└── TextBeeSMSProvider (alternative - device gateway)
 ```
 
 ## Security

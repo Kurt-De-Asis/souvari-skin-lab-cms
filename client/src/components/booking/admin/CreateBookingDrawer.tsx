@@ -60,6 +60,9 @@ export default function CreateBookingDrawer({
 }: CreateBookingDrawerProps) {
   const [appointmentDate, setAppointmentDate] = useState(date);
 
+  const TODAY = dayjs().format('YYYY-MM-DD');
+  const safeDate = date && date < TODAY ? TODAY : date;
+
   const [customerQuery, setCustomerQuery] = useState('');
   const [customerResults, setCustomerResults] = useState<CustomerOption[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
@@ -97,7 +100,7 @@ export default function CreateBookingDrawer({
   // Reset whenever the drawer opens
   useEffect(() => {
     if (!open) return;
-    setAppointmentDate(date);
+    setAppointmentDate(safeDate);
     setCustomerQuery('');
     setCustomerResults([]);
     setSelectedCustomer(null);
@@ -376,9 +379,12 @@ export default function CreateBookingDrawer({
           <input
             type="date"
             className="input-field"
-            min={dayjs().format('YYYY-MM-DD')}
+            min={TODAY}
             value={appointmentDate}
-            onChange={(e) => setAppointmentDate(e.target.value)}
+            onChange={(e) => {
+              const v = e.target.value;
+              setAppointmentDate(v && v < TODAY ? TODAY : v);
+            }}
           />
         </div>
 

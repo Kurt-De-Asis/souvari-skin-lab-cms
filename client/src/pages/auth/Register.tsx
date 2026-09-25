@@ -44,9 +44,9 @@ export default function Register() {
     <div className="min-h-screen flex flex-col bg-neutral-50">
       {/* Simple top nav */}
       <div className="border-b border-neutral-800 bg-neutral-900">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center">
+        <div className="px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-center">
           <Link to="/" className="flex items-center">
-            <img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-14 w-auto object-contain" />
+            <img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-8 sm:h-9 w-auto object-contain" />
           </Link>
         </div>
       </div>

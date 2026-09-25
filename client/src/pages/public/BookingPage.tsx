@@ -81,14 +81,14 @@ const GROUPS: { key: string; label: string; description: string; categories: str
   },
   {
     key: 'injectables',
-    label: 'Injectables, Botox & IV Therapy',
-    description: 'Clinical injectables, vitamin infusions and wellness drips administered by professionals.',
+    label: 'Injectables & Botox',
+    description: 'Clinical botox, fillers and regenerative procedures administered by licensed physicians.',
     categories: ['injection'],
   },
   {
     key: 'consults_packages',
-    label: 'Consultations & Packages',
-    description: 'Start with a skin consultation, or commit to a multi-session results program.',
+    label: 'Session Packages',
+    description: 'Commit to a multi-session results program for skin, body and laser treatments.',
     categories: ['consultation', 'package'],
   },
   {

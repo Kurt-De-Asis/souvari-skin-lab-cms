@@ -11,6 +11,10 @@ export function peso(amount: number): string {
   return `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
+export function base(amount: number, source_ref?: string): PriceRowInput[] {
+  return [{ audience: 'non_member', amount, source_ref }];
+}
+
 export function vipNm(vip: number, nm: number, opts?: Partial<PriceRowInput>): PriceRowInput[] {
   return [
     { audience: 'vip', amount: vip, ...opts },

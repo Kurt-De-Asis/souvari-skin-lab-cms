@@ -225,7 +225,7 @@ Frontend (React) → REST API → Express Router → Controller → Service → 
 
 ### External Services
 - **AI**: OpenAI API with rule-based fallback when API key is unavailable
-- **SMS**: Mock provider (logs to console) — ready for Twilio integration
+- **SMS**: Mock provider (logs to console) — switch to Semaphore (`SMS_PROVIDER=semaphore`) or TextBee (`SMS_PROVIDER=textbee`)
 
 ---
 

@@ -1,4 +1,6 @@
 import express from 'express';
+import path from 'path';
+import fs from 'fs';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
@@ -83,6 +85,15 @@ app.use('/api/resources', resourcesRoutes);
 app.use('/api/service-addons', serviceAddonsRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/reviews', reviewsRoutes);
+
+// Serves the built React app (client/dist) so one process hosts UI + API.
+const clientDist = path.resolve(__dirname, '../../client/dist');
+if (fs.existsSync(path.join(clientDist, 'index.html'))) {
+  app.use(express.static(clientDist));
+  app.get(/^\/(?!api($|\/)).*/, (_req, res) => {
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+}
 
 // Error handling
 app.use(notFoundHandler);

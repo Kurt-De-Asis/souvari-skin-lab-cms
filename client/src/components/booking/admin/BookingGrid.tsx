@@ -76,6 +76,8 @@ export default function BookingGrid({
 
   const today = dayjs().format('YYYY-MM-DD');
   const isToday = date.format('YYYY-MM-DD') === today;
+  const isPast = date.format('YYYY-MM-DD') < today;
+  const canBook = !isPast;
 
   const [hoverSlot, setHoverSlot] = useState<{ staffId: number; minutes: number } | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
@@ -222,11 +224,11 @@ export default function BookingGrid({
                 return (
                   <div
                     key={c.staff.id}
-                    className={`relative flex-1 border-l border-neutral-200 ${c.off ? 'bg-neutral-50/70' : 'group cursor-pointer'}`}
+                    className={`relative flex-1 border-l border-neutral-200 ${c.off || !canBook ? 'bg-neutral-50/70' : 'group cursor-pointer'}`}
                     style={{ minWidth: COL_MIN_W, height: totalHeight }}
-                    onClick={c.off ? undefined : (e) => handleTrackClick(e, c.staff.id)}
-                    onMouseMove={c.off ? undefined : (e) => handleTrackMove(e, c.staff.id)}
-                    onMouseLeave={c.off ? undefined : handleTrackLeave}
+                    onClick={c.off || !canBook ? undefined : (e) => handleTrackClick(e, c.staff.id)}
+                    onMouseMove={c.off || !canBook ? undefined : (e) => handleTrackMove(e, c.staff.id)}
+                    onMouseLeave={c.off || !canBook ? undefined : handleTrackLeave}
                   >
                     {/* Horizontal gridlines */}
                     {gridlines.map((t) => (
@@ -238,7 +240,7 @@ export default function BookingGrid({
                     ))}
 
                     {/* Hover slot highlight */}
-                    {!c.off && hoverSlot?.staffId === c.staff.id && hoverSlot.minutes + 30 <= viewEnd && (
+                    {canBook && !c.off && hoverSlot?.staffId === c.staff.id && hoverSlot.minutes + 30 <= viewEnd && (
                       <div
                         className="absolute left-1 right-1 rounded-md bg-primary-500/10 border border-primary-400/50 pointer-events-none z-10 flex items-center justify-center"
                         style={{

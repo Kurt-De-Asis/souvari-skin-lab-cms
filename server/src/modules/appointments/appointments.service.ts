@@ -5,6 +5,7 @@ import { notificationDispatch } from '../../services/notification-dispatch.servi
 import posService from '../pos/pos.service';
 import { customerService } from '../customers/customers.service';
 import { getPaginationParams, createPaginatedResult, PaginatedResult } from '../../utils/pagination';
+import logger from '../../utils/logger';
 import {
   CreateAppointmentInput,
   CreateGroupAppointmentInput,
@@ -158,6 +159,14 @@ export class AppointmentService {
       );
     }
 
+    // Past-date gate: bookings must be for a current or future date.
+    if (data.appointment_date < this.localDateString()) {
+      throw new AppError(
+        'Cannot book an appointment in the past. Please choose a current or future date.',
+        422
+      );
+    }
+
     let endTime = data.end_time;
     if (!endTime) {
       const [hours, minutes] = data.start_time.split(':').map(Number);
@@ -266,6 +275,14 @@ export class AppointmentService {
     if (closedWeekdays.has(this.weekdayOf(data.appointment_date))) {
       throw new AppError(
         'The clinic is closed on this day. Please choose an operating day.',
+        422
+      );
+    }
+
+    // Past-date gate: bookings must be for a current or future date.
+    if (data.appointment_date < this.localDateString()) {
+      throw new AppError(
+        'Cannot book an appointment in the past. Please choose a current or future date.',
         422
       );
     }
@@ -468,6 +485,14 @@ export class AppointmentService {
       data.staff_id !== undefined;
 
     if (slotOrStaffChanged) {
+      // Past-date gate: only explicit date changes are checked, so notes/staff
+      // edits on existing (even past) appointments remain allowed.
+      if (data.appointment_date && data.appointment_date < this.localDateString()) {
+        throw new AppError(
+          'Cannot reschedule to a past date. Please choose a current or future date.',
+          422
+        );
+      }
       const effectiveDate = data.appointment_date ?? new Date(existing.appointment_date).toISOString().slice(0, 10);
       const effectiveStart = data.start_time ?? existing.start_time;
       const effectiveEnd = data.end_time ?? existing.end_time;
@@ -867,6 +892,78 @@ export class AppointmentService {
     };
   }
 
+  // Sends automatic appointment reminders for tomorrow's confirmed/pending
+  // appointments. Runs once daily (see server.ts scheduler). Each appointment
+  // is reminded at most once, guarded by the `reminder_sent` flag.
+  async processAppointmentReminders(): Promise<{ reminded: number; failed: number }> {
+    const tomorrow = this.localDateString(new Date(Date.now() + 24 * 60 * 60 * 1000));
+
+    const rows = await prisma.appointments.findMany({
+      where: {
+        appointment_date: new Date(tomorrow),
+        status: { in: ['confirmed', 'pending'] },
+        reminder_sent: false,
+        deleted_at: null,
+      },
+      include: {
+        customer: {
+          include: { user: { select: { id: true, phone: true } } },
+        },
+        service: { select: { name: true } },
+        services: { include: { service: { select: { name: true } } } },
+      },
+    });
+
+    let reminded = 0;
+    let failed = 0;
+
+    for (const appointment of rows) {
+      const customer = appointment.customer;
+      const phone = customer.user?.phone ?? null;
+
+      if (!customer.user) {
+        // No user account tied to the customer; mark as reminded to avoid retries.
+        await prisma.appointments.update({
+          where: { id: appointment.id },
+          data: { reminder_sent: true },
+        });
+        continue;
+      }
+
+      const serviceNames = (appointment.services?.length
+        ? appointment.services.map((s: any) => s.service.name).join(', ')
+        : appointment.service?.name) ?? '';
+
+      const [, month, day] = tomorrow.split('-');
+      const message =
+        `Hi ${customer.first_name}, this is a reminder from Souvari Skin Lab: your ${serviceNames} ` +
+        `appointment is on ${month}-${day} at ${appointment.start_time}. See you!`;
+
+      try {
+        await notificationDispatch.dispatch({
+          userId: customer.user.id,
+          type: 'appointment_reminder',
+          title: 'Appointment Reminder',
+          message,
+          data: { appointment_id: appointment.id },
+          sendSMS: true,
+          smsPhone: phone ?? undefined,
+        });
+        reminded += 1;
+      } catch (err: any) {
+        failed += 1;
+        logger.error(`[REMINDER] Failed for appointment ${appointment.id}: ${err.message}`);
+      }
+
+      await prisma.appointments.update({
+        where: { id: appointment.id },
+        data: { reminder_sent: true },
+      });
+    }
+
+    return { reminded, failed };
+  }
+
   // Validates the resulting appointment window for an update: the clinic must
   // be open, the assigned staff must be qualified for the service, and the
   // staff must have no conflicting (non-cancelled) appointment covering the
@@ -937,8 +1034,8 @@ private async validateUpdateWindow(
     return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
   }
 
-  private localDateString(): string {
-    const now = new Date();
+  private localDateString(date?: Date): string {
+    const now = date ?? new Date();
     const y = now.getFullYear();
     const m = String(now.getMonth() + 1).padStart(2, '0');
     const d = String(now.getDate()).padStart(2, '0');

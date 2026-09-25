@@ -298,7 +298,7 @@ server/src/modules/<feature>/
 | Pricing math (prices/variants matrix) | `server/src/services/pricing-engine.core.ts` (+ `.core.test.ts`) |
 | Pricing service wrapper | `server/src/services/pricing.service.ts` |
 | Notification dispatch (in-app/SMS routing) | `server/src/services/notification-dispatch.service.ts` |
-| SMS layer + mock/textbee providers | `server/src/services/sms.service.ts`, `mock-sms.provider.ts`, `textbee-sms.provider.ts` |
+| SMS layer + mock/semaphore/textbee providers | `server/src/services/sms.service.ts`, `mock-sms.provider.ts`, `semaphore-sms.provider.ts`, `textbee-sms.provider.ts` |
 | JWT helpers | `server/src/utils/jwt.ts` |
 | Password hashing | `server/src/utils/password.ts` |
 | Pagination helpers | `server/src/utils/pagination.ts` |

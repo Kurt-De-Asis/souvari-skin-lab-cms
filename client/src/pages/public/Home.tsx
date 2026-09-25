@@ -32,21 +32,21 @@ const STATS = [
 
 const FEATURED = [
   {
-    serviceId: 251,
+    serviceId: 13,
     image: '/images/facial-services.webp',
     alt: 'Signature facial at Souvari Skin Lab',
     eyebrow: 'Signature facials',
     flip: false,
   },
   {
-    serviceId: 12,
+    serviceId: 344,
     image: '/images/doctor-procedures.webp',
     alt: 'Advanced treatment procedures at Souvari Skin Lab',
     eyebrow: 'Medical aesthetic care',
     flip: true,
   },
   {
-    serviceId: 402,
+    serviceId: 290,
     image: '/images/permanent-makeup.webp',
     alt: 'Permanent makeup artistry at Souvari Skin Lab',
     eyebrow: 'Permanent makeup',

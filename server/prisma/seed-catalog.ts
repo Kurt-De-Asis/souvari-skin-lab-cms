@@ -2,59 +2,45 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import { SectionDef, CatalogServiceInput } from './seed-data/types';
 
 import signatureFacials from './seed-data/catalog/signature-facials';
-import glowCombos from './seed-data/catalog/glow-combos';
 import bodyWhitening from './seed-data/catalog/body-whitening';
 import diodeLaser from './seed-data/catalog/diode-laser';
-import beautyEnhancers from './seed-data/catalog/beauty-enhancers';
-import hifu from './seed-data/catalog/hifu';
-import sessionPackages from './seed-data/catalog/session-packages';
-import skinTagRemoval from './seed-data/catalog/skin-tag-removal';
+import ultratightHifu from './seed-data/catalog/hifu';
+import radioFrequency from './seed-data/catalog/rf';
+import ultratight3 from './seed-data/catalog/ultratight-3';
+import rf7 from './seed-data/catalog/rf-7';
+import bodyWhitening7 from './seed-data/catalog/bw-7';
+import diode7 from './seed-data/catalog/diode-7';
 import nailsEssential from './seed-data/catalog/nails-essential';
 import nailsGel from './seed-data/catalog/nails-gel';
 import nailsExtensions from './seed-data/catalog/nails-extensions';
-import nailsArt from './seed-data/catalog/nails-art';
-import nailsCrystals from './seed-data/catalog/nails-crystals';
-import nailsPackages from './seed-data/catalog/nails-packages';
-import handSpa from './seed-data/catalog/hand-spa';
-import footSpa from './seed-data/catalog/foot-spa';
-import spaAddons from './seed-data/catalog/spa-addons';
+import footHandSpa from './seed-data/catalog/foot-hand-spa';
 import lashesBrows from './seed-data/catalog/lashes-brows';
 import permanentMakeup from './seed-data/catalog/permanent-makeup';
 import threading from './seed-data/catalog/threading';
 import hotWax from './seed-data/catalog/hot-wax';
-import advanceAestheticSolutions from './seed-data/catalog/advance-aesthetic-solutions';
-import premiumIvDrips from './seed-data/catalog/premium-iv-drips';
-import premiumIvAddons from './seed-data/catalog/premium-iv-addons';
-import consultation from './seed-data/catalog/consultation';
+import doctorsProcedures from './seed-data/catalog/doctors-procedures';
 
 const prisma = new PrismaClient();
 
 const allSections: SectionDef[] = [
   signatureFacials,
-  glowCombos,
   bodyWhitening,
   diodeLaser,
-  beautyEnhancers,
-  hifu,
-  sessionPackages,
-  skinTagRemoval,
+  ultratightHifu,
+  radioFrequency,
+  ultratight3,
+  rf7,
+  bodyWhitening7,
+  diode7,
   nailsEssential,
   nailsGel,
   nailsExtensions,
-  nailsArt,
-  nailsCrystals,
-  nailsPackages,
-  handSpa,
-  footSpa,
-  spaAddons,
+  footHandSpa,
   lashesBrows,
   permanentMakeup,
   threading,
   hotWax,
-  advanceAestheticSolutions,
-  premiumIvDrips,
-  premiumIvAddons,
-  consultation,
+  doctorsProcedures,
 ];
 
 async function seedGroups() {
@@ -172,20 +158,19 @@ external_id: svc.external_id ?? null,
 }
 
 async function retireOrphanedServices() {
-  console.log('Retiring orphaned group services (slug not in current catalog)...');
+  console.log('Retiring orphaned services (slug not in current catalog, incl. legacy)...');
   const currentSlugs = new Set(allSections.flatMap(s => s.services.map(svc => svc.slug)));
 
   const orphaned = await prisma.services.findMany({
     where: {
       is_active: true,
-      is_legacy: false,
-      group_id: { not: null },
+      OR: [{ group_id: { not: null } }, { is_legacy: true }],
     },
   });
 
   let retired = 0;
   for (const svc of orphaned) {
-    if (svc.slug && !currentSlugs.has(svc.slug)) {
+    if (!svc.slug || !currentSlugs.has(svc.slug)) {
       await prisma.services.update({
         where: { id: svc.id },
         data: { is_active: false, status: 'inactive' },
@@ -194,6 +179,24 @@ async function retireOrphanedServices() {
     }
   }
   console.log(`  ${retired} orphaned services retired.`);
+}
+
+async function retireOrphanedGroups() {
+  console.log('Sinking orphaned service groups (not in current catalog)...');
+  const currentGroupSlugs = new Set(allSections.map(s => s.slug));
+  const groups = await prisma.service_groups.findMany();
+
+  let sunk = 0;
+  for (const group of groups) {
+    if (!currentGroupSlugs.has(group.slug)) {
+      await prisma.service_groups.update({
+        where: { id: group.id },
+        data: { display_order: 999 },
+      });
+      sunk++;
+    }
+  }
+  console.log(`  ${sunk} orphaned groups sunk to bottom.`);
 }
 
 function getLegacyPrices(svc: CatalogServiceInput) {
@@ -215,6 +218,7 @@ async function main() {
   await seedGroups();
   await seedServices();
   await retireOrphanedServices();
+  await retireOrphanedGroups();
   console.log('=== Catalog Seed Complete ===');
 }
 

@@ -1,7 +1,7 @@
 import prisma from '../config/database';
 import { roundPeso } from './pricing-engine.core';
 
-interface PricingInput {
+export interface PricingInput {
   serviceId: number;
   membershipCode?: string;
   useMonthlyPerk?: boolean;
@@ -16,7 +16,7 @@ function isActiveMembership(membership: { end_date: Date }): boolean {
   return now <= end;
 }
 
-interface PricingResult {
+export interface PricingResult {
   basePrice: number;
   applicablePrice: number;
   priceType: 'regular' | 'vip' | 'non_member';

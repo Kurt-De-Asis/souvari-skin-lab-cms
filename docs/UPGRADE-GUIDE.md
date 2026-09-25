@@ -111,7 +111,7 @@ This runs, in order:
 | Seed step | What it does | Safe? |
 |-----------|--------------|-------|
 | base demo data | demo accounts/customers/products | ✅ upserts |
-| service catalog | the full ~240-service Souvari catalog, variants & packages | ✅ upserts |
+| service catalog | the full 260-service Souvari catalog (18 sections), base prices & packages | ✅ upserts |
 | memberships | the VIP membership plans & benefits | ✅ upserts |
 | loyalty | loyalty milestones & reward rules | ✅ deletes & rebuilds loyalty rules only |
 | employees | the **real staff** + their schedules (Owner, Gian Heart, Princess Ashly, Jocelyn, Jobelle, Rica May, Wendy Jane, Queenie Rose) | ⚠️ **deletes ALL existing staff first** |
@@ -213,6 +213,58 @@ cd ..
 | Old staff still appear | The employees step wipes them **then** recreates the team. If `npm run db:seed:all` failed before the employees step, re-run it (your backup is safe). |
 | Map still shows the old location | You're opening an outdated cached page. Press **Ctrl + F5**, or close and reopen the browser tab. |
 | Page looks broken / styles missing | You may still be running old code. Stop the system, update files (Step A2), restart, and `Ctrl + F5`. |
+
+---
+
+## Automated SMS & Appointment Reminders (optional)
+
+The system can send SMS to customers automatically (booking / status /
+reschedule notices) plus a **24-hour reminder** for appointments. For a
+capstone/teaching demo, the easiest Philippine option is **Semaphore**
+(semaphore.co) — a local SMS gateway with simple API-key setup and pay-per-text
+pricing (~₱0.56/text). No live SMS is sent while `SMS_PROVIDER=mock` (the
+default) — messages are only logged to the server console.
+
+### Turn on Semaphore SMS in `server\.env`
+
+1. Sign up at semaphore.co and top up a small amount of credits.
+2. From the Semaphore dashboard, copy your **API key**.
+3. (Optional but recommended) Register a **Sender Name** under Settings →
+   Sender Names — max **11 alphanumeric characters** (e.g. `SOUVARI`). The words
+   "TEST", "MESSAGE" and "SMS" are not allowed. If omitted, Semaphore uses your
+   registered default.
+4. In `server\.env`:
+   ```env
+   SMS_PROVIDER=semaphore
+   SMS_API_KEY=your_semaphore_api_key
+   SMS_SENDER=SOUVARI                # your approved Sender Name (max 11 chars)
+   ```
+5. Restart the server.
+
+> Notes: Semaphore only delivers to **Philippine numbers** (09…). Messages
+> longer than 160 characters are split automatically. Sending is throttled to
+> 120 API calls/minute.
+
+### Alternate: TextBee
+
+If you prefer a phone-as-gateway provider instead of Semaphore, set
+`SMS_PROVIDER=textbee` with your TextBee **API key** (in `SMS_API_KEY`) and
+**device ID** (in `TEXTBEE_DEVICE_ID`). TextBee sends from an installed device,
+so there is no Sender Name registration or per-message credit purchase.
+
+### Appointment reminders
+
+The server automatically sends a reminder SMS **(and an in-app notification)**
+to each **confirmed or pending** appointment **24 hours before** it, once per
+day at 8 AM server time. Control it in `server\.env`:
+
+```env
+REMINDERS_ENABLED=true    # false to turn off
+REMINDER_RUN_HOUR=8       # local hour (0-23) the daily batch runs
+```
+
+No database migration is needed — the `reminder_sent` flag already exists in
+`appointments`.
 
 ---
 

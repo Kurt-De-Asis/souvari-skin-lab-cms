@@ -113,6 +113,10 @@ class AiService {
 
   private static readonly NAIL_PATTERN = /manicure|pedicure|\bnail(s)?\b|nail art|extension|mermaid|\b3d\b|gel/;
 
+  private static readonly NEW_CLIENT_TRIGGERS = [
+    'first time', 'new client', 'new to souvari', 'never been', 'first visit', 'new here', 'first appointment',
+  ];
+
   /** Is this message about the clinic / its services? */
   private isClinicRelated(message: string, services: Array<{ name: string; category: string }>): boolean {
     const lower = message.toLowerCase();
@@ -477,6 +481,16 @@ STRICT TOPIC RULE:
 - For ANY question that is not about this clinic or its services (for example politics, sports, current events, recipes, programming, or any unrelated topic), respond ONLY with: "${this.OFF_TOPIC_REPLY}"
 - Do not engage with, elaborate on, or answer off-topic questions under any circumstances.
 
+RESPONSE GUIDELINES:
+- Be concise. Aim for at most 3-4 short sentences per answer. When listing services, give at most 3 options, each with a one-line reason.
+- NEVER dump the full service menu or the full price list.
+- CLARIFY FIRST, BUT ONLY ONCE: If the user asks a broad service, recommendation, or pricing question (such as "what services do you have", "recommend something", "what should I get", or "prices") WITHOUT naming a skin concern, a specific area, or a specific treatment, do NOT answer with a list yet. Ask ONE short question to understand their need — e.g. their main skin concern/goal and whether it is for their face or body.
+- After the user answers, respond with 2-3 targeted services and a one-line reason for each, then invite them to ask about any of them.
+- If the follow-up answer is still vague, do NOT ask again. Give a brief fallback: the top 3 best-selling services, or the FREE "Consultation First (Recommended for New Clients)".
+- For new clients, always mention the FREE "Consultation First (Recommended for New Clients)".
+- Example — User: "recommend something for me" -> You: "I would love to help! Could you tell me your main skin concern or goal (e.g. acne, dark spots, wrinkles, dryness, whitening) and whether it is for your face or body?"
+- Example — User: "I have acne" -> You: "For acne and breakouts, our top picks are: 1) Acne Clear — deep-cleansing with extraction; 2) Carbon Laser — targets breakouts and oil; 3) Dermapen — helps with acne marks. Want more details on any of these?"
+
 You should be friendly, professional, and helpful while staying within these boundaries.`;
     return this.systemPrompt;
   }
@@ -587,7 +601,7 @@ You should be friendly, professional, and helpful while staying within these bou
         { role: 'system', content: systemPrompt },
         ...history,
       ],
-      max_tokens: 500,
+      max_tokens: 300,
       temperature: 0.7,
     });
 
@@ -665,7 +679,8 @@ You should be friendly, professional, and helpful while staying within these bou
   }
 
   /** Group a service list by category with readable headers. */
-  private formatServicesByCategory(services: any[]): string {
+  /** Group a service list by category with readable headers. */
+  private formatServicesByCategory(services: any[], capPerCategory = 4): string {
     const byCat = new Map<string, any[]>();
     for (const s of services) {
       const key = (s.category || 'other').replace(/_/g, ' ');
@@ -674,7 +689,12 @@ You should be friendly, professional, and helpful while staying within these bou
     }
     return [...byCat.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([cat, list]) => `[${cat.charAt(0).toUpperCase()}${cat.slice(1)}]\n${list.map((s) => this.formatServiceLine(s)).join('\n')}`)
+      .map(([cat, list]) => {
+        const header = `[${cat.charAt(0).toUpperCase()}${cat.slice(1)}]`;
+        const shown = list.slice(0, capPerCategory).map((s) => this.formatServiceLine(s)).join('\n');
+        const more = list.length > capPerCategory ? `\n… and ${list.length - capPerCategory} more — tell me which interests you.` : '';
+        return `${header}\n${shown}${more}`;
+      })
       .join('\n');
   }
 
@@ -684,6 +704,34 @@ You should be friendly, professional, and helpful while staying within these bou
       .map((s) => s.category)
       .filter((cat) => cat.length >= 3)
       .find((cat) => lowerMessage.includes(cat.toLowerCase().replace(/_/g, ' ')));
+  }
+
+  /** True when the request already pinpoints a concern, category, service, or direct need (no probing needed). */
+  private hasSpecificNeed(lowerMessage: string, services: Array<{ name: string; category: string }>): boolean {
+    if (AiService.NEW_CLIENT_TRIGGERS.some((t) => lowerMessage.includes(t))) return true;
+    if (this.mentionedCategory(lowerMessage, services)) return true;
+    if (this.findServiceByMessage(lowerMessage, services)) return true;
+    const msgTokens = this.tokenize(lowerMessage);
+    return AiService.SKIN_CONCERNS.some((group) => this.concernHits(lowerMessage, msgTokens, group).length > 0);
+  }
+
+  /** One-round clarification probe used before recommending / listing when the request is too vague. */
+  private clarifyResponse(kind: 'recommend' | 'services' | 'pricing'): string {
+    const categories =
+      'We cover facials, laser and skin rejuvenation, hair removal, body treatments, injectables, consultations, and nail/spa care.';
+    const concern =
+      'Could you tell me your main skin concern or goal — for example acne, dark spots, wrinkles, dryness, or whitening — and whether it is for your face or body?';
+    const free =
+      'You can also start with our FREE "Consultation First (Recommended for New Clients)" and our professionals will build the right plan for you.';
+    switch (kind) {
+      case 'recommend':
+        return `I would love to recommend the right treatment for you. ${concern}\n\n${free}`;
+      case 'pricing':
+        return `${categories}\n\nWhich service or category would you like pricing for?`;
+      case 'services':
+      default:
+        return `${categories}\n\n${concern} Or you can just name a category and I will show you its top services.\n\n${free}`;
+    }
   }
 
   private async ruleBasedResponse(message: string): Promise<string> {
@@ -723,20 +771,19 @@ You should be friendly, professional, and helpful while staying within these bou
       lowerMessage.includes('top service') ||
       lowerMessage.includes('most booked')
     ) {
-      const popular = await this.getPopularServices(5);
+      const popular = await this.getPopularServices(3);
       if (popular.length === 0) {
-        return `We don't have booking data available yet, but some of our most loved treatments include:\n${services.slice(0, 5).map((s) => this.formatServiceLine(s)).join('\n')}\n\nPlease consult with our clinic professionals for personalized advice.`;
+        return `We don't have booking data yet. Our most-loved treatments include:\n${services.slice(0, 3).map((s) => this.formatServiceLine(s)).join('\n')}\n\nWant details on any of these? Please consult with our clinic professionals for personalized advice.`;
       }
       const lines = popular.map((s, i) => {
         const desc = s.description ? ` — ${s.description.trim()}` : '';
         return `${i + 1}. ${s.name} (${s.duration_minutes} min, ${this.formatPrice(s.price)})${desc}`;
       });
-      return `Here are our best-selling services based on most-booked treatments:\n\n${lines.join('\n')}\n\nThese are our clients' most trusted treatments. Please consult with our clinic professionals for personalized advice.`;
+      return `Our best-selling treatments:\n\n${lines.join('\n')}\n\nWant more details on any? Please consult with our clinic professionals for personalized advice.`;
     }
 
     // --- New clients: free consultation nudge ---
-    const newClientTriggers = ['first time', 'new client', 'new to souvari', 'never been', 'first visit', 'new here', 'first appointment'];
-    if (newClientTriggers.some((t) => lowerMessage.includes(t))) {
+    if (AiService.NEW_CLIENT_TRIGGERS.some((t) => lowerMessage.includes(t))) {
       return `If you're new to Souvari Skin Lab, we recommend starting with a free Consultation First (recommended for new clients). Our professionals will assess your skin and build a personalized treatment plan before you commit to any service.\n\nWould you like to see our best-selling treatments, or would you prefer to book the consultation?\n\nPlease consult with our clinic professionals for personalized advice.`;
     }
 
@@ -754,13 +801,17 @@ You should be friendly, professional, and helpful while staying within these bou
       !pineBlockWords.some((w) => lowerMessage.includes(w));
 
     if (isRecommendation) {
+      if (!this.hasSpecificNeed(lowerMessage, services)) {
+        return this.clarifyResponse('recommend');
+      }
       const recommended = this.recommend(lowerMessage, services);
       if (recommended.length === 0) {
-        return `Based on what we offer, I'd recommend booking a free Consultation First (recommended for new clients) so our professionals can create a personalized plan for you. We'll match you with the right treatment.\n\nPlease consult with our clinic professionals for personalized advice.`;
+        return `Based on what we offer, I'd recommend booking our FREE "Consultation First (Recommended for New Clients)" so our professionals can create a personalized plan for you.\n\nPlease consult with our clinic professionals for personalized advice.`;
       }
-      return `I'd be happy to recommend a treatment just for you! Based on your needs, here are my top recommendations:\n\n${recommended
+      return `Here are my top recommendations for you:\n\n${recommended
+        .slice(0, 3)
         .map((r) => `- ${r.service.name} (${this.formatPrice(r.service.price)}, ${r.service.duration_minutes} min) ${r.reasons[0] ? `— ${r.reasons[0]}` : ''}`)
-        .join('\n')}\n\nFor the most accurate recommendation, please consult with our clinic professionals for personalized advice.`;
+        .join('\n')}\n\nWant details on any of these? Please consult with our clinic professionals for personalized advice.`;
     }
 
     // --- Clinic hours ---
@@ -798,13 +849,14 @@ You should be friendly, professional, and helpful while staying within these bou
         return `The price for ${priceSvc.service.name} is ${this.formatPrice(priceSvc.service.price)} (${priceSvc.service.duration_minutes} min).\n\nPlease consult with our clinic professionals for personalized advice.`;
       }
       const category = this.mentionedCategory(lowerMessage, services);
-      const filtered = category ? services.filter((s) => s.category === category) : services;
-      const scope = category ? `${category} services` : 'services';
-      if (filtered.length === 0) {
-        return `I don't have pricing information for that yet. Please contact the clinic directly.\n\nPlease consult with our clinic professionals for personalized advice.`;
+      if (category) {
+        const filtered = services.filter((s) => s.category === category);
+        if (filtered.length === 0) {
+          return `I don't have pricing information for that yet. Please contact the clinic directly.\n\nPlease consult with our clinic professionals for personalized advice.`;
+        }
+        return `Here's pricing for ${category} services:\n${this.formatServicesByCategory(filtered)}\n\nPlease consult with our clinic professionals for personalized advice.`;
       }
-      const listed = category ? filtered.map((s) => this.formatServiceLine(s)).join('\n') : this.formatServicesByCategory(services);
-      return `Our ${scope} pricing:\n${listed}\n\nPlease consult with our clinic professionals for personalized advice.`;
+      return this.clarifyResponse('pricing');
     }
 
     // --- Contact / location ---
@@ -824,15 +876,23 @@ You should be friendly, professional, and helpful while staying within these bou
         return "Please contact the clinic directly to learn about our services.\n\nPlease consult with our clinic professionals for personalized advice.";
       }
       const category = this.mentionedCategory(lowerMessage, services);
-      const filtered = category ? services.filter((s) => s.category === category) : services;
-      const scope = category ? `${category} services` : 'services';
-      if (filtered.length === 0) {
-        return `We currently don't offer that service. Please contact the clinic directly to learn more.\n\nPlease consult with our clinic professionals for personalized advice.`;
+      if (category) {
+        const filtered = services.filter((s) => s.category === category);
+        if (filtered.length === 0) {
+          return `We currently don't offer that service. Please contact the clinic directly to learn more.\n\nPlease consult with our clinic professionals for personalized advice.`;
+        }
+        return `Here are our ${category} services:\n${this.formatServicesByCategory(filtered)}\n\nPlease consult with our clinic professionals for personalized advice.`;
       }
-      const listed = category
-        ? filtered.map((s) => `${this.formatServiceLine(s)} (${s.category.replace(/_/g, ' ')})`).join('\n')
-        : this.formatServicesByCategory(services);
-      return `We offer the following ${scope}:\n${listed}\n\nPlease consult with our clinic professionals for personalized advice.`;
+      if (this.hasSpecificNeed(lowerMessage, services)) {
+        const recommended = this.recommend(lowerMessage, services);
+        if (recommended.length > 0) {
+          return `Based on what you described, here are my top picks:\n\n${recommended
+            .slice(0, 3)
+            .map((r) => `- ${r.service.name} (${this.formatPrice(r.service.price)}, ${r.service.duration_minutes} min) ${r.reasons[0] ? `— ${r.reasons[0]}` : ''}`)
+            .join('\n')}\n\nWant details on any of these? Please consult with our clinic professionals for personalized advice.`;
+        }
+      }
+      return this.clarifyResponse('services');
     }
 
     return this.HELP_REPLY;

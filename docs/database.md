@@ -4,51 +4,46 @@
 
 The database uses MySQL 8.0 with InnoDB engine and utf8mb4 character set. It contains 26 tables and 6 analytics views.
 
-The service catalog is seed-managed from `server/prisma/seed-catalog.ts`. It defines 24 sections (groups), each with its own slug and sorted by `display_order`:
+The service catalog is seed-managed from `server/prisma/seed-catalog.ts`. It defines 18 sections (groups) mirroring `SOUVARI_UPDATED_PRICELIST_README.md` (the single source of truth), each with its own slug and sorted by `display_order`:
 
 | Section | Display Order | Pricing Model |
 |---------|--------------|----------------|
-| signature-facials | 1 | vipNm |
-| glow-combos | 2 | vipNm |
-| body-whitening | 3 | vipNm |
-| diode-laser | 4 | vipNm |
-| beauty-enhancers | 5 | vipNm |
-| hifu | 6 | vipNm |
-| session-packages | 7 | vipNm + service_packages |
-| skin-tag-removal | 8 | vipNm (variants for size) |
-| nails-essential | 9 | vipNm |
-| nails-gel | 10 | vipNm |
-| nails-extensions | 11 | vipNm |
-| nails-art | 12 | nailArtPrices (variants) |
-| nails-crystals | 13 | crystalPrices |
-| nails-packages | 14 | vipNm + packages |
-| hand-spa | 15 | vipNm |
-| foot-spa | 16 | vipNm |
-| spa-addons | 17 | vipNm |
-| lashes-brows | 18 | lashTiers (senior/guru staff tiers) |
-| permanent-makeup | 19 | vipNmRegular (3-tier) |
-| threading | 21 | vipNm |
-| hot-wax | 22 | waxVipNm4 (female/male split) |
-| advance-aesthetic-solutions | 23 | retail (non_member only) |
-| premium-iv-drips | 24 | retail |
-| premium-iv-addons | 25 | retail |
+| FACIALS (`signature-facials`) | 1 | base (non_member = README price) |
+| CARBON LASER BODY WHITENING (`body-whitening`) | 2 | base |
+| DIODE LASER HAIR REMOVAL (`diode-laser`) | 3 | base |
+| UltraTight® HIFU (`ultratight-hifu`) | 4 | base |
+| Radio Frequency (RF) (`radio-frequency`) | 5 | base |
+| 3 Session Series · UltraTight® (`ultratight-3`) | 6 | base + service_packages |
+| 7 Session Series · RF (`rf-7-sessions`) | 7 | base + service_packages |
+| 7 Session Series Body Whitening (`body-whitening-7`) | 8 | base + service_packages |
+| 7 Session Series DIODE (`diode-7-sessions`) | 9 | base + service_packages |
+| ESSENTIAL NAIL CARE (`nail-essential`) | 10 | base |
+| GEL POLISH PREMIER (`nail-gel`) | 11 | base |
+| NAIL EXTENSIONS AND SPECIALIZED (`nail-extensions`) | 12 | base |
+| FOOT SPA AND HAND SPA (`foot-hand-spa`) | 13 | base |
+| EYELASH EXTENSIONS (`lashes-brows`) | 14 | base |
+| PERMANENT MAKE UP (`permanent-makeup`) | 15 | base |
+| THREADING (`threading`) | 16 | base |
+| HOT WAX HAIR REMOVAL (`hot-wax`) | 17 | base |
+| DOCTORS PROCEDURES (`doctors-procedures`) | 18 | base (non-bookable) |
 
 ### Pricing Model
 
-- **Audiences**: `vip` (SOUVARI member), `non_member` (regular customer without membership), `regular` (used for PMU/staff-tier pricing on permanent-makeup section).
-- **Resolution order** (server/src/services/pricing.service.ts): VIP → exact match → gender → staff tier → no_variant → regular_fallback; Non-member → exact → gender → staff → no_variant → null (no regular fallback). Legacy services fall back to `vip_price`/`non_member_price`/`price` columns.
-- **SOURCE B retail-only** services (sections 23-25): single `non_member` price row. VIP members fall back to the backfilled `vip_price`/`non_member_price` legacy columns.
+- **Base / standard pricing**: every catalog service stores a single base price (`non_member_price` = `price` = the README standard/base amount). `vip_price` is `NULL`, so member discounts are applied separately at pricing time from the membership plan configuration (`pricing-engine.core.ts`), never baked into the base price.
+- **Resolution order** (server/src/services/pricing.service.ts): VIP → exact match → gender → staff tier → no_variant → regular_fallback; Non-member → exact → gender → staff → no_variant → null (no regular fallback). With `vip_price = null`, members resolve via their plan's `discount_pct`; non-members use `non_member_price`.
 - **Membership expiry**: an active-VIP pricing lookup is only honored while `end_date` >= today (end-of-day). Expired memberships resolve to non_member pricing.
 - **History is preserved**: quotes, transaction unit prices, and line totals are never rewritten. Only the new `price_type` column on appointments/transaction_items is backfilled from membership status at the time.
 
 ### Retire-not-delete
 
-Placeholder services removed during the catalog rollout are **retired**, not deleted: `is_active=false`, `status='inactive'`. Their `service_staff` rows (1,189) and historical appointments remain intact so past records keep referencing real services. `retireOrphanedServices()` in `seed-catalog.ts` only retires services that belong to a seeded group and whose slug is no longer in the catalog; standalone legacy services (e.g. Acne Treatment) are left active.
+Services removed from the catalog are **retired**, not deleted: `is_active=false`, `status='inactive'`. Their `service_staff` rows and historical appointments/transactions remain intact so past records keep referencing real services. `retireOrphanedServices()` in `seed-catalog.ts` retires every active service whose slug is no longer in the catalog — including legacy demo services from `seed.ts` (which have no slug) and any admin/temp services — so the active catalog contains **exactly** the README services.
 
 ### Seed Workflow
 
 ```bash
-npm run db:seed:catalog          # groups, services, variants, prices, packages
+npm run db:seed:catalog          # groups, services, base prices, packages (upsert + retire)
+npm run db:verify:catalog        # assert DB active catalog == seed catalog (18 sections / 260 services)
+npm run db:seed:service-staff    # rebuild service↔staff assignments
 npm run db:seed:memberships      # membership plans + sample members
 npx vitest run                   # pricing engine + helper regression tests
 ```

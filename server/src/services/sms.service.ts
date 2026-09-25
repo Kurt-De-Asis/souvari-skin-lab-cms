@@ -18,7 +18,10 @@ let cachedProvider: ISMSProvider | null = null;
 export function getSMSProvider(): ISMSProvider {
   if (cachedProvider) return cachedProvider;
 
-  if (env.SMS_PROVIDER === 'textbee' && env.SMS_API_KEY && env.TEXTBEE_DEVICE_ID) {
+  if (env.SMS_PROVIDER === 'semaphore' && env.SMS_API_KEY) {
+    const { SemaphoreSMSProvider } = require('./semaphore-sms.provider');
+    cachedProvider = new SemaphoreSMSProvider();
+  } else if (env.SMS_PROVIDER === 'textbee' && env.SMS_API_KEY && env.TEXTBEE_DEVICE_ID) {
     const { TextBeeSMSProvider } = require('./textbee-sms.provider');
     cachedProvider = new TextBeeSMSProvider();
   } else {

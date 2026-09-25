@@ -10,6 +10,7 @@
     "db:generate": "npx prisma generate",
     "db:seed": "npx prisma db seed",
     "db:seed:catalog": "ts-node --project tsconfig.seed.json prisma/seed-catalog.ts",
+    "db:verify:catalog": "ts-node --project tsconfig.seed.json prisma/verify-catalog.ts",
     "db:seed:memberships": "ts-node --project tsconfig.seed.json prisma/seed-memberships.ts",
     "db:seed:loyalty": "ts-node --project tsconfig.seed.json prisma/seed-loyalty.ts",
     "db:seed:all": "npx prisma db seed && ts-node --project tsconfig.seed.json prisma/seed-catalog.ts && ts-node --project tsconfig.seed.json prisma/seed-memberships.ts && ts-node --project tsconfig.seed.json prisma/seed-loyalty.ts && ts-node --project tsconfig.seed.json prisma/seed-employees.ts && ts-node --project tsconfig.seed.json prisma/seed-service-staff.ts",

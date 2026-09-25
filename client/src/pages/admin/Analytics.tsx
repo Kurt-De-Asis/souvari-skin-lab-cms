@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Activity, CalendarCheck, DollarSign, Package, ShoppingBag, SlidersHorizontal,
-  Sparkles, TrendingUp, UserCheck, UserPlus, Users,
+  Activity, CalendarCheck, ClipboardList, DollarSign, Package, ShoppingBag, SlidersHorizontal,
+  Sparkles, TrendingUp, UserCheck, UserPlus, Users, FileText, Sheet,
 } from 'lucide-react';
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement,
   Title, Tooltip, Legend, Filler,
 } from 'chart.js';
-import { Line, Doughnut } from 'react-chartjs-2';
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import dayjs from 'dayjs';
 import { analyticsApi } from '@/api';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -17,6 +17,12 @@ import ChartCard from '@/components/analytics/ChartCard';
 import DeltaBadge from '@/components/analytics/DeltaBadge';
 import StaffPerformanceTable, { StaffPerformanceRow } from '@/components/analytics/StaffPerformanceTable';
 import { formatCurrency, formatNumber, formatMinutesHours, formatPercent, percentChange } from '@/utils/format';
+import {
+  exportAnalyticsPdf,
+  exportAnalyticsExcel,
+  captureChartImages,
+  type AnalyticsReportData,
+} from '@/utils/analyticsReport';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Title, Tooltip, Legend, Filler);
 
@@ -41,7 +47,10 @@ interface StatusData {
 
 interface ServiceData {
   name: string;
+  category: string;
+  price: number;
   appointment_count: number;
+  total_revenue: number;
 }
 
 interface InventorySummary {
@@ -298,7 +307,107 @@ export default function Analytics() {
     plugins: { legend: { position: 'bottom' as const, labels: { padding: 10, usePointStyle: true, font: { size: 11 } } } },
   };
 
+  const categoryTotals = serviceData.reduce<Record<string, number>>((acc, s) => {
+    const key = s.category.replace(/_/g, ' ');
+    acc[key] = (acc[key] || 0) + Number(s.total_revenue || 0);
+    return acc;
+  }, {});
+  const categoryRevenue = Object.entries(categoryTotals)
+    .map(([category, revenue]) => ({ category, revenue }))
+    .sort((a, b) => b.revenue - a.revenue);
+
+  const statusBarData = {
+    labels: statusData.map((s) => STATUS_META[s.status]?.label || s.status),
+    datasets: [
+      {
+        label: 'Bookings',
+        data: statusData.map((s) => s.count),
+        backgroundColor: statusData.map((s) => STATUS_META[s.status]?.color || '#a3a3a3'),
+        borderRadius: 4,
+      },
+    ],
+  };
+
+  const statusBarOptions = {
+    indexAxis: 'y' as const,
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { beginAtZero: true, grid: { display: false }, ticks: { font: { size: 11 } } },
+      y: { grid: { display: false }, ticks: { font: { size: 11 } } },
+    },
+  };
+
+  const categoryBarData = {
+    labels: categoryRevenue.map((c) => c.category),
+    datasets: [
+      {
+        label: 'Revenue',
+        data: categoryRevenue.map((c) => c.revenue),
+        backgroundColor: '#bb8875',
+        borderRadius: 4,
+      },
+    ],
+  };
+
+  const categoryBarOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+      y: { beginAtZero: true, grid: { display: false }, ticks: { font: { size: 11 } } },
+    },
+  };
+
   const statusTotal = statusData.reduce((s, d) => s + d.count, 0);
+
+  const buildReport = (): AnalyticsReportData => {
+    const kpis = [
+      { label: 'Total Revenue', value: formatCurrency(revenueTotal) },
+      { label: 'Transactions', value: formatNumber(summary?.transaction_count ?? 0) },
+      { label: 'Average Sale', value: formatCurrency(avgSale) },
+      { label: 'Appointments', value: formatNumber(appointmentTotal) },
+      { label: 'Occupancy Rate', value: formatPercent(occupancyRate) },
+      { label: 'Returning Patient Rate', value: formatPercent(returningRate) },
+      { label: 'New Patients', value: formatNumber(summary?.patients.new_patients ?? 0) },
+      { label: 'Returning Patients', value: formatNumber(summary?.patients.returning_patients ?? 0) },
+      ...(summary?.occupancy
+        ? [
+            { label: 'Working Time', value: formatMinutesHours(summary.occupancy.working_minutes) },
+            { label: 'Booked Time', value: formatMinutesHours(summary.occupancy.booked_minutes) },
+            { label: 'Unbooked Time', value: formatMinutesHours(summary.occupancy.unbooked_minutes) },
+          ]
+        : []),
+    ];
+    return {
+      dateFrom,
+      dateTo,
+      compare: compare === 'previous_period',
+      kpis,
+      revenue: revenueData,
+      prevRevenueByDate: Object.fromEntries(prevByDate),
+      appointments: appointmentData,
+      status: statusData,
+      categories: categoryRevenue,
+      services: serviceData as AnalyticsReportData['services'],
+      staff: (summary?.staff ?? []) as AnalyticsReportData['staff'],
+      inventory: inventorySummary,
+      occupancy: summary?.occupancy ?? null,
+    };
+  };
+
+  const handleExportPdf = () => {
+    const images = captureChartImages(['revenue', 'appointments', 'status', 'categories', 'top-services', 'occupancy']);
+    exportAnalyticsPdf(buildReport(), images);
+  };
+
+  const handleExportExcel = () => {
+    exportAnalyticsExcel(buildReport());
+  };
+
+  const hasData = revenueData.length > 0 || appointmentData.length > 0 || serviceData.length > 0;
 
   return (
     <div className="space-y-6">
@@ -349,6 +458,29 @@ export default function Analytics() {
           >
             <SlidersHorizontal size={16} />
             Filters
+          </button>
+
+          <div className="w-px h-6 bg-neutral-200 hidden sm:block" />
+
+          <button
+            onClick={handleExportPdf}
+            disabled={loading || !hasData}
+            className="btn-secondary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            type="button"
+            title="Download analytics report as PDF"
+          >
+            <FileText size={16} />
+            Export PDF
+          </button>
+          <button
+            onClick={handleExportExcel}
+            disabled={loading || !hasData}
+            className="btn-secondary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            type="button"
+            title="Download analytics report as Excel"
+          >
+            <Sheet size={16} />
+            Export Excel
           </button>
         </div>
 
@@ -421,7 +553,7 @@ export default function Analytics() {
 
             <div className="xl:col-span-2">
               <ChartCard icon={TrendingUp} title="Revenue Over Time" subtitle="Grouped by day">
-                <div className="h-72">
+                <div className="h-72" data-chart="revenue">
                   {revenueData.length > 0 ? (
                     <Line data={revenueLineData} options={lineOptions as any} />
                   ) : (
@@ -464,7 +596,7 @@ export default function Analytics() {
                   ) : null
                 }
               >
-                <div className="h-72">
+                <div className="h-72" data-chart="appointments">
                   {appointmentData.length > 0 ? (
                     <Line data={appointmentLineData} options={lineOptions as any} />
                   ) : (
@@ -510,6 +642,29 @@ export default function Analytics() {
             </div>
           </div>
 
+          {/* Bookings by status + revenue by category */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <ChartCard icon={ClipboardList} title="Bookings by Status" subtitle="Breakdown of appointment statuses">
+              <div className="h-72" data-chart="status">
+                {statusData.some((s) => s.count > 0) ? (
+                  <div className="flex items-center justify-center h-full text-sm text-neutral-400">No status data for this period</div>
+                ) : (
+                  <Bar data={statusBarData} options={statusBarOptions as any} />
+                )}
+              </div>
+            </ChartCard>
+
+            <ChartCard icon={TrendingUp} title="Revenue by Service Category" subtitle="Revenue contribution per category">
+              <div className="h-72" data-chart="categories">
+                {categoryRevenue.length > 0 ? (
+                  <Bar data={categoryBarData} options={categoryBarOptions as any} />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-sm text-neutral-400">No revenue data for this period</div>
+                )}
+              </div>
+            </ChartCard>
+          </div>
+
           {/* Occupancy + top services */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div className="xl:col-span-2">
@@ -533,7 +688,7 @@ export default function Analytics() {
                     <p className="text-lg font-semibold text-neutral-900 mt-0.5">{formatMinutesHours(summary?.occupancy.unbooked_minutes ?? 0)}</p>
                   </div>
                 </div>
-                <div className="h-56">
+                <div className="h-56" data-chart="occupancy">
                   {occupancySeries.length > 0 ? (
                     <Line data={occupancyLineData} options={occupancyOptions as any} />
                   ) : (
@@ -545,7 +700,7 @@ export default function Analytics() {
 
             <div>
               <ChartCard icon={Sparkles} title="Top Services" subtitle="By appointment count">
-                <div className="h-72">
+                <div className="h-72" data-chart="top-services">
                   {serviceData.length > 0 ? (
                     <Doughnut data={doughnutData} options={doughnutOptions} />
                   ) : (

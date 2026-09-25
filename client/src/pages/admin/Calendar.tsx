@@ -39,6 +39,7 @@ export default function Calendar() {
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
 
   const dateStr = currentDate.format('YYYY-MM-DD');
+  const isPastDay = dateStr < dayjs().format('YYYY-MM-DD');
 
   type Fetcher = (params: Record<string, string>) => Promise<{ data: any }>;
 
@@ -131,6 +132,7 @@ export default function Calendar() {
   };
 
   const openCreate = (prefill?: { staff_id: number; start_time: string } | null) => {
+    if (isPastDay) return;
     setCreatePrefill(prefill ?? null);
     setCreateOpen(true);
   };
@@ -210,7 +212,7 @@ export default function Calendar() {
           <h1 className="text-2xl font-sans font-semibold text-neutral-900">Calendar</h1>
           <p className="text-sm text-neutral-500 mt-1">Staff schedule &amp; appointment booking workspace</p>
         </div>
-        <button onClick={() => openCreate(null)} className="btn-primary">
+        <button onClick={() => openCreate(null)} disabled={isPastDay} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
           <Plus size={18} />
           New Appointment
         </button>
