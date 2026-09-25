@@ -1,0 +1,13 @@
+.git
+**/node_modules
+**/dist
+**/.env
+**/*.log
+**/*.tsbuildinfo
+coverage
+docs
+deploy
+souvari_full.sql
+*.sql.bak
+.DS_Store
+Thumbs.db

@@ -63,7 +63,17 @@ npm start
 # (SPA fallback included), so the UI + API share one origin.
 ```
 
-### Easy online option: Cloudflare Tunnel (own clinic PC)
+### Simplest online option: Deploy from GitHub on Railway (recommended)
+
+A root `Dockerfile` + `railway.toml` let Railway build the whole app (frontend +
+API + MySQL in one click) straight from the GitHub repo, with auto-deploy on
+every push. No own machine involved — ideal so the clinic PC doesn't need to
+stay on. Full step-by-step guide: `deploy/paas-github/README.md`.
+
+The container runs `prisma migrate deploy` on start, then serves both the API
+and the built SPA (`client/dist`) from one origin.
+
+### Alternative: Cloudflare Tunnel (own clinic PC)
 
 To put this system online with a stable URL at zero hosting cost, expose the
 machine it already runs on through a **Cloudflare named tunnel** (PM2 for the
