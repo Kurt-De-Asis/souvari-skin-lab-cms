@@ -734,12 +734,17 @@ export default function CreateBookingDrawer({
                 <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
                   {staffSlots.map((slot) => {
                     const active = selectedSlot?.start === slot.start;
+                    const past = appointmentDate === TODAY && slot.start <= dayjs().format('HH:mm');
                     return (
                       <button
                         key={`${slot.start}-${slot.staff_id}`}
                         onClick={() => setSelectedSlot(slot)}
+                        disabled={past}
+                        title={past ? 'This time has already passed' : undefined}
                         className={`px-1.5 py-2 rounded-md border text-xs font-medium transition ${
-                          active
+                          past
+                            ? 'opacity-40 cursor-not-allowed'
+                            : active
                             ? 'bg-neutral-900 border-neutral-900 text-white'
                             : 'bg-white border-neutral-200 text-neutral-900 hover:border-neutral-300'
                         }`}

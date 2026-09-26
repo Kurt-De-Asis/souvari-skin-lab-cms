@@ -612,6 +612,7 @@ export default function BookingPage() {
                     staff={availableStaff}
                     selectedStaffId={selectedStaffId}
                     onSelectStaff={setSelectedStaffId}
+                    date={selectedDate}
                   />
                 )}
               </div>

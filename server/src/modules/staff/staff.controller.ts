@@ -40,7 +40,7 @@ export class StaffController {
 
   async remove(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      await staffService.remove(Number(String(req.params.id)));
+      await staffService.remove(Number(String(req.params.id)), req.user?.userId);
       res.json({ success: true, message: 'Staff member deleted' });
     } catch (error) {
       next(error);

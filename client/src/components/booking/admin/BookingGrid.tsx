@@ -126,9 +126,10 @@ export default function BookingGrid({
       const clickedMin = ((e.clientY - rect.top) / rect.height) * viewMinutes + viewStart;
       const snapped = Math.floor(clickedMin / 30) * 30;
       if (snapped + 30 > viewEnd) return;
+      if (isToday && snapped < nowMin) return;
       onSlotClick(staffId, toTimeString(snapped));
     },
-    [viewStart, viewMinutes, viewEnd, onSlotClick]
+    [viewStart, viewMinutes, viewEnd, onSlotClick, isToday, nowMin]
   );
 
   const handleTrackMove = useCallback(
@@ -239,8 +240,18 @@ export default function BookingGrid({
                       />
                     ))}
 
+                    {/* Past-time shading on today */}
+                    {isToday && nowMin > viewStart && (
+                      <div
+                        className="absolute left-0 right-0 bg-neutral-200/50 pointer-events-none z-[5]"
+                        style={{ top: 0, height: Math.max(yPos(nowMin) - yPos(viewStart), 0) }}
+                      >
+                        <span className="absolute top-1 right-2 text-[10px] font-medium text-neutral-500">Past</span>
+                      </div>
+                    )}
+
                     {/* Hover slot highlight */}
-                    {canBook && !c.off && hoverSlot?.staffId === c.staff.id && hoverSlot.minutes + 30 <= viewEnd && (
+                    {canBook && !c.off && hoverSlot?.staffId === c.staff.id && hoverSlot.minutes + 30 <= viewEnd && !(isToday && hoverSlot.minutes < nowMin) && (
                       <div
                         className="absolute left-1 right-1 rounded-md bg-primary-500/10 border border-primary-400/50 pointer-events-none z-10 flex items-center justify-center"
                         style={{

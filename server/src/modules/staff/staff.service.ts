@@ -208,16 +208,44 @@ export class StaffService {
     return staff;
   }
 
-  async remove(id: number) {
+  async remove(id: number, userId?: number) {
     const existing = await prisma.staff.findFirst({ where: { id, deleted_at: null } });
     if (!existing) {
       throw new AppError('Staff member not found', 404);
     }
 
-    await prisma.staff.update({
-      where: { id },
-      data: { deleted_at: new Date(), status: 'inactive' as any },
+    if (userId !== undefined && existing.user_id === userId) {
+      throw new AppError('You cannot delete your own staff account', 400);
+    }
+
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const upcoming = await prisma.appointments.findFirst({
+      where: {
+        staff_id: id,
+        deleted_at: null,
+        appointment_date: { gte: new Date(todayStr) },
+        status: { notIn: ['cancelled', 'no_show'] },
+      },
+      select: { id: true },
     });
+    if (upcoming) {
+      throw new AppError(
+        'Cannot delete a staff member with upcoming appointments. Reschedule or cancel them first.',
+        409
+      );
+    }
+
+    await prisma.$transaction([
+      prisma.staff.update({
+        where: { id },
+        data: { deleted_at: new Date(), status: 'inactive' as any },
+      }),
+      prisma.users.update({
+        where: { id: existing.user_id },
+        data: { status: 'inactive' },
+      }),
+    ]);
   }
 
   async getSchedules(staffId: number) {

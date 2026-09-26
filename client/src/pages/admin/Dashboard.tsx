@@ -370,9 +370,9 @@ export default function Dashboard() {
         </ChartCard>
       </div>
 
-      {/* Appointment trends + insights */}
+      {/* Appointment trends */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-2">
+        <div className="xl:col-span-3">
           <ChartCard
             icon={CalendarCheck}
             title="Appointment Trends"
@@ -403,13 +403,15 @@ export default function Dashboard() {
             </div>
           </ChartCard>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 content-start">
+      </div>
+
+      {/* KPI insights */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           <KpiCard label="Avg Sale" value={formatCurrency(summary?.avg_sale ?? 0)} icon={DollarSign} iconClassName="bg-yellow-50 text-yellow-600" delta={avgSaleDelta} deltaLabel="vs prev 30 days" />
           <KpiCard label="Occupancy" value={formatPercent(summary?.occupancy.rate ?? 0)} icon={Activity} iconClassName="bg-amber-50 text-amber-600" delta={occupancyDelta} deltaLabel="vs prev 30 days (pp)" />
           <KpiCard label="Returning Patients" value={formatPercent(summary?.returning_patient_rate ?? 0)} icon={UserCheck} iconClassName="bg-purple-50 text-purple-600" delta={returningDelta} deltaLabel="vs prev 30 days (pp)" />
           <KpiCard label="Appointments" value={formatNumber(appointmentTotal)} icon={CalendarCheck} iconClassName="bg-blue-50 text-blue-600" delta={appointmentDelta} deltaLabel="vs prev 30 days" />
         </div>
-      </div>
 
       {/* Today's schedule */}
       <div className="card">

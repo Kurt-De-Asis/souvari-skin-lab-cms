@@ -21,6 +21,7 @@ interface TimeSlotPickerProps {
   staff?: StaffChip[];
   selectedStaffId?: number;
   onSelectStaff?: (staffId: number) => void;
+  date?: string;
 }
 
 function formatTime(time: string): string {
@@ -29,6 +30,16 @@ function formatTime(time: string): string {
   const period = hours >= 12 ? 'PM' : 'AM';
   const displayHour = hours % 12 || 12;
   return `${displayHour}:${String(minutes).padStart(2, '0')} ${period}`;
+}
+
+function localToday(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function localNow(): string {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 function initials(name: string): string {
@@ -44,6 +55,7 @@ export default function TimeSlotPicker({
   staff = [],
   selectedStaffId,
   onSelectStaff,
+  date,
 }: TimeSlotPickerProps) {
   if (loading) {
     return (
@@ -120,12 +132,17 @@ export default function TimeSlotPicker({
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {slots.map((slot, idx) => {
           const isSelected = selectedSlot?.start === slot.start && selectedSlot?.staff_id === slot.staff_id;
+          const past = date === localToday() && slot.start <= localNow();
           return (
             <button
               key={`${slot.start}-${slot.staff_id}-${idx}`}
               onClick={() => onSelectSlot(slot)}
+              disabled={past}
+              title={past ? 'This time has already passed' : undefined}
               className={`px-3 py-3 border text-sm font-medium transition ${
-                isSelected
+                past
+                  ? 'opacity-40 cursor-not-allowed'
+                  : isSelected
                   ? 'bg-primary-600 border-primary-600 text-white'
                   : 'bg-white border-neutral-200 text-neutral-900 hover:border-neutral-300'
               }`}

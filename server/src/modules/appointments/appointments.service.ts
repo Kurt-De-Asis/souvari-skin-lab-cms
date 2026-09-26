@@ -167,6 +167,14 @@ export class AppointmentService {
       );
     }
 
+    // Same-day past-time gate: the start time must still be in the future.
+    if (data.appointment_date === this.localDateString() && data.start_time <= this.localTimeString()) {
+      throw new AppError(
+        'Cannot book an appointment at a time that has already passed. Please choose a later time.',
+        422
+      );
+    }
+
     let endTime = data.end_time;
     if (!endTime) {
       const [hours, minutes] = data.start_time.split(':').map(Number);
@@ -283,6 +291,14 @@ export class AppointmentService {
     if (data.appointment_date < this.localDateString()) {
       throw new AppError(
         'Cannot book an appointment in the past. Please choose a current or future date.',
+        422
+      );
+    }
+
+    // Same-day past-time gate: the start time must still be in the future.
+    if (data.appointment_date === this.localDateString() && data.start_time <= this.localTimeString()) {
+      throw new AppError(
+        'Cannot book an appointment at a time that has already passed. Please choose a later time.',
         422
       );
     }
@@ -497,6 +513,14 @@ export class AppointmentService {
       const effectiveStart = data.start_time ?? existing.start_time;
       const effectiveEnd = data.end_time ?? existing.end_time;
       const effectiveStaffId = data.staff_id ?? existing.staff_id;
+
+      // Same-day past-time gate: the new start time must still be in the future.
+      if (effectiveDate === this.localDateString() && effectiveStart <= this.localTimeString()) {
+        throw new AppError(
+          'Cannot reschedule to a time that has already passed. Please choose a later time.',
+          422
+        );
+      }
 
       await this.validateUpdateWindow(
         id,

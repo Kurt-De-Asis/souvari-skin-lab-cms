@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
-import { Search, Plus, Pencil, Calendar } from 'lucide-react';
+import { Search, Plus, Pencil, Calendar, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import dayjs from 'dayjs';
 import { staffApi } from '@/api';
@@ -18,7 +18,6 @@ interface Staff {
   phone: string;
   position: string;
   job_title?: string;
-  permission_level?: string;
   status: string;
   schedules?: any[];
 }
@@ -30,7 +29,6 @@ interface StaffForm {
   phone: string;
   position: string;
   job_title?: string;
-  permission_level?: string;
   password?: string;
 }
 
@@ -72,6 +70,10 @@ export default function Staff() {
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [scheduleSaving, setScheduleSaving] = useState(false);
 
+  // Delete confirm modal
+  const [deleteTarget, setDeleteTarget] = useState<Staff | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   const { register, handleSubmit, reset, formState: { errors } } = useForm<StaffForm>();
 
   const fetchStaff = useCallback(async () => {
@@ -94,15 +96,30 @@ export default function Staff() {
   useEffect(() => { fetchStaff(); }, [fetchStaff]);
   useEffect(() => { setPage(1); }, [positionFilter, statusFilter]);
 
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await staffApi.delete(deleteTarget.id);
+      toast.success('Staff member deleted');
+      setDeleteTarget(null);
+      fetchStaff();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to delete staff');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const openAddModal = () => {
     setEditingStaff(null);
-    reset({ first_name: '', last_name: '', email: '', phone: '', position: '', job_title: '', permission_level: 'medium', password: '' });
+    reset({ first_name: '', last_name: '', email: '', phone: '', position: '', job_title: '', password: '' });
     setModalOpen(true);
   };
 
   const openEditModal = (s: Staff) => {
     setEditingStaff(s);
-    reset({ first_name: s.first_name, last_name: s.last_name, email: s.email, phone: s.phone, position: s.position, job_title: s.job_title || '', permission_level: s.permission_level || 'medium', password: '' });
+    reset({ first_name: s.first_name, last_name: s.last_name, email: s.email, phone: s.phone, position: s.position, job_title: s.job_title || '', password: '' });
     setModalOpen(true);
   };
 
@@ -255,7 +272,6 @@ export default function Staff() {
                 <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
                   <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Name</th>
                   <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Job Title</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Permission</th>
                   <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Hours/Week</th>
                   <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Status</th>
                   <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
@@ -284,15 +300,6 @@ export default function Staff() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-neutral-600 text-sm">{s.job_title || '—'}</td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${
-                          s.permission_level === 'owner' ? 'bg-neutral-900 text-white' :
-                          s.permission_level === 'high' ? 'bg-neutral-700 text-white' :
-                          'bg-neutral-100 text-neutral-700'
-                        }`}>
-                          {s.permission_level || 'medium'}
-                        </span>
-                      </td>
                       <td className="px-6 py-4 text-sm text-neutral-600">{hoursPerWeek}h</td>
                       <td className="px-6 py-4"><StatusBadge status={s.status} /></td>
                       <td className="px-6 py-4">
@@ -302,6 +309,9 @@ export default function Staff() {
                           </button>
                           <button onClick={() => openScheduleModal(s)} title="Schedule" className="p-2 text-neutral-500 hover:text-primary-700 hover:bg-blue-50 rounded-md transition">
                             <Calendar size={16} />
+                          </button>
+                          <button onClick={() => setDeleteTarget(s)} title="Delete" className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-md transition">
+                            <Trash2 size={16} />
                           </button>
                         </div>
                       </td>
@@ -364,21 +374,10 @@ export default function Staff() {
               {errors.position && <p className="text-xs text-red-600 mt-1">{errors.position.message}</p>}
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
+          <div>
               <label className="label">Job Title</label>
               <input className="input-field" placeholder="e.g. Skincare Specialist" {...register('job_title')} />
             </div>
-            <div>
-              <label className="label">Permission Level</label>
-              <select className="select-field" {...register('permission_level')}>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="owner">Owner</option>
-              </select>
-            </div>
-          </div>
           <div>
             <label className="label">{editingStaff ? 'Password (leave blank to keep)' : 'Password'}</label>
             <input type="password" className="input-field" placeholder="••••••••" {...register('password', editingStaff ? {} : { required: 'Required' })} />
@@ -391,6 +390,25 @@ export default function Staff() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Delete Confirm Modal */}
+      <Modal open={deleteTarget !== null} onClose={() => setDeleteTarget(null)} title="Delete Staff Member">
+        <div className="space-y-4">
+          <p className="text-sm text-neutral-600">
+            Are you sure you want to delete{' '}
+            <span className="font-semibold text-neutral-900">
+              {deleteTarget?.first_name} {deleteTarget?.last_name}
+            </span>
+            ? Their login access will be deactivated and they will no longer appear in the team.
+          </p>
+          <div className="flex justify-end gap-3 pt-2">
+            <button onClick={() => setDeleteTarget(null)} className="btn-secondary">Cancel</button>
+            <button onClick={handleDelete} disabled={deleting} className="btn-danger">
+              {deleting ? 'Deleting...' : 'Delete'}
+            </button>
+          </div>
+        </div>
       </Modal>
 
       {/* Schedule Modal */}
