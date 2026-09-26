@@ -70,7 +70,7 @@ export const listAppointmentsQuerySchema = z.object({
   customer_id: z.coerce.number().int().positive().optional(),
   staff_id: z.coerce.number().int().positive().optional(),
   service_id: z.coerce.number().int().positive().optional(),
-  status: appointmentStatusEnum.optional(),
+  status: z.string().optional(),
   date_from: z.string().optional(),
   date_to: z.string().optional(),
   sort_by: z.enum(['appointment_date', 'created_at', 'start_time']).optional(),

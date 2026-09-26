@@ -62,7 +62,10 @@ export default function Appointments() {
     setLoading(true);
     try {
       const params: Record<string, string> = {};
-      if (dateFilter) params.date = dateFilter;
+      if (dateFilter) {
+        params.date_from = dateFilter;
+        params.date_to = dateFilter;
+      }
       if (statusFilter) params.status = statusFilter;
       if (user?.staff?.id) params.staff_id = String(user.staff.id);
       const { data } = await appointmentsApi.list(params);

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, CheckCircle2, XCircle, RefreshCw, LogIn } from 'lucide-react';
+import { Plus, CheckCircle2, XCircle, RefreshCw, LogIn, ArrowUp, ArrowDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import dayjs from 'dayjs';
 import { appointmentsApi, customersApi, staffApi, servicesApi } from '@/api';
@@ -50,6 +50,7 @@ export default function Appointments() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -103,7 +104,7 @@ export default function Appointments() {
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = { page: String(page), limit: '15' };
+      const params: Record<string, string> = { page: String(page), limit: '15', sort_by: 'appointment_date', sort_order: sortOrder };
       if (dateFrom) params.date_from = dateFrom;
       if (dateTo) params.date_to = dateTo;
       if (statusFilter) params.status = statusFilter;
@@ -117,7 +118,7 @@ export default function Appointments() {
     } finally {
       setLoading(false);
     }
-  }, [page, dateFrom, dateTo, statusFilter, staffFilter]);
+  }, [page, dateFrom, dateTo, statusFilter, staffFilter, sortOrder]);
 
   const fetchDropdownData = useCallback(async () => {
     try {
@@ -204,6 +205,11 @@ export default function Appointments() {
     setRescheduleModalOpen(true);
   };
 
+  const toggleSort = () => {
+    setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'));
+    setPage(1);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -263,7 +269,16 @@ export default function Appointments() {
             <table className="w-full text-sm min-w-[820px]">
               <thead>
                 <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Date</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">
+                    <button
+                      onClick={toggleSort}
+                      className="inline-flex items-center gap-1 hover:text-neutral-800 transition"
+                      title={sortOrder === 'desc' ? 'Newest to oldest — click to sort oldest to newest' : 'Oldest to newest — click to sort newest to oldest'}
+                    >
+                      Date
+                      {sortOrder === 'desc' ? <ArrowDown size={12} /> : <ArrowUp size={12} />}
+                    </button>
+                  </th>
                   <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Time</th>
                   <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Customer</th>
                   <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Staff</th>

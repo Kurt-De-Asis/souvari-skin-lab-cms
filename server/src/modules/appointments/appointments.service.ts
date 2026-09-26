@@ -31,7 +31,13 @@ export class AppointmentService {
     if (customer_id) where.customer_id = customer_id;
     if (staff_id) where.staff_id = staff_id;
     if (service_id) where.service_id = service_id;
-    if (status) where.status = status;
+    if (status) {
+      const statuses = String(status)
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      where.status = statuses.length === 1 ? statuses[0] : { in: statuses };
+    }
 
     if (date_from || date_to) {
       where.appointment_date = {};
