@@ -36,7 +36,13 @@ import reviewsRoutes from './modules/reviews/reviews.routes';
 const app = express();
 
 // Security
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      frameSrc: ["'self'", "https://www.google.com"],
+    },
+  },
+}));
 app.use(cors({
   origin: env.FRONTEND_URL,
   credentials: true,
