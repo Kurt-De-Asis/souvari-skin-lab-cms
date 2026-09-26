@@ -6,6 +6,7 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import EmptyState from '../../components/shared/EmptyState';
 import Reveal from '../../components/ui/Reveal';
 import { formatServicePrice } from '../../utils/format';
+import formatCategory from '../../utils/formatCategory';
 
 interface Service {
   id: number;
@@ -21,15 +22,6 @@ interface Service {
 const PREVIEW_PER_CATEGORY = 6;
 
 const groupKey = (s: Service): string => s.category_name || s.category;
-
-const prettyLabel = (s: string): string =>
-  s
-    .split(/\s+/)
-    .map((word) => {
-      if (!word || word.includes('®')) return word;
-      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-    })
-    .join(' ');
 
 interface Category {
   key: string;
@@ -212,7 +204,7 @@ export default function PublicServices() {
                     : 'bg-white text-neutral-600 border border-neutral-200 hover:border-neutral-400'
                 }`}
               >
-                {prettyLabel(cat.key)}
+                {formatCategory(cat.key)}
                 <span className={`ml-1.5 text-xs ${activeCategory === cat.key ? 'text-neutral-300' : 'text-neutral-400'}`}>
                   {cat.count}
                 </span>
@@ -235,7 +227,7 @@ export default function PublicServices() {
                 {grouped.map(({ key, list }) => (
                   <div key={key}>
                     <div className="flex items-center justify-between mb-3">
-                      <h2 className="text-xl font-sans font-semibold text-neutral-900">{prettyLabel(key)}</h2>
+                      <h2 className="text-xl font-sans font-semibold text-neutral-900">{formatCategory(key)}</h2>
                       {list.length > PREVIEW_PER_CATEGORY && (
                         <button
                           onClick={() => selectCategory(key)}
@@ -253,7 +245,7 @@ export default function PublicServices() {
                           onClick={() => selectCategory(key)}
                           className="w-full py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 hover:text-primary-700 transition"
                         >
-                          View all {list.length} {prettyLabel(key).toLowerCase()} services
+                          View all {list.length} {formatCategory(key).toLowerCase()} services
                         </button>
                       )}
                     </div>
@@ -266,7 +258,7 @@ export default function PublicServices() {
           ) : (
             <div>
               <p className="text-sm text-neutral-500 mb-4">
-                {filtered.length} treatment{filtered.length === 1 ? '' : 's'} in {prettyLabel(activeCategory)}
+                {filtered.length} treatment{filtered.length === 1 ? '' : 's'} in {formatCategory(activeCategory)}
               </p>
               <div className="border border-neutral-200 bg-white rounded-lg overflow-hidden">
                 {freeConsultation && groupKey(freeConsultation) !== activeCategory && renderConsultationRow()}

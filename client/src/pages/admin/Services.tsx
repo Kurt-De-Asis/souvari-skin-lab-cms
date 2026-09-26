@@ -8,6 +8,7 @@ import EmptyState from '@/components/shared/EmptyState';
 import Pagination from '@/components/ui/Pagination';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { formatServicePrice } from '@/utils/format';
+import formatCategory from '@/utils/formatCategory';
 
 interface Service {
   id: number;
@@ -142,7 +143,7 @@ export default function Services() {
                 {services.map((s) => (
                   <tr key={s.id} className="hover:bg-neutral-50/50">
                     <td className="px-6 py-4 font-medium text-neutral-900">{s.name}</td>
-                    <td className="px-6 py-4 text-neutral-600">{s.category_name || (s.category?.replace('_', ' ') ? s.category.replace('_', ' ') : '—')}</td>
+                    <td className="px-6 py-4 text-neutral-600">{formatCategory(s.category_name || s.category || 'other')}</td>
                     <td className="px-6 py-4 text-neutral-600 text-sm">{s.service_type || '—'}</td>
                     <td className="px-6 py-4 text-neutral-900 font-medium">{formatPrice(s.price)}</td>
                     <td className="px-6 py-4 text-neutral-600">{s.duration_minutes} min</td>

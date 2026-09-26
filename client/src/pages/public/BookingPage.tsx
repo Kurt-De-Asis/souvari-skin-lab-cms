@@ -15,6 +15,7 @@ import TimeSlotPicker from '../../components/booking/TimeSlotPicker';
 import BookingSummary from '../../components/booking/BookingSummary';
 import Modal from '../../components/ui/Modal';
 import { formatServicePrice } from '../../utils/format';
+import formatCategory from '../../utils/formatCategory';
 
 interface Service {
   id: number;
@@ -174,7 +175,7 @@ export default function BookingPage() {
         existing.count++;
       } else {
         byKey.set(key, {
-          label: serviceCategoryName(s),
+          label: formatCategory(serviceCategoryName(s)),
           description: cleanGroupDescription(s.group?.description),
           order: s.group?.display_order ?? 999,
           count: 1,

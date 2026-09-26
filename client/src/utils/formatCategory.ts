@@ -15,5 +15,11 @@ export default function formatCategory(cat: string): string {
   if (CATEGORY_LABELS[cat]) return CATEGORY_LABELS[cat];
   return cat
     .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+    .split(/\s+/)
+    .map((word) => {
+      if (!word || word.includes('®')) return word;
+      if (word === word.toUpperCase() && word.length <= 4) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ');
 }
