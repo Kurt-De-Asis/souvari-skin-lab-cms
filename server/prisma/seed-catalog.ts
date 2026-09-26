@@ -80,8 +80,8 @@ async function seedServices() {
     const group = await prisma.service_groups.findUnique({ where: { slug: section.slug } });
     if (!group) throw new Error(`Group not found: ${section.slug}`);
 
-    const category = await prisma.service_categories.findUnique({ where: { name: section.name } });
-    if (!category) throw new Error(`Category not found: ${section.name}`);
+    const categoryRef = await prisma.service_categories.findUnique({ where: { name: section.name } });
+    if (!categoryRef) throw new Error(`Category not found: ${section.name}`);
 
     for (const svc of section.services) {
       const category = (svc.category || 'other') as any;
@@ -92,7 +92,7 @@ async function seedServices() {
           name: svc.name,
           description: svc.description ?? null,
           category,
-          category_id: category.id,
+          category_id: categoryRef.id,
           service_type: 'Individual',
           price: legacy.base,
           vip_price: legacy.vip,
@@ -116,7 +116,7 @@ async function seedServices() {
           slug: svc.slug,
           description: svc.description ?? null,
           category,
-          category_id: category.id,
+          category_id: categoryRef.id,
           service_type: 'Individual',
           price: legacy.base,
           vip_price: legacy.vip,

@@ -106,6 +106,46 @@ export default function PublicServices() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const freeConsultation = useMemo<Service | undefined>(
+    () => services.find((s) => s.category === 'consultation' && Number(s.price) === 0),
+    [services],
+  );
+
+  const renderConsultationRow = () => {
+    if (!freeConsultation) return null;
+    return (
+      <Link
+        key={`free-consultation-${freeConsultation.id}`}
+        to={`/services/${freeConsultation.id}`}
+        className="group flex items-center justify-between gap-6 py-5 border-b border-primary-200 bg-primary-50/60 px-4 sm:px-6 transition hover:bg-primary-50"
+      >
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-primary-700 text-white text-[10px] font-bold uppercase tracking-wider px-2 py-0.5">
+              Free
+            </span>
+            <span className="rounded-full bg-primary-100 text-primary-800 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5">
+              Recommended for New Clients
+            </span>
+          </div>
+          <h3 className="mt-1.5 font-sans text-lg md:text-xl text-neutral-900 group-hover:text-primary-700 transition">
+            {freeConsultation.name}
+          </h3>
+          {freeConsultation.description && (
+            <p className="mt-0.5 text-sm text-neutral-500 line-clamp-1 md:line-clamp-2">{freeConsultation.description}</p>
+          )}
+          <div className="mt-1.5 flex items-center gap-2 text-xs text-neutral-400">
+            <span className="flex items-center gap-1"><Clock size={11} /> {freeConsultation.duration} min</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 flex-shrink-0">
+          <span className="font-sans text-lg text-primary-700 whitespace-nowrap">{formatServicePrice(freeConsultation.price)}</span>
+          <ArrowRight size={18} className="text-neutral-300 transition group-hover:translate-x-1 group-hover:text-primary-600" />
+        </div>
+      </Link>
+    );
+  };
+
   const renderRow = (service: Service) => (
     <Link
       key={service.id}
@@ -206,6 +246,7 @@ export default function PublicServices() {
                       )}
                     </div>
                     <div className="border border-neutral-200 bg-white rounded-lg overflow-hidden">
+                      {groupKey(list[0]) !== (freeConsultation && groupKey(freeConsultation)) && renderConsultationRow()}
                       {list.slice(0, PREVIEW_PER_CATEGORY).map(renderRow)}
                       {list.length > PREVIEW_PER_CATEGORY && (
                         <button
@@ -228,6 +269,7 @@ export default function PublicServices() {
                 {filtered.length} treatment{filtered.length === 1 ? '' : 's'} in {prettyLabel(activeCategory)}
               </p>
               <div className="border border-neutral-200 bg-white rounded-lg overflow-hidden">
+                {freeConsultation && groupKey(freeConsultation) !== activeCategory && renderConsultationRow()}
                 {filtered.map(renderRow)}
               </div>
             </div>
