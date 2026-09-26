@@ -5,7 +5,6 @@ import { servicesApi } from '../../api';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import EmptyState from '../../components/shared/EmptyState';
 import Reveal from '../../components/ui/Reveal';
-import formatCategory from '../../utils/formatCategory';
 import { formatServicePrice } from '../../utils/format';
 
 interface Service {
@@ -16,6 +15,26 @@ interface Service {
   duration: number;
   category: string;
   category_name?: string;
+  group?: { display_order: number } | null;
+}
+
+const PREVIEW_PER_CATEGORY = 6;
+
+const groupKey = (s: Service): string => s.category_name || s.category;
+
+const prettyLabel = (s: string): string =>
+  s
+    .split(/\s+/)
+    .map((word) => {
+      if (!word || word.includes('®')) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ');
+
+interface Category {
+  key: string;
+  count: number;
+  order: number;
 }
 
 export default function PublicServices() {
@@ -53,15 +72,63 @@ export default function PublicServices() {
     fetchServices();
   }, []);
 
-  const categories = useMemo(() => {
-    const cats = [...new Set(services.map((s) => s.category_name || s.category))];
-    return ['All', ...cats];
+  const categories = useMemo<Category[]>(() => {
+    const byKey = new Map<string, Category>();
+    for (const s of services) {
+      const key = groupKey(s);
+      const existing = byKey.get(key);
+      if (existing) existing.count++;
+      else byKey.set(key, { key, count: 1, order: s.group?.display_order ?? 999 });
+    }
+    return [...byKey.values()].sort((a, b) => a.order - b.order);
   }, [services]);
 
   const filtered = useMemo(() => {
     if (activeCategory === 'All') return services;
-    return services.filter((s) => (s.category_name || s.category) === activeCategory);
+    return services.filter((s) => groupKey(s) === activeCategory);
   }, [services, activeCategory]);
+
+  const grouped = useMemo(() => {
+    if (activeCategory !== 'All') return [];
+    const byKey = new Map<string, Service[]>();
+    for (const s of services) {
+      const key = groupKey(s);
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key)!.push(s);
+    }
+    return [...byKey.entries()]
+      .map(([key, list]) => ({ key, list, order: list[0]?.group?.display_order ?? 999 }))
+      .sort((a, b) => a.order - b.order);
+  }, [services, activeCategory]);
+
+  const selectCategory = (key: string) => {
+    setActiveCategory(key);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const renderRow = (service: Service) => (
+    <Link
+      key={service.id}
+      to={`/services/${service.id}`}
+      className="group flex items-center justify-between gap-6 py-5 border-b border-neutral-200 bg-white px-4 sm:px-6 transition hover:bg-neutral-50"
+    >
+      <div className="min-w-0">
+        <h3 className="font-sans text-lg md:text-xl text-neutral-900 group-hover:text-primary-700 transition">
+          {service.name}
+        </h3>
+        {service.description && (
+          <p className="mt-0.5 text-sm text-neutral-500 line-clamp-1 md:line-clamp-2">{service.description}</p>
+        )}
+        <div className="mt-1.5 flex items-center gap-2 text-xs text-neutral-400">
+          <span className="flex items-center gap-1"><Clock size={11} /> {service.duration} min</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-4 flex-shrink-0">
+        <span className="font-sans text-lg text-primary-700 whitespace-nowrap">{formatServicePrice(service.price)}</span>
+        <ArrowRight size={18} className="text-neutral-300 transition group-hover:translate-x-1 group-hover:text-primary-600" />
+      </div>
+    </Link>
+  );
 
   return (
     <div>
@@ -78,57 +145,91 @@ export default function PublicServices() {
         </div>
       </section>
 
+      {/* Sticky category filter */}
+      {categories.length > 0 && (
+        <div className="sticky top-0 z-20 bg-neutral-50/95 backdrop-blur border-b border-neutral-200">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex gap-2 overflow-x-auto scrollbar-hide">
+            <button
+              onClick={() => selectCategory('All')}
+              className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition ${
+                activeCategory === 'All'
+                  ? 'bg-neutral-900 text-white'
+                  : 'bg-white text-neutral-600 border border-neutral-200 hover:border-neutral-400'
+              }`}
+            >
+              All
+              <span className={`ml-1.5 text-xs ${activeCategory === 'All' ? 'text-neutral-300' : 'text-neutral-400'}`}>
+                {services.length}
+              </span>
+            </button>
+            {categories.map((cat) => (
+              <button
+                key={cat.key}
+                onClick={() => selectCategory(cat.key)}
+                className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition ${
+                  activeCategory === cat.key
+                    ? 'bg-neutral-900 text-white'
+                    : 'bg-white text-neutral-600 border border-neutral-200 hover:border-neutral-400'
+                }`}
+              >
+                {prettyLabel(cat.key)}
+                <span className={`ml-1.5 text-xs ${activeCategory === cat.key ? 'text-neutral-300' : 'text-neutral-400'}`}>
+                  {cat.count}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       <section className="bg-neutral-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
-          {/* Category Tabs */}
-          {categories.length > 1 && (
-            <div className="flex flex-wrap gap-x-8 gap-y-2 border-b border-neutral-200 mb-10">
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setActiveCategory(cat)}
-                  className={`pb-3 text-xs font-semibold uppercase tracking-[0.2em] transition border-b ${
-                    activeCategory === cat
-                      ? 'border-primary-600 text-primary-700'
-                      : 'border-transparent text-neutral-400 hover:text-neutral-900'
-                  }`}
-                >
-                  {formatCategory(cat)}
-                </button>
-              ))}
-            </div>
-          )}
-
           {loading ? (
             <div className="py-12 flex justify-center"><LoadingSpinner /></div>
+          ) : activeCategory === 'All' ? (
+            grouped.length === 0 ? (
+              <EmptyState title="No services found" description="No services available yet." />
+            ) : (
+              <div className="space-y-12">
+                {grouped.map(({ key, list }) => (
+                  <div key={key}>
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="text-xl font-sans font-semibold text-neutral-900">{prettyLabel(key)}</h2>
+                      {list.length > PREVIEW_PER_CATEGORY && (
+                        <button
+                          onClick={() => selectCategory(key)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.15em] text-primary-700 hover:text-primary-800 transition"
+                        >
+                          View all {list.length} <ArrowRight size={12} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="border border-neutral-200 bg-white rounded-lg overflow-hidden">
+                      {list.slice(0, PREVIEW_PER_CATEGORY).map(renderRow)}
+                      {list.length > PREVIEW_PER_CATEGORY && (
+                        <button
+                          onClick={() => selectCategory(key)}
+                          className="w-full py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 hover:text-primary-700 transition"
+                        >
+                          View all {list.length} {prettyLabel(key).toLowerCase()} services
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
           ) : filtered.length === 0 ? (
             <EmptyState title="No services found" description="No services available in this category." />
           ) : (
-            <div className="border-t border-neutral-200">
-              {filtered.map((service) => (
-                <Link
-                  key={service.id}
-                  to={`/services/${service.id}`}
-                  className="group flex items-center justify-between gap-6 py-6 border-b border-neutral-200 transition"
-                >
-                  <div className="min-w-0">
-                    <h3 className="font-sans text-xl md:text-2xl text-neutral-900 group-hover:text-primary-700 transition">
-                      {service.name}
-                    </h3>
-                    <p className="mt-1 text-sm text-neutral-500 line-clamp-1 md:line-clamp-none">{service.description}</p>
-                    <div className="mt-2 flex items-center gap-3 text-xs uppercase tracking-wide text-neutral-400">
-                      <span className="flex items-center gap-1.5"><Clock size={12} /> {service.duration} min</span>
-                      <span className="text-neutral-300">·</span>
-                      <span>{formatCategory(service.category_name || service.category)}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-5 flex-shrink-0">
-                    <span className="font-sans text-lg text-primary-700 whitespace-nowrap">{formatServicePrice(service.price)}</span>
-                    <ArrowRight size={18} className="text-neutral-300 transition group-hover:translate-x-1 group-hover:text-primary-600" />
-                  </div>
-                </Link>
-              ))}
+            <div>
+              <p className="text-sm text-neutral-500 mb-4">
+                {filtered.length} treatment{filtered.length === 1 ? '' : 's'} in {prettyLabel(activeCategory)}
+              </p>
+              <div className="border border-neutral-200 bg-white rounded-lg overflow-hidden">
+                {filtered.map(renderRow)}
+              </div>
             </div>
           )}
         </div>

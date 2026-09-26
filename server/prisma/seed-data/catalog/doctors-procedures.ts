@@ -1,7 +1,7 @@
 import { CatalogServiceInput, SectionDef } from '../types';
 import { base } from '../helpers';
 
-const SRC = 'README §18 · DOCTORS PROCEDURES';
+const SRC = 'README 18 · DOCTORS PROCEDURES';
 
 type Row = [name: string, slug: string, price: number, duration: number, treatmentType: string, externalId?: string];
 
@@ -89,7 +89,7 @@ const services: CatalogServiceInput[] = rows.map(([name, slug, price, duration, 
 const section: SectionDef = {
   slug: 'doctors-procedures',
   name: 'DOCTORS PROCEDURES',
-  description: 'Doctor-supervised procedures: injectables, bio-remodeling, thread lifts, lipolysis, metabolic therapy, and IV infusions. Base retail pricing from README §18.',
+  description: 'Doctor-supervised procedures: injectables, bio-remodeling, thread lifts, lipolysis, metabolic therapy, and IV infusions.',
   display_order: 18,
   is_bookable: false,
   services,

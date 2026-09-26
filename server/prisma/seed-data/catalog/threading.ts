@@ -1,7 +1,7 @@
 import { SectionDef } from '../types';
 import { base } from '../helpers';
 
-const SRC = 'README §16 · THREADING';
+const SRC = 'README 16 · THREADING';
 
 const section: SectionDef = {
   slug: 'threading',

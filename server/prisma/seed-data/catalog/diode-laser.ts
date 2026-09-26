@@ -1,7 +1,7 @@
 import { SectionDef } from '../types';
 import { base } from '../helpers';
 
-const SRC = 'README §3 · DIODE LASER HAIR REMOVAL';
+const SRC = 'README 3 · DIODE LASER HAIR REMOVAL';
 
 const section: SectionDef = {
   slug: 'diode-laser',

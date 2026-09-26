@@ -1,7 +1,7 @@
 import { SectionDef } from '../types';
 import { base } from '../helpers';
 
-const SRC = 'README §13 · FOOT SPA AND HAND SPA';
+const SRC = 'README 13 · FOOT SPA AND HAND SPA';
 
 const section: SectionDef = {
   slug: 'foot-hand-spa',

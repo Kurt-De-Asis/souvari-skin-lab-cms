@@ -1,7 +1,7 @@
 import { SectionDef } from '../types';
 import { base } from '../helpers';
 
-const SRC = 'README §7 · 7 Session Series · RF';
+const SRC = 'README 7 · 7 Session Series · RF';
 
 type Row = [string, string, number];
 

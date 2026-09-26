@@ -1,7 +1,7 @@
 import { SectionDef } from '../types';
 import { base } from '../helpers';
 
-const SRC = 'README §9 · 7 Session Series DIODE Laser Hair Removal';
+const SRC = 'README 9 · 7 Session Series DIODE Laser Hair Removal';
 
 type Row = [string, string, number];
 

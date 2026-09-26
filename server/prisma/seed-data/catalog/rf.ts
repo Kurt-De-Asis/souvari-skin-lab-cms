@@ -1,7 +1,7 @@
 import { SectionDef } from '../types';
 import { base } from '../helpers';
 
-const SRC = 'README §5 · Radio Frequency (RF)';
+const SRC = 'README 5 · Radio Frequency (RF)';
 
 const section: SectionDef = {
   slug: 'radio-frequency',

@@ -19,10 +19,12 @@ import permanentMakeup from './seed-data/catalog/permanent-makeup';
 import threading from './seed-data/catalog/threading';
 import hotWax from './seed-data/catalog/hot-wax';
 import doctorsProcedures from './seed-data/catalog/doctors-procedures';
+import consultations from './seed-data/catalog/consultations';
 
 const prisma = new PrismaClient();
 
 const EXPECTED_SECTIONS: SectionDef[] = [
+  consultations,
   signatureFacials,
   bodyWhitening,
   diodeLaser,
@@ -105,7 +107,7 @@ async function main() {
       failures++;
     }
     seenSlug.set(e.slug, e.name);
-    if (!e.price || e.price <= 0) {
+    if (e.category !== 'consultation' && (!e.price || e.price <= 0)) {
       console.error(`  [DATA] Non-positive price for "${e.name}" (${e.price})`);
       failures++;
     }

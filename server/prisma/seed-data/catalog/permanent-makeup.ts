@@ -1,7 +1,7 @@
 import { SectionDef } from '../types';
 import { base } from '../helpers';
 
-const SRC = 'README §15 · PERMANENT MAKE UP';
+const SRC = 'README 15 · PERMANENT MAKE UP';
 
 const section: SectionDef = {
   slug: 'permanent-makeup',

@@ -1,7 +1,7 @@
 import { SectionDef } from '../types';
 import { base } from '../helpers';
 
-const SRC = 'README §1 · FACIALS';
+const SRC = 'README 1 · FACIALS';
 
 const section: SectionDef = {
   slug: 'signature-facials',

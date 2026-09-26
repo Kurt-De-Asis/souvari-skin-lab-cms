@@ -19,10 +19,12 @@ import permanentMakeup from './seed-data/catalog/permanent-makeup';
 import threading from './seed-data/catalog/threading';
 import hotWax from './seed-data/catalog/hot-wax';
 import doctorsProcedures from './seed-data/catalog/doctors-procedures';
+import consultations from './seed-data/catalog/consultations';
 
 const prisma = new PrismaClient();
 
 const allSections: SectionDef[] = [
+  consultations,
   signatureFacials,
   bodyWhitening,
   diodeLaser,

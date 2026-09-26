@@ -1,7 +1,7 @@
 import { SectionDef } from '../types';
 import { base } from '../helpers';
 
-const SRC = 'README §14 · EYELASH EXTENSIONS';
+const SRC = 'README 14 · EYELASH EXTENSIONS';
 
 const section: SectionDef = {
   slug: 'lashes-brows',

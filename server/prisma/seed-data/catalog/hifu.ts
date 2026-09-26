@@ -1,7 +1,7 @@
 import { SectionDef } from '../types';
 import { base } from '../helpers';
 
-const SRC = 'README §4 · UltraTight® HIFU';
+const SRC = 'README 4 · UltraTight® HIFU';
 
 const section: SectionDef = {
   slug: 'ultratight-hifu',

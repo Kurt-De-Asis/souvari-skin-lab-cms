@@ -1,7 +1,7 @@
 import { SectionDef } from '../types';
 import { base } from '../helpers';
 
-const SRC = 'README §2 · CARBON LASER BODY WHITENING';
+const SRC = 'README 2 · CARBON LASER BODY WHITENING';
 
 const section: SectionDef = {
   slug: 'body-whitening',

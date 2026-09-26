@@ -1,7 +1,7 @@
 import { SectionDef } from '../types';
 import { base } from '../helpers';
 
-const SRC = 'README §12 · NAIL EXTENSIONS AND SPECIALIZED';
+const SRC = 'README 12 · NAIL EXTENSIONS AND SPECIALIZED';
 
 const section: SectionDef = {
   slug: 'nail-extensions',

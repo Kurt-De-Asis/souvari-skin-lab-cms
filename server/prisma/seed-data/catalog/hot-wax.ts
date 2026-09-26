@@ -1,7 +1,7 @@
 import { SectionDef } from '../types';
 import { base } from '../helpers';
 
-const SRC = 'README §17 · HOT WAX HAIR REMOVAL';
+const SRC = 'README 17 · HOT WAX HAIR REMOVAL';
 
 const section: SectionDef = {
   slug: 'hot-wax',
