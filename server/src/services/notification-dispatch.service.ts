@@ -3,6 +3,8 @@ import { getSMSProvider } from './sms.service';
 import logger from '../utils/logger';
 import { NotificationType } from '@prisma/client';
 
+const SMS_GREETING = 'Hello, this is Souvari Skin Lab.';
+
 interface DispatchParams {
   userId: number;
   type: NotificationType;
@@ -34,13 +36,14 @@ class NotificationDispatchService {
     if (sendSMS && smsPhone) {
       try {
         const provider = getSMSProvider();
-        const result = await provider.send(smsPhone, message);
+        const smsText = `${SMS_GREETING} ${message}`;
+        const result = await provider.send(smsPhone, smsText);
 
         await prisma.sms_logs.create({
           data: {
             user_id: userId,
             recipient_phone: smsPhone,
-            message,
+            message: smsText,
             status: result.success ? 'sent' : 'failed',
             external_id: result.externalId ?? null,
             error_message: result.error ?? null,
