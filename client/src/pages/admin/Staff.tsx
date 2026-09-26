@@ -219,7 +219,7 @@ export default function Staff() {
       {/* Filters */}
       <div className="card pb-0">
         <div className="flex flex-wrap gap-3 pb-4">
-          <select className="select-field w-auto" value={positionFilter} onChange={(e) => setPositionFilter(e.target.value)}>
+          <select className="select-field w-full sm:w-auto" value={positionFilter} onChange={(e) => setPositionFilter(e.target.value)}>
             <option value="">All Positions</option>
             <option value="head_admin">Head/Admin</option>
             <option value="nail_technician">Nail Technician</option>
@@ -232,7 +232,7 @@ export default function Staff() {
             <option value="aesthetician">Aesthetician</option>
             <option value="receptionist">Receptionist</option>
           </select>
-          <select className="select-field w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <select className="select-field w-full sm:w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">All Status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
@@ -250,14 +250,14 @@ export default function Staff() {
           <EmptyState title="No staff found" description="Adjust filters or add a new staff member." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Name</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Job Title</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Permission</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Hours/Week</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Status</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Name</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Job Title</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Permission</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Hours/Week</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Status</th>
                   <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
                 </tr>
               </thead>

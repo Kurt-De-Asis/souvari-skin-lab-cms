@@ -151,7 +151,7 @@ export default function Schedule() {
             {weekStart.format('MMM D')} - {weekStart.add(6, 'day').format('MMM D, YYYY')}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button onClick={goToPreviousWeek} className="btn-secondary p-2">
             <ChevronLeft size={16} />
           </button>

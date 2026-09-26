@@ -19,6 +19,7 @@ export const createServiceSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255),
   description: z.string().optional(),
   category: serviceCategoryEnum.default('other'),
+  category_id: z.coerce.number().int().positive().nullable().optional(),
   price: z.coerce.number().min(0, 'Price must be non-negative'),
   vip_price: z.coerce.number().min(0).optional(),
   non_member_price: z.coerce.number().min(0).optional(),
@@ -32,6 +33,7 @@ export const updateServiceSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   description: z.string().optional(),
   category: serviceCategoryEnum.optional(),
+  category_id: z.coerce.number().int().positive().nullable().optional(),
   price: z.coerce.number().min(0).optional(),
   vip_price: z.coerce.number().min(0).optional().nullable(),
   non_member_price: z.coerce.number().min(0).optional().nullable(),
@@ -45,6 +47,7 @@ export const serviceQuerySchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
   category: serviceCategoryEnum.optional(),
+  category_id: z.coerce.number().int().positive().optional(),
   status: serviceStatusEnum.optional(),
   search: z.string().max(255).optional(),
   is_active: z.coerce.boolean().optional(),
@@ -80,6 +83,7 @@ export const publicServiceQuerySchema = z.object({
   page: z.string().optional(),
   limit: z.string().optional(),
   category: serviceCategoryEnum.optional(),
+  category_id: z.coerce.number().int().positive().optional(),
   search: z.string().max(255).optional(),
 });
 

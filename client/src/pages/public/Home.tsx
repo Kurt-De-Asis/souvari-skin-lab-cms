@@ -14,6 +14,7 @@ interface Service {
   price: number;
   duration: number;
   category: string;
+  category_name?: string;
 }
 
 const MARQUEE_ITEMS = [
@@ -288,7 +289,7 @@ export default function Home() {
                     <div className="mt-2 flex items-center gap-3 text-xs uppercase tracking-wide text-neutral-500">
                       <span className="flex items-center gap-1.5"><Clock size={12} /> {service.duration} min</span>
                       <span className="text-neutral-600">·</span>
-                      <span>{formatCategory(service.category)}</span>
+                      <span>{formatCategory(service.category_name || service.category)}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-5 flex-shrink-0">
@@ -343,7 +344,7 @@ export default function Home() {
                     <span className="text-neutral-600">·</span>
                     <span className="font-sans text-base text-primary-300 normal-case tracking-normal">{formatServicePrice(f.service.price)}</span>
                     <span className="text-neutral-600">·</span>
-                    <span>{formatCategory(f.service.category)}</span>
+                    <span>{formatCategory(f.service.category_name || f.service.category)}</span>
                   </div>
                   <div className="mt-8 flex flex-wrap gap-4">
                     <Link to="/booking" state={{ serviceId: f.service.id }} className="btn-gold">

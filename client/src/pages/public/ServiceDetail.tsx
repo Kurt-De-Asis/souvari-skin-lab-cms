@@ -21,6 +21,7 @@ interface ServiceDetail {
   price: number;
   duration: number;
   category: string;
+  category_name?: string;
   staff?: ServiceStaff[];
 }
 
@@ -70,7 +71,7 @@ export default function ServiceDetail() {
           <Link to="/services" className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.2em] text-neutral-300 hover:text-white transition mb-8">
             <ArrowLeft size={13} /> All Services
           </Link>
-          <p className="text-xs font-medium uppercase tracking-[0.3em] text-primary-400">{formatCategory(service.category)}</p>
+          <p className="text-xs font-medium uppercase tracking-[0.3em] text-primary-400">{formatCategory(service.category_name || service.category)}</p>
           <h1 className="mt-4 text-4xl sm:text-5xl font-sans font-semibold leading-[1.1]">{service.name}</h1>
         </div>
       </section>
@@ -128,7 +129,7 @@ export default function ServiceDetail() {
                     </div>
                     <div className="flex items-center gap-2.5 text-sm text-neutral-600">
                       <span className="text-primary-600">—</span>
-                      <span>{formatCategory(service.category)}</span>
+                      <span>{formatCategory(service.category_name || service.category)}</span>
                     </div>
                   </div>
                   <Link to="/booking" state={{ serviceId: service.id }} className="btn-primary w-full justify-center mt-7">

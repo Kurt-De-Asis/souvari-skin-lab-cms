@@ -382,7 +382,7 @@ export default function Membership() {
             </button>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
             <div>
               <p className="text-neutral-400 text-xs">Start Date</p>
               <p className="font-medium mt-0.5">{dayjs(startDate).format('MMM D, YYYY')}</p>

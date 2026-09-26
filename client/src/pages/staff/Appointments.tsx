@@ -204,15 +204,15 @@ export default function Appointments() {
       ) : (
         <div className="card overflow-hidden p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[820px]">
               <thead>
                 <tr className="border-b border-neutral-200 bg-neutral-50">
-                  <th className="text-left px-4 py-3 font-medium text-neutral-600">Date</th>
-                  <th className="text-left px-4 py-3 font-medium text-neutral-600">Time</th>
-                  <th className="text-left px-4 py-3 font-medium text-neutral-600">Customer</th>
-                  <th className="text-left px-4 py-3 font-medium text-neutral-600">Service</th>
-                  <th className="text-left px-4 py-3 font-medium text-neutral-600">Status</th>
-                  <th className="text-right px-4 py-3 font-medium text-neutral-600">Actions</th>
+                  <th className="text-left px-4 py-3 font-medium text-neutral-600 whitespace-nowrap">Date</th>
+                  <th className="text-left px-4 py-3 font-medium text-neutral-600 whitespace-nowrap">Time</th>
+                  <th className="text-left px-4 py-3 font-medium text-neutral-600 whitespace-nowrap">Customer</th>
+                  <th className="text-left px-4 py-3 font-medium text-neutral-600 whitespace-nowrap">Service</th>
+                  <th className="text-left px-4 py-3 font-medium text-neutral-600 whitespace-nowrap">Status</th>
+                  <th className="text-right px-4 py-3 font-medium text-neutral-600 whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">

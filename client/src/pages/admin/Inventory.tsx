@@ -253,7 +253,7 @@ export default function Inventory() {
             <div className="flex flex-wrap items-end gap-3 pb-4">
               <div>
                 <label className="label">Product</label>
-                <select className="select-field w-auto" value={movementProductFilter} onChange={(e) => setMovementProductFilter(e.target.value)}>
+                <select className="select-field w-full sm:w-auto" value={movementProductFilter} onChange={(e) => setMovementProductFilter(e.target.value)}>
                   <option value="">All Products</option>
                   {allProducts.map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
@@ -262,7 +262,7 @@ export default function Inventory() {
               </div>
               <div>
                 <label className="label">Type</label>
-                <select className="select-field w-auto" value={movementTypeFilter} onChange={(e) => setMovementTypeFilter(e.target.value)}>
+                <select className="select-field w-full sm:w-auto" value={movementTypeFilter} onChange={(e) => setMovementTypeFilter(e.target.value)}>
                   <option value="">All Types</option>
                   <option value="purchase">Purchase</option>
                   <option value="adjustment">Adjustment</option>
@@ -291,15 +291,15 @@ export default function Inventory() {
               <EmptyState title="No movements found" description="Adjust your filters or record a new movement." />
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm min-w-[640px]">
                   <thead>
                     <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Date</th>
-                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Product</th>
-                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Type</th>
-                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Quantity</th>
-                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Stock After</th>
-                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Performed By</th>
+                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Date</th>
+                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Product</th>
+                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Type</th>
+                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Quantity</th>
+                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Stock After</th>
+                      <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Performed By</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-100">
@@ -349,15 +349,15 @@ export default function Inventory() {
             <EmptyState title="No low stock alerts" description="All products are well-stocked." />
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[640px]">
                 <thead>
                   <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Product</th>
-                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Category</th>
-                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Current Stock</th>
-                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Minimum Stock</th>
-                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Unit</th>
-                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Deficit</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Product</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Category</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Current Stock</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Minimum Stock</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Unit</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Deficit</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">

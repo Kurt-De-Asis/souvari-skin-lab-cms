@@ -23,6 +23,23 @@ class ServiceCategoriesService {
     return createPaginatedResult(data, total, { page: p, limit: l, skip });
   }
 
+  async browse() {
+    const [data, total] = await Promise.all([
+      prisma.service_categories.findMany({
+        where: { is_active: true },
+        include: {
+          _count: {
+            select: { services: { where: { is_active: true, status: 'active', deleted_at: null } } },
+          },
+        },
+        orderBy: { sort_order: 'asc' },
+      }),
+      prisma.service_categories.count({ where: { is_active: true } }),
+    ]);
+
+    return createPaginatedResult(data, total, { page: 1, limit: total, skip: 0 });
+  }
+
   async getById(id: number) {
     return prisma.service_categories.findUnique({
       where: { id },

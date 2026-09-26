@@ -107,7 +107,7 @@ export default function TreatmentSelector({
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <div
                       className={`w-5 h-5 border flex items-center justify-center flex-shrink-0 transition ${
                         selected ? 'bg-primary-600 border-primary-600' : 'border-neutral-300'
@@ -115,7 +115,7 @@ export default function TreatmentSelector({
                     >
                       {selected && <Check size={12} className="text-white" />}
                     </div>
-                    <p className="text-sm font-medium text-neutral-900">{s.name}</p>
+                    <p className="text-sm font-medium text-neutral-900 min-w-0 flex-1">{s.name}</p>
                     {isFeatured && (
                       <span className="inline-flex items-center px-2 py-0.5 bg-primary-600 text-white text-[10px] font-semibold uppercase tracking-[0.12em] whitespace-nowrap">
                         Recommended for New Clients

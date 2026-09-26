@@ -239,7 +239,7 @@ export default function Shifts() {
           <p className="text-sm text-neutral-500 mt-1">Weekly staff schedule grid</p>
         </div>
         <div className="flex items-center gap-2">
-          <select className="select-field w-auto" value={positionFilter} onChange={(e) => setPositionFilter(e.target.value)}>
+          <select className="select-field w-full sm:w-auto" value={positionFilter} onChange={(e) => setPositionFilter(e.target.value)}>
             {POSITIONS.map((p) => (
               <option key={p.value} value={p.value}>{p.label}</option>
             ))}

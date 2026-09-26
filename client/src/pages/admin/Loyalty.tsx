@@ -194,7 +194,7 @@ export default function Loyalty() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <select className="select-field w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <select className="select-field w-full sm:w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">All Status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
@@ -209,13 +209,13 @@ export default function Loyalty() {
           <EmptyState title="No milestones found" description="Create a milestone to define reward tiers." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Plan Type</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Spend Threshold</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Reward %</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Status</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Plan Type</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Spend Threshold</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Reward %</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Status</th>
                   <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
                 </tr>
               </thead>
@@ -319,7 +319,7 @@ export default function Loyalty() {
             <LoadingSpinner fullScreen={false} />
           ) : progressResults.length > 0 ? (
             <div className="overflow-x-auto max-h-96 overflow-y-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[720px]">
                 <thead className="sticky top-0 bg-white">
                   <tr className="text-left text-neutral-500 border-b border-neutral-200">
                     <th className="px-4 py-2 font-medium">Customer</th>

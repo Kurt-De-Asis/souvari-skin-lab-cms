@@ -230,7 +230,7 @@ export default function Appointments() {
           </div>
           <div>
             <label className="label">Status</label>
-            <select className="select-field w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <select className="select-field w-full sm:w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="">All Status</option>
               <option value="pending">Pending</option>
               <option value="confirmed">Confirmed</option>
@@ -242,7 +242,7 @@ export default function Appointments() {
           </div>
           <div>
             <label className="label">Staff</label>
-            <select className="select-field w-auto" value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)}>
+            <select className="select-field w-full sm:w-auto" value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)}>
               <option value="">All Staff</option>
               {staffList.map((s) => (
                 <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
@@ -260,15 +260,15 @@ export default function Appointments() {
           <EmptyState title="No appointments found" description="Create a new appointment or adjust filters." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[820px]">
               <thead>
                 <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Date</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Time</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Customer</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Staff</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Service</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Status</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Date</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Time</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Customer</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Staff</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Service</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Status</th>
                   <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
                 </tr>
               </thead>

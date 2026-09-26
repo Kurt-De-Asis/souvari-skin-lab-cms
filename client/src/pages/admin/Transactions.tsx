@@ -171,7 +171,7 @@ export default function Transactions() {
           </div>
           <div>
             <label className="label">Payment Status</label>
-            <select className="select-field w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <select className="select-field w-full sm:w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="">All Status</option>
               <option value="paid">Paid</option>
               <option value="pending">Pending</option>
@@ -182,7 +182,7 @@ export default function Transactions() {
           </div>
           <div>
             <label className="label">Type</label>
-            <select className="select-field w-auto" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <select className="select-field w-full sm:w-auto" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
               <option value="">All Types</option>
               <option value="service">Service</option>
               <option value="product">Product</option>
@@ -213,16 +213,16 @@ export default function Transactions() {
           <EmptyState title="No transactions found" description="Adjust your filters to see results." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[980px]">
               <thead>
                 <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
                   <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 w-8" />
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Date</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Reference #</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Customer</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Items</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Total</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Payment</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Date</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Reference #</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Customer</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Items</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Total</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Payment</th>
                   <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
                 </tr>
               </thead>
@@ -273,10 +273,11 @@ export default function Transactions() {
                       </tr>
                       {isExpanded && (
                         <tr>
-                          <td colSpan={8} className="bg-neutral-50/50 px-12 py-4">
+                          <td colSpan={8} className="bg-neutral-50/50 px-4 sm:px-6 py-4">
                             <p className="text-xs font-medium text-neutral-500 mb-2">Transaction Items</p>
                             {txn.items && txn.items.length > 0 ? (
-                              <table className="w-full text-xs">
+                              <div className="overflow-x-auto">
+                              <table className="w-full text-xs min-w-[560px]">
                                 <thead>
                                   <tr className="text-left text-neutral-500 border-b border-neutral-200">
                                     <th className="pb-2 font-medium">Item</th>
@@ -298,6 +299,7 @@ export default function Transactions() {
                                   ))}
                                 </tbody>
                               </table>
+                              </div>
                             ) : (
                               <p className="text-xs text-neutral-400">No item details available</p>
                             )}

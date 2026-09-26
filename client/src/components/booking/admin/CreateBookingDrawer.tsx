@@ -259,7 +259,8 @@ export default function CreateBookingDrawer({
   const categories = useMemo(() => {
     const seen: string[] = [];
     for (const s of services) {
-      if (s.category && !seen.includes(s.category)) seen.push(s.category);
+      const c = s.category_name || s.category;
+      if (c && !seen.includes(c)) seen.push(c);
     }
     return seen;
   }, [services]);
@@ -267,7 +268,8 @@ export default function CreateBookingDrawer({
   const filteredServices = useMemo(() => {
     const q = serviceQuery.trim().toLowerCase();
     return services.filter((s) => {
-      if (activeCategory !== 'all' && s.category !== activeCategory) return false;
+      const c = s.category_name || s.category;
+      if (activeCategory !== 'all' && c !== activeCategory) return false;
       if (!q) return true;
       return s.name.toLowerCase().includes(q) || (s.description ?? '').toLowerCase().includes(q);
     });
@@ -651,7 +653,7 @@ export default function CreateBookingDrawer({
                               <Clock size={10} />
                               <span>{s.duration} min</span>
                               <span className="mx-0.5">·</span>
-                              <span className="truncate">{formatCategory(s.category)}</span>
+                              <span className="truncate">{formatCategory(s.category_name || s.category)}</span>
                             </div>
                           </div>
                           <span className="text-[13px] font-semibold text-neutral-900 whitespace-nowrap">{formatServicePrice(s.price)}</span>

@@ -403,7 +403,7 @@ export default function Dashboard() {
             </div>
           </ChartCard>
         </div>
-        <div className="grid grid-cols-2 gap-4 content-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 content-start">
           <KpiCard label="Avg Sale" value={formatCurrency(summary?.avg_sale ?? 0)} icon={DollarSign} iconClassName="bg-yellow-50 text-yellow-600" delta={avgSaleDelta} deltaLabel="vs prev 30 days" />
           <KpiCard label="Occupancy" value={formatPercent(summary?.occupancy.rate ?? 0)} icon={Activity} iconClassName="bg-amber-50 text-amber-600" delta={occupancyDelta} deltaLabel="vs prev 30 days (pp)" />
           <KpiCard label="Returning Patients" value={formatPercent(summary?.returning_patient_rate ?? 0)} icon={UserCheck} iconClassName="bg-purple-50 text-purple-600" delta={returningDelta} deltaLabel="vs prev 30 days (pp)" />

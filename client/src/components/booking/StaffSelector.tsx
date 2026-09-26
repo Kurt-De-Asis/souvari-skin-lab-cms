@@ -13,7 +13,7 @@ interface StaffSelectorProps {
   selectedStaff: Staff | null;
   onSelectStaff: (staff: Staff) => void;
   loading?: boolean;
-  service?: { name: string; category: string };
+  service?: { name: string; category: string; category_name?: string };
 }
 
 export default function StaffSelector({
@@ -35,7 +35,7 @@ export default function StaffSelector({
           <h3 className="text-sm font-semibold text-neutral-900">Choose a Specialist</h3>
           {service && (
             <p className="text-xs text-neutral-400 mt-0.5">
-              Available for {service.name} ({formatCategory(service.category)})
+              Available for {service.name} ({formatCategory(service.category_name || service.category)})
             </p>
           )}
         </div>

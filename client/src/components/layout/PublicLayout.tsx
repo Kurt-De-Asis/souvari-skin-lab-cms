@@ -42,8 +42,8 @@ export default function PublicLayout() {
               ))}
             </div>
 
-            {/* Centered Logo */}
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+            {/* Centered Logo (desktop only — mobile row below renders its own) */}
+            <div className="hidden md:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
               <Link to="/" className="flex items-center">
                 <img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-10 sm:h-12 w-auto object-contain" />
               </Link>

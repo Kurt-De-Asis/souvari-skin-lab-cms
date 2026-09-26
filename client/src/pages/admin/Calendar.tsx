@@ -220,14 +220,17 @@ export default function Calendar() {
 
       {/* Date navigation */}
       <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button onClick={() => navigate('prev')} className="btn-secondary !px-3 !py-2">
             <ChevronLeft size={18} />
           </button>
           <button onClick={() => navigate('next')} className="btn-secondary !px-3 !py-2">
             <ChevronRight size={18} />
           </button>
-          <h2 className="text-lg font-semibold text-neutral-900 ml-2">{currentDate.format('dddd, MMMM D, YYYY')}</h2>
+          <h2 className="text-base sm:text-lg font-semibold text-neutral-900 ml-2">
+            <span className="sm:hidden">{currentDate.format('MMMM D, YYYY')}</span>
+            <span className="hidden sm:inline">{currentDate.format('dddd, MMMM D, YYYY')}</span>
+          </h2>
         </div>
         <button onClick={() => setCurrentDate(dayjs())} className="btn-secondary text-sm">Today</button>
       </div>
@@ -237,7 +240,7 @@ export default function Calendar() {
         <div className="flex flex-wrap items-end gap-3 pb-4">
           <div>
             <label className="label">Staff</label>
-            <select className="select-field w-auto" value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)}>
+            <select className="select-field w-full sm:w-auto" value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)}>
               <option value="">All Staff</option>
               {activeStaff.map((s) => (
                 <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
@@ -246,7 +249,7 @@ export default function Calendar() {
           </div>
           <div>
             <label className="label">Service</label>
-            <select className="select-field w-auto" value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)}>
+            <select className="select-field w-full sm:w-auto" value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)}>
               <option value="">All Services</option>
               {servicesList.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
@@ -255,7 +258,7 @@ export default function Calendar() {
           </div>
           <div>
             <label className="label">Status</label>
-            <select className="select-field w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <select className="select-field w-full sm:w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="">All Status</option>
               {STATUS_OPTIONS.map((st) => (
                 <option key={st} value={st}>{st.replace(/_/g, ' ')}</option>

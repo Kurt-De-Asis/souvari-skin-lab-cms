@@ -38,6 +38,7 @@ export interface ServiceOption {
   price: number;
   duration: number;
   category: string;
+  category_name?: string;
   staff: { id: number; first_name: string; last_name: string; position?: string }[];
 }
 

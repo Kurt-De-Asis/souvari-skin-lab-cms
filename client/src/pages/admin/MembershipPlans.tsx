@@ -152,14 +152,14 @@ export default function MembershipPlans() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <select className="select-field w-auto" value={tierFilter} onChange={(e) => setTierFilter(e.target.value)}>
+          <select className="select-field w-full sm:w-auto" value={tierFilter} onChange={(e) => setTierFilter(e.target.value)}>
             <option value="">All Tiers</option>
             <option value="SILVER">Silver</option>
             <option value="GOLD">Gold</option>
             <option value="PLATINUM">Platinum</option>
             <option value="ELITE">Diamond</option>
           </select>
-          <select className="select-field w-auto" value={String(statusFilter)} onChange={(e) => setStatusFilter(e.target.value === '' ? '' : e.target.value === 'true')}>
+          <select className="select-field w-full sm:w-auto" value={String(statusFilter)} onChange={(e) => setStatusFilter(e.target.value === '' ? '' : e.target.value === 'true')}>
             <option value="">All Status</option>
             <option value="true">Active</option>
             <option value="false">Inactive</option>
@@ -174,15 +174,15 @@ export default function MembershipPlans() {
           <EmptyState title="No membership plans found" description="Create a new plan to get started." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[780px]">
               <thead>
                 <tr className="text-left text-neutral-500 bg-neutral-50/80 border-b border-neutral-200">
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Name</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Tier</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Duration</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Regular Price</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Promo Price</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Status</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Name</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Tier</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Duration</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Regular Price</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Promo Price</th>
+                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Status</th>
                   <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
                 </tr>
               </thead>

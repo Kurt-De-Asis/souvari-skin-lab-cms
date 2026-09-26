@@ -191,6 +191,7 @@ export const servicePackagesApi = {
 
 export const serviceCategoriesApi = {
   list: (params?: Record<string, string>) => api.get('/service-categories', { params }),
+  browse: (params?: Record<string, string>) => api.get('/service-categories/browse', { params }),
   getById: (id: number) => api.get(`/service-categories/${id}`),
   create: (data: any) => api.post('/service-categories', data),
   update: (id: number, data: any) => api.put(`/service-categories/${id}`, data),

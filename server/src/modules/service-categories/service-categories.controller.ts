@@ -2,6 +2,15 @@ import { Request, Response } from 'express';
 import serviceCategoriesService from './service-categories.service';
 
 class ServiceCategoriesController {
+  async browse(req: Request, res: Response) {
+    try {
+      const result = await serviceCategoriesService.browse();
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
   async list(req: Request, res: Response) {
     try {
       const result = await serviceCategoriesService.list(req.query);

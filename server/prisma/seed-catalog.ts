@@ -55,6 +55,20 @@ async function seedGroups() {
   console.log(`  ${allSections.length} groups seeded.`);
 }
 
+async function seedCategories() {
+  console.log('Seeding service categories (README headings)...');
+  let totalCategories = 0;
+  for (const section of allSections) {
+    await prisma.service_categories.upsert({
+      where: { name: section.name },
+      update: { description: section.description ?? null, sort_order: section.display_order, is_active: true },
+      create: { name: section.name, description: section.description ?? null, sort_order: section.display_order, is_active: true },
+    });
+    totalCategories++;
+  }
+  console.log(`  ${totalCategories} categories seeded.`);
+}
+
 async function seedServices() {
   console.log('Seeding services...');
   let totalServices = 0;
@@ -63,6 +77,9 @@ async function seedServices() {
   for (const section of allSections) {
     const group = await prisma.service_groups.findUnique({ where: { slug: section.slug } });
     if (!group) throw new Error(`Group not found: ${section.slug}`);
+
+    const category = await prisma.service_categories.findUnique({ where: { name: section.name } });
+    if (!category) throw new Error(`Category not found: ${section.name}`);
 
     for (const svc of section.services) {
       const category = (svc.category || 'other') as any;
@@ -73,6 +90,7 @@ async function seedServices() {
           name: svc.name,
           description: svc.description ?? null,
           category,
+          category_id: category.id,
           service_type: 'Individual',
           price: legacy.base,
           vip_price: legacy.vip,
@@ -96,6 +114,7 @@ async function seedServices() {
           slug: svc.slug,
           description: svc.description ?? null,
           category,
+          category_id: category.id,
           service_type: 'Individual',
           price: legacy.base,
           vip_price: legacy.vip,
@@ -183,7 +202,7 @@ async function retireOrphanedServices() {
 
 async function retireOrphanedGroups() {
   console.log('Sinking orphaned service groups (not in current catalog)...');
-  const currentGroupSlugs = new Set(allSections.map(s => s.slug));
+  const currentGroupSlugs = new Set(allSections.map((s) => s.slug));
   const groups = await prisma.service_groups.findMany();
 
   let sunk = 0;
@@ -191,12 +210,30 @@ async function retireOrphanedGroups() {
     if (!currentGroupSlugs.has(group.slug)) {
       await prisma.service_groups.update({
         where: { id: group.id },
-        data: { display_order: 999 },
+        data: { display_order: 999, is_bookable: false },
       });
       sunk++;
     }
   }
-  console.log(`  ${sunk} orphaned groups sunk to bottom.`);
+  console.log(`  ${sunk} orphaned groups sunk to bottom & hidden.`);
+}
+
+async function retireOrphanedCategories() {
+  console.log('Retiring orphaned service categories (not in current catalog)...');
+  const currentNames = new Set(allSections.map((s) => s.name));
+  const categories = await prisma.service_categories.findMany();
+
+  let retired = 0;
+  for (const cat of categories) {
+    if (!currentNames.has(cat.name)) {
+      await prisma.service_categories.update({
+        where: { id: cat.id },
+        data: { is_active: false },
+      });
+      retired++;
+    }
+  }
+  console.log(`  ${retired} orphaned categories hidden.`);
 }
 
 function getLegacyPrices(svc: CatalogServiceInput) {
@@ -216,9 +253,11 @@ function getLegacyPrices(svc: CatalogServiceInput) {
 async function main() {
   console.log('=== Catalog Seed ===');
   await seedGroups();
+  await seedCategories();
   await seedServices();
   await retireOrphanedServices();
   await retireOrphanedGroups();
+  await retireOrphanedCategories();
   console.log('=== Catalog Seed Complete ===');
 }
 

@@ -15,6 +15,7 @@ interface Service {
   price: number;
   duration: number;
   category: string;
+  category_name?: string;
 }
 
 export default function PublicServices() {
@@ -53,13 +54,13 @@ export default function PublicServices() {
   }, []);
 
   const categories = useMemo(() => {
-    const cats = [...new Set(services.map((s) => s.category))];
+    const cats = [...new Set(services.map((s) => s.category_name || s.category))];
     return ['All', ...cats];
   }, [services]);
 
   const filtered = useMemo(() => {
     if (activeCategory === 'All') return services;
-    return services.filter((s) => s.category === activeCategory);
+    return services.filter((s) => (s.category_name || s.category) === activeCategory);
   }, [services, activeCategory]);
 
   return (
@@ -119,7 +120,7 @@ export default function PublicServices() {
                     <div className="mt-2 flex items-center gap-3 text-xs uppercase tracking-wide text-neutral-400">
                       <span className="flex items-center gap-1.5"><Clock size={12} /> {service.duration} min</span>
                       <span className="text-neutral-300">·</span>
-                      <span>{formatCategory(service.category)}</span>
+                      <span>{formatCategory(service.category_name || service.category)}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-5 flex-shrink-0">

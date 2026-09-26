@@ -11,6 +11,7 @@ interface Service {
   non_member_price?: number | null;
   duration: number;
   category: string;
+  category_name?: string;
 }
 
 interface ServiceSelectorProps {
@@ -99,7 +100,7 @@ export default function ServiceSelector({
                     <Clock size={11} />
                     <span>{s.duration} min</span>
                     <span className="mx-0.5">·</span>
-                    <span>{formatCategory(s.category)}</span>
+                    <span>{formatCategory(s.category_name || s.category)}</span>
                   </div>
                 </div>
                 <div className="text-right">

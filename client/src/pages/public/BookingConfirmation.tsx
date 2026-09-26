@@ -1,6 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
 import { CheckCircle, Calendar, Clock } from 'lucide-react';
-import ChatbotWidget from '../../components/chatbot/ChatbotWidget';
 import { formatServicePrice } from '../../utils/format';
 
 interface LocationState {
@@ -110,8 +109,6 @@ export default function BookingConfirmation() {
           </div>
         </div>
       </div>
-
-      <ChatbotWidget />
     </div>
   );
 }

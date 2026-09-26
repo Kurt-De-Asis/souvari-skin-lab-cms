@@ -14,6 +14,7 @@ import DateSelector from '../../components/booking/DateSelector';
 import TimeSlotPicker from '../../components/booking/TimeSlotPicker';
 import BookingSummary from '../../components/booking/BookingSummary';
 import Modal from '../../components/ui/Modal';
+import { formatServicePrice } from '../../utils/format';
 
 interface Service {
   id: number;
@@ -24,7 +25,17 @@ interface Service {
   non_member_price?: number | null;
   duration: number;
   category: string;
+  category_name?: string;
+  group?: { id: number; slug: string; name: string; description?: string | null; display_order: number } | null;
   staff?: Array<{ id: number; first_name: string; last_name: string }>;
+}
+
+function serviceGroupKey(s: { category?: string; group?: { slug?: string | null } | null }): string {
+  return s.group?.slug ?? (s.category || 'other');
+}
+
+function serviceCategoryName(s: { category?: string; category_name?: string | null; group?: { name?: string | null } | null }): string {
+  return s.group?.name ?? s.category_name ?? s.category ?? '';
 }
 
 interface TimeSlot {
@@ -53,51 +64,6 @@ const SINGLE_DETAILS_STEP = 3;
 const MULTI_SERVICES_STEP = 0;
 const MULTI_SCHEDULE_STEP = 1;
 const MULTI_DETAILS_STEP = 2;
-
-const GROUPS: { key: string; label: string; description: string; categories: string[] }[] = [
-  {
-    key: 'facials',
-    label: 'Facials & Skin Treatments',
-    description: 'Deep-cleansing facials, glow treatments and clinical skin care, personalized to your concern.',
-    categories: ['facial', 'laser'],
-  },
-  {
-    key: 'rejuvenation',
-    label: 'HIFU, Peels & Rejuvenation',
-    description: 'Lifting, contouring and renewal — from peels and microdermabrasion to HIFU.',
-    categories: ['skin_rejuvenation'],
-  },
-  {
-    key: 'hair_removal',
-    label: 'Laser & IPL Hair Removal',
-    description: 'Smooth, low-maintenance skin — safely, session by session.',
-    categories: ['hair_removal'],
-  },
-  {
-    key: 'body',
-    label: 'Body, Whitening & Waxing',
-    description: 'Body treatments, laser whitening and waxing for cared-for skin.',
-    categories: ['body'],
-  },
-  {
-    key: 'injectables',
-    label: 'Injectables & Botox',
-    description: 'Clinical botox, fillers and regenerative procedures administered by licensed physicians.',
-    categories: ['injection'],
-  },
-  {
-    key: 'consults_packages',
-    label: 'Session Packages',
-    description: 'Commit to a multi-session results program for skin, body and laser treatments.',
-    categories: ['consultation', 'package'],
-  },
-  {
-    key: 'beauty',
-    label: 'Brows, Lashes, Nails & Spa',
-    description: 'Polished details — permanent makeup, lashes, nails and hand-and-foot rituals.',
-    categories: ['other'],
-  },
-];
 
 const DRAFT_KEY = 'souvari_booking_draft';
 
@@ -196,15 +162,27 @@ export default function BookingPage() {
   const isDetailsStep = useCallback((s: number) => (isSingle ? s === SINGLE_DETAILS_STEP : s === MULTI_DETAILS_STEP), [isSingle]);
 
   const groups = useMemo<BookingGroup[]>(() => {
-    return GROUPS.map((g) => ({
-      key: g.key,
-      label: g.label,
-      description: g.description,
-      count: allServices.filter((s) => g.categories.includes(s.category)).length,
-    })).filter((g) => g.count > 0);
+    const byKey = new Map<string, { label: string; description: string; order: number; count: number }>();
+    for (const s of allServices) {
+      const key = serviceGroupKey(s);
+      const existing = byKey.get(key);
+      if (existing) {
+        existing.count++;
+      } else {
+        byKey.set(key, {
+          label: serviceCategoryName(s),
+          description: s.group?.description ?? '',
+          order: s.group?.display_order ?? 999,
+          count: 1,
+        });
+      }
+    }
+    return [...byKey.entries()]
+      .map(([key, v]) => ({ key, label: v.label, description: v.description, count: v.count }))
+      .sort((a, b) => (byKey.get(a.key)!.order - byKey.get(b.key)!.order));
   }, [allServices]);
 
-  const activeGroup = useMemo(() => GROUPS.find((g) => g.key === selectedGroup) || null, [selectedGroup]);
+  const activeGroup = useMemo(() => groups.find((g) => g.key === selectedGroup) || null, [groups, selectedGroup]);
 
   const bookingServices = useMemo<Service[]>(() => {
     return selectedServices;
@@ -251,8 +229,7 @@ export default function BookingPage() {
         if (preselectedServiceId) {
           const found = all.find((s: Service) => s.id === preselectedServiceId);
           if (found) {
-            const g = GROUPS.find((grp) => grp.categories.includes(found.category));
-            setSelectedGroup(g?.key || '');
+            setSelectedGroup(serviceGroupKey(found));
             setSelectedServices([found]);
           }
         }
@@ -392,13 +369,13 @@ export default function BookingPage() {
   
 
   const categories = useMemo(() => {
-    const cats = [...new Set(allServices.map((s) => s.category))];
+    const cats = [...new Set(allServices.map((s) => serviceCategoryName(s) || s.category))];
     return ['All', ...cats];
   }, [allServices]);
 
   const filteredServices = useMemo(() => {
     if (serviceCategory === 'All') return allServices;
-    return allServices.filter((s) => s.category === serviceCategory);
+    return allServices.filter((s) => (serviceCategoryName(s) || s.category) === serviceCategory);
   }, [allServices, serviceCategory]);
 
   const consultationService = useMemo<Service | undefined>(() => {
@@ -406,11 +383,11 @@ export default function BookingPage() {
   }, [allServices]);
 
   const treatmentServices = useMemo(() => {
-    if (!activeGroup) return [];
-    const grouped = allServices.filter((s) => activeGroup.categories.includes(s.category));
+    if (!selectedGroup) return [];
+    const grouped = allServices.filter((s) => serviceGroupKey(s) === selectedGroup);
     if (!consultationService) return grouped;
     return [consultationService, ...grouped.filter((s) => s.id !== consultationService.id)];
-  }, [activeGroup, allServices, consultationService]);
+  }, [selectedGroup, allServices, consultationService]);
 
   const availableStaff = useMemo(() => {
     const seen = new Map<number, string>();
@@ -789,7 +766,7 @@ export default function BookingPage() {
                 </button>
               )}
 
-              <div className="flex gap-3 mt-4">
+              <div className="hidden md:flex gap-3 mt-4">
                 {step > 0 && (
                   <button onClick={handleBack} className="btn-secondary flex-1 justify-center">
                     <ArrowLeft size={16} /> Back
@@ -809,6 +786,49 @@ export default function BookingPage() {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile sticky action bar */}
+        <div className="md:hidden sticky bottom-0 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-white/95 backdrop-blur border-t border-neutral-200 z-30">
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 shrink-0">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-neutral-500">
+                Total{membership ? ' · VIP' : ''}
+              </p>
+              <p className="font-sans font-semibold text-neutral-900 leading-tight">
+                {totalPrice > 0 ? formatServicePrice(totalPrice) : 'Free'}
+                {membership && totalRegularPrice > totalPrice && (
+                  <span className="ml-1.5 text-xs text-neutral-400 line-through">
+                    {formatServicePrice(totalRegularPrice)}
+                  </span>
+                )}
+              </p>
+            </div>
+            <div className="flex gap-2 flex-1 justify-end min-w-0">
+              {step > 0 && (
+                <button onClick={handleBack} className="btn-secondary !px-4 shrink-0">
+                  <ArrowLeft size={16} />
+                </button>
+              )}
+              <button
+                onClick={handleNext}
+                disabled={!canNext()}
+                className="btn-primary flex-1 justify-center !px-4 whitespace-nowrap"
+              >
+                {isDetailsStep(step) ? (
+                  submitting ? (
+                    <><Loader2 size={16} className="animate-spin" /> Booking...</>
+                  ) : (
+                    <><CheckCircle size={16} /> Confirm</>
+                  )
+                ) : (
+                  <>
+                    Continue <ArrowRight size={16} />
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

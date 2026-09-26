@@ -200,7 +200,7 @@ export default function Products() {
               className="input-field pl-10"
             />
           </div>
-          <select className="select-field w-auto" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+          <select className="select-field w-full sm:w-auto" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
             <option value="">All Categories</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>

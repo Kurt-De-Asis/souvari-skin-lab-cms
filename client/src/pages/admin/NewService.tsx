@@ -309,7 +309,7 @@ export default function NewService() {
 
                 <div>
                   <label className="label">Status</label>
-                  <select className="select-field w-auto" {...register('status')}>
+                  <select className="select-field w-full sm:w-auto" {...register('status')}>
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                     <option value="draft">Draft</option>

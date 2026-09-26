@@ -7,6 +7,7 @@ import { serviceCategoryQuerySchema, createServiceCategorySchema, updateServiceC
 
 const router = Router();
 
+router.get('/browse', serviceCategoriesController.browse);
 router.get('/', serviceCategoriesController.list);
 router.get('/:id', serviceCategoriesController.getById);
 router.post('/', authenticate, authorize('admin'), validate(createServiceCategorySchema), serviceCategoriesController.create);

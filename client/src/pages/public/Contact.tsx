@@ -1,7 +1,6 @@
 import { useForm } from 'react-hook-form';
 import { MapPin, Phone, Mail, Clock, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
-import ChatbotWidget from '../../components/chatbot/ChatbotWidget';
 import { contactApi } from '@/api';
 
 interface ContactForm {
@@ -181,8 +180,6 @@ export default function Contact() {
           </div>
         </div>
       </section>
-
-      <ChatbotWidget />
     </div>
   );
 }

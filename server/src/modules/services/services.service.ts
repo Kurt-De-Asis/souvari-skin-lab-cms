@@ -32,6 +32,10 @@ class ServicesService {
     return labels[category] ?? '';
   }
 
+  private categoryDisplayName<T extends { category?: string | null; group?: { name?: string | null } | null; category_ref?: { name?: string | null } | null }>(service: T): string {
+    return service.group?.name ?? service.category_ref?.name ?? this.categoryLabel(service.category ?? '');
+  }
+
   private withFallbackDescription<T extends { description?: string | null; category?: string; name?: string; inclusions?: unknown }>(service: T): T {
     if (service.description && service.description.trim() !== '') {
       return service;
@@ -65,6 +69,7 @@ class ServicesService {
     const where: any = { deleted_at: null };
 
     if (query.category) where.category = query.category;
+    if (query.category_id) where.category_id = query.category_id;
     if (query.status) where.status = query.status;
     if (query.is_active !== undefined) where.is_active = query.is_active;
     if (query.search) {
@@ -88,12 +93,19 @@ class ServicesService {
               },
             },
           },
+          category_ref: { select: { id: true, name: true } },
+          group: { select: { id: true, slug: true, name: true, description: true, display_order: true } },
         },
       }),
       prisma.services.count({ where }),
     ]);
 
-    return createPaginatedResult(data, total, { page, limit, skip });
+    const dataWithCategory = data.map((s) => ({
+      ...s,
+      category_name: s.group?.name ?? s.category_ref?.name ?? this.categoryLabel(s.category),
+    }));
+
+    return createPaginatedResult(dataWithCategory, total, { page, limit, skip });
   }
 
   async listPublic(query: PublicServiceQueryInput): Promise<PaginatedResult<any>> {
@@ -106,6 +118,7 @@ class ServicesService {
     };
 
     if (query.category) where.category = query.category;
+    if (query.category_id) where.category_id = query.category_id;
     if (query.search) {
       where.OR = [
         { name: { contains: query.search } },
@@ -124,6 +137,7 @@ class ServicesService {
           name: true,
           description: true,
           category: true,
+          category_id: true,
           price: true,
           vip_price: true,
           non_member_price: true,
@@ -131,6 +145,8 @@ class ServicesService {
           image_url: true,
           needs_verification: true,
           inclusions: true,
+          category_ref: { select: { id: true, name: true } },
+          group: { select: { id: true, slug: true, name: true, description: true, display_order: true } },
         },
       }),
       prisma.services.count({ where }),
@@ -151,6 +167,7 @@ class ServicesService {
       price: s.price ? Number(s.price) : null,
       vip_price: s.vip_price ? Number(s.vip_price) : null,
       non_member_price: s.non_member_price ? Number(s.non_member_price) : null,
+      category_name: s.group?.name ?? s.category_ref?.name ?? this.categoryLabel(s.category ?? ''),
       staff: activeStaff,
     })).map((s: any) => this.withFallbackDescription(s));;
 
@@ -165,6 +182,7 @@ class ServicesService {
         name: true,
         description: true,
         category: true,
+        category_id: true,
         price: true,
         vip_price: true,
         non_member_price: true,
@@ -172,6 +190,8 @@ class ServicesService {
         image_url: true,
         needs_verification: true,
         inclusions: true,
+        category_ref: { select: { id: true, name: true } },
+        group: { select: { id: true, slug: true, name: true, description: true, display_order: true } },
       },
     });
 
@@ -195,6 +215,7 @@ class ServicesService {
       price: service.price ? Number(service.price) : null,
       vip_price: service.vip_price ? Number(service.vip_price) : null,
       non_member_price: service.non_member_price ? Number(service.non_member_price) : null,
+      category_name: service.group?.name ?? service.category_ref?.name ?? this.categoryLabel(service.category ?? ''),
       staff: activeStaff,
     });
   }
@@ -245,6 +266,7 @@ class ServicesService {
         name: data.name,
         description: data.description,
         category: data.category,
+        category_id: data.category_id,
         price: data.price,
         duration_minutes: data.duration_minutes,
         image_url: data.image_url,
