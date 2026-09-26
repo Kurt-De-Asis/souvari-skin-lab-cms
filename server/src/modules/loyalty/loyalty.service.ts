@@ -36,13 +36,45 @@ export class LoyaltyService {
       orderBy: { spend_threshold: 'asc' },
     });
 
+    // Compute live spend from the customer's transaction history so the
+    // membership dashboard always reflects completed purchases.
+    const [qualifyingResult, totalResult] = await Promise.all([
+      prisma.transactions.aggregate({
+        where: {
+          customer_id: membership.customer_id,
+          payment_status: 'paid',
+          deleted_at: null,
+          NOT: {
+            OR: [{ type: 'refund' }],
+          },
+        },
+        _sum: { total_amount: true },
+      }),
+      prisma.transactions.aggregate({
+        where: {
+          customer_id: membership.customer_id,
+          deleted_at: null,
+        },
+        _sum: { total_amount: true },
+      }),
+    ]);
+
+    const qualifyingSpend = Number(qualifyingResult._sum.total_amount ?? 0);
+    const totalSpend = Number(totalResult._sum.total_amount ?? 0);
+
+    // Keep the stored progress row in sync with the live figures.
+    await prisma.loyalty_progress.update({
+      where: { membership_id: membershipId },
+      data: { qualifying_spend: qualifyingSpend, total_spend: totalSpend },
+    });
+
     const recentLogs = await prisma.membership_activity_logs.findMany({
       where: { membership_id: membershipId },
       orderBy: { created_at: 'desc' },
       take: 8,
     });
 
-    const recentActivity = recentLogs.map((log) => {
+    const recentLogActivity = recentLogs.map((log) => {
       let parsed: any = {};
       try {
         parsed = JSON.parse(log.details ?? '{}');
@@ -88,6 +120,34 @@ export class LoyaltyService {
       };
     });
 
+    // Transaction-derived activity so completed services and purchases show up.
+    const recentTransactions = await prisma.transactions.findMany({
+      where: {
+        customer_id: membership.customer_id,
+        type: 'sale',
+        payment_status: 'paid',
+        deleted_at: null,
+      },
+      orderBy: { created_at: 'desc' },
+      take: 8,
+      include: { items: { select: { description: true } } },
+    });
+
+    const txActivity = recentTransactions.map((tx) => {
+      const lineItems = tx.items.map((i) => i.description).filter(Boolean);
+      return {
+        id: tx.id,
+        type: 'spend',
+        description: lineItems.length > 0 ? `Paid for ${lineItems.join(', ')}` : 'Service payment',
+        amount: Number(tx.total_amount),
+        created_at: tx.created_at,
+      };
+    });
+
+    const recentActivity = [...recentLogActivity, ...txActivity]
+      .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())
+      .slice(0, 8);
+
     return {
       membership: {
         id: membership.id,
@@ -96,8 +156,8 @@ export class LoyaltyService {
         plan: membership.plan,
       },
       progress: {
-        qualifying_spend: progress.qualifying_spend,
-        total_spend: progress.total_spend,
+        qualifying_spend: qualifyingSpend,
+        total_spend: totalSpend,
         highest_reward_pct: progress.highest_reward_pct,
         updated_at: progress.updated_at,
       },

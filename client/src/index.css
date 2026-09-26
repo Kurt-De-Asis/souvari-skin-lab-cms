@@ -125,8 +125,8 @@
   to { opacity: 1; transform: translateY(0); }
 }
 @keyframes page-enter {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 @keyframes shimmer {
   from { background-position: -400px 0; }

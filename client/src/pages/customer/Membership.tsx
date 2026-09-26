@@ -10,7 +10,6 @@ import {
   Clock,
   TrendingUp,
   Tag,
-  Send,
   CheckCircle2,
   AlertCircle,
   Activity,
@@ -35,17 +34,11 @@ export default function Membership() {
   const { user } = useAuth();
   const [membership, setMembership] = useState<any>(null);
   const [loyalty, setLoyalty] = useState<any>(null);
-  const [milestones, setMilestones] = useState<any[]>([]);
   const [perk, setPerk] = useState<any>(null);
-  const [referralBalance, setReferralBalance] = useState<number>(0);
-  const [referralCode, setReferralCode] = useState<string>('');
   const [gifts, setGifts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [referralModalOpen, setReferralModalOpen] = useState(false);
   const [giftModalOpen, setGiftModalOpen] = useState(false);
-  const [referralName, setReferralName] = useState('');
-  const [referralEmail, setReferralEmail] = useState('');
   const [giftName, setGiftName] = useState('');
   const [giftEmail, setGiftEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -124,29 +117,22 @@ export default function Membership() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [memRes, perkRes, milestoneRes, giftRes] = await Promise.allSettled([
+      const [memRes, perkRes, giftRes] = await Promise.allSettled([
         membershipsApi.getMe(),
         monthlyPerksApi.getMe(),
-        loyaltyApi.listMilestones(),
         membershipGiftsApi.getMe(),
       ]);
 
       if (memRes.status === 'fulfilled') {
         const mem = memRes.value.data.data;
         setMembership(mem);
-        if (mem?.id) {
-          try {
-            const progRes = await loyaltyApi.getProgress(mem.id);
-            setLoyalty(progRes.data.data);
-          } catch { /* skip */ }
-        }
+        try {
+          const progRes = await loyaltyApi.getMe();
+          setLoyalty(progRes.data.data);
+        } catch { /* skip */ }
       }
       if (perkRes.status === 'fulfilled') {
         setPerk(perkRes.value.data.data);
-      }
-      if (milestoneRes.status === 'fulfilled') {
-        const mData = milestoneRes.value.data.data;
-        setMilestones(Array.isArray(mData) ? mData : mData?.items || []);
       }
       if (giftRes.status === 'fulfilled') {
         const gData = giftRes.value.data.data;
@@ -164,19 +150,12 @@ export default function Membership() {
   }, [fetchData]);
 
   const copyCode = () => {
-    const code = membership?.code || membership?.membership_code || referralCode;
+    const code = membership?.code || membership?.membership_code;
     if (code) {
       navigator.clipboard.writeText(code);
       setCopied(true);
       toast.success('Copied to clipboard');
       setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const copyReferralCode = () => {
-    if (referralCode) {
-      navigator.clipboard.writeText(referralCode);
-      toast.success('Referral code copied');
     }
   };
 
@@ -190,25 +169,6 @@ export default function Membership() {
       toast.error(err.response?.data?.message || 'Failed to use perk');
     } finally {
       setUsingPerk(false);
-    }
-  };
-
-  const handleReferFriend = async () => {
-    if (!referralName.trim() || !referralEmail.trim()) {
-      toast.error('Please fill in all fields');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      // TODO: implement referral API
-      toast.success('Referral feature coming soon!');
-      setReferralModalOpen(false);
-      setReferralName('');
-      setReferralEmail('');
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to send referral');
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -236,76 +196,78 @@ export default function Membership() {
     }
   };
 
-  const availPaymentModal = availPaymentOpen && availPaymentPlan
-    ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="w-full max-w-md bg-white rounded-md shadow-xl">
-            <div className="p-4 border-b border-neutral-200">
-              <h2 className="text-lg font-semibold text-neutral-900">Avail Membership</h2>
-              <p className="text-sm text-neutral-500 mt-1">{availPaymentPlan.name}</p>
-            </div>
-            <div className="p-4 space-y-4">
-              <div className="bg-neutral-50 p-3 rounded-md">
-                <div className="flex justify-between text-sm">
-                  <span>Plan Price</span>
-                  <span className="font-semibold">₱{Number(availPaymentPlan.promo_price ?? availPaymentPlan.regular_price ?? 0).toLocaleString()}</span>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-neutral-700">Payment Type</label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { setAvailPaymentType('FULL'); setAvailAmountPaid(Number(availPaymentPlan.promo_price ?? availPaymentPlan.regular_price ?? 0)); }}
-                    className={`flex-1 py-2 px-3 text-sm rounded-md border transition ${availPaymentType === 'FULL' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 text-neutral-700 hover:border-primary-500'}`}
-                  >
-                    Full Payment
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setAvailPaymentType('DOWN_PAYMENT'); setAvailAmountPaid(Math.round(Number(availPaymentPlan.promo_price ?? availPaymentPlan.regular_price ?? 0) * 0.3)); }}
-                    className={`flex-1 py-2 px-3 text-sm rounded-md border transition ${availPaymentType === 'DOWN_PAYMENT' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 text-neutral-700 hover:border-primary-500'}`}
-                  >
-                    Down Payment (30%)
-                  </button>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-neutral-700">Payment Method</label>
-                <select value={availPaymentMethod} onChange={e => setAvailPaymentMethod(e.target.value)} className="select-field">
-                  {PAYMENT_METHODS.map(m => (
-                    <option key={m} value={m}>{formatPaymentMethod(m)}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-neutral-700">Amount Paid</label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  className="input-field hide-number-spinners"
-                  value={availAmountPaid ? formatAmountInput(String(availAmountPaid)) : ''}
-                  onChange={e => setAvailAmountPaid(parseAmountInput(e.target.value) || 0)}
-                />
-              </div>
-            </div>
-            <div className="p-4 border-t border-neutral-200 flex gap-3 justify-end">
-              <button onClick={() => { setAvailPaymentOpen(false); setAvailPaymentPlan(null); }} className="btn-secondary" disabled={availSubmitting}>
-                Cancel
-              </button>
-              <button onClick={handleAvailPaymentSubmit} disabled={availSubmitting} className="btn-primary">
-                {availSubmitting ? 'Processing...' : 'Confirm & Avail'}
-              </button>
-            </div>
+  const availPaymentModal = availPaymentOpen && availPaymentPlan ? (
+    <Modal
+      open={availPaymentOpen}
+      onClose={() => { setAvailPaymentOpen(false); setAvailPaymentPlan(null); }}
+      title="Avail Membership"
+      maxWidth="max-w-md"
+    >
+      <div className="space-y-4">
+        <div className="bg-neutral-50 p-3 rounded-md">
+          <div className="flex justify-between text-sm">
+            <span>Plan Price</span>
+            <span className="font-semibold">₱{Number(availPaymentPlan.promo_price ?? availPaymentPlan.regular_price ?? 0).toLocaleString()}</span>
           </div>
         </div>
-      )
-    : null;
+        <div className="space-y-3">
+          <label className="block text-sm font-medium text-neutral-700">Payment Type</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => { setAvailPaymentType('FULL'); setAvailAmountPaid(Number(availPaymentPlan.promo_price ?? availPaymentPlan.regular_price ?? 0)); }}
+              className={`flex-1 py-2 px-3 text-sm rounded-md border transition ${availPaymentType === 'FULL' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 text-neutral-700 hover:border-primary-500'}`}
+            >
+              Full Payment
+            </button>
+            <button
+              type="button"
+              onClick={() => { setAvailPaymentType('DOWN_PAYMENT'); setAvailAmountPaid(Math.round(Number(availPaymentPlan.promo_price ?? availPaymentPlan.regular_price ?? 0) * 0.3)); }}
+              className={`flex-1 py-2 px-3 text-sm rounded-md border transition ${availPaymentType === 'DOWN_PAYMENT' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 text-neutral-700 hover:border-primary-500'}`}
+            >
+              Down Payment (30%)
+            </button>
+          </div>
+        </div>
+        <div className="space-y-3">
+          <label className="block text-sm font-medium text-neutral-700">Payment Method</label>
+          <select value={availPaymentMethod} onChange={e => setAvailPaymentMethod(e.target.value)} className="select-field">
+            {PAYMENT_METHODS.map(m => (
+              <option key={m} value={m}>{formatPaymentMethod(m)}</option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-3">
+          <label className="block text-sm font-medium text-neutral-700">Amount Paid</label>
+          <input
+            type="text"
+            inputMode="decimal"
+            className="input-field hide-number-spinners"
+            value={availAmountPaid ? formatAmountInput(String(availAmountPaid)) : ''}
+            onChange={e => setAvailAmountPaid(parseAmountInput(e.target.value) || 0)}
+          />
+        </div>
+        <div className="flex gap-3 justify-end pt-2">
+          <button
+            onClick={() => { setAvailPaymentOpen(false); setAvailPaymentPlan(null); }}
+            className="btn-secondary"
+            disabled={availSubmitting}
+          >
+            Cancel
+          </button>
+          <button onClick={handleAvailPaymentSubmit} disabled={availSubmitting} className="btn-primary">
+            {availSubmitting ? 'Processing...' : 'Confirm & Avail'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  ) : null;
 
   if (loading) return <LoadingSpinner fullScreen />;
 
   if (!membership) {
     return (
+      <>
       <div className="space-y-6">
         <h1 className="text-2xl font-bold text-neutral-900">Membership</h1>
         <div className="card text-center py-12">
@@ -389,10 +351,11 @@ export default function Membership() {
             </div>
           )}
         </div>
-
-        {availPaymentModal}
       </div>
-    );
+
+      {availPaymentModal}
+    </>
+  );
   }
 
   const plan = membership.membership_plan || membership.plan || {};
@@ -401,14 +364,11 @@ export default function Membership() {
   const startDate = membership.start_date || membership.created_at;
   const endDate = membership.end_date;
   const daysRemaining = endDate ? Math.max(0, dayjs(endDate).diff(dayjs(), 'day')) : null;
-  const totalSpending = loyalty?.total_spend || loyalty?.total_spent || 0;
+  const totalSpending = Number(loyalty?.progress?.total_spend ?? loyalty?.total_spend ?? loyalty?.total_spent ?? 0);
   const is12Month = plan.duration_months >= 12 || plan.duration === 12 || plan.duration_months === 12;
 
   const perkStatus = perk?.status || 'unavailable';
   const perkUsedDate = perk?.used_at || perk?.used_date;
-
-  const loyaltyTarget = loyalty?.next_milestone?.target_amount || loyalty?.target || 18000;
-  const loyaltyProgress = Math.min(100, (totalSpending / loyaltyTarget) * 100);
 
   return (
     <>
@@ -509,7 +469,7 @@ export default function Membership() {
       )}
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="card">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-neutral-100 rounded-lg">
@@ -518,16 +478,6 @@ export default function Membership() {
             <p className="text-xs text-neutral-500 uppercase tracking-wide">Total Spending</p>
           </div>
           <p className="text-2xl font-bold text-neutral-900">₱{totalSpending.toLocaleString()}</p>
-        </div>
-
-        <div className="card">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-neutral-100 rounded-lg">
-              <Users size={18} className="text-neutral-600" />
-            </div>
-            <p className="text-xs text-neutral-500 uppercase tracking-wide">Referral Credits</p>
-          </div>
-          <p className="text-2xl font-bold text-neutral-900">₱{referralBalance.toLocaleString()}</p>
         </div>
 
         <div className="card">
@@ -629,96 +579,7 @@ export default function Membership() {
         </div>
       </div>
 
-      {/* Loyalty Progress */}
-      <div className="card">
-        <h2 className="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
-          <TrendingUp size={18} /> Loyalty Progress
-        </h2>
-
-        <div className="mb-4">
-          <div className="flex justify-between text-sm mb-2">
-            <span className="text-neutral-500">Current Spend</span>
-            <span className="font-semibold text-neutral-900">
-              ₱{totalSpending.toLocaleString()} / ₱{loyaltyTarget.toLocaleString()}
-            </span>
-          </div>
-          <div className="w-full bg-neutral-100 rounded-full h-3">
-            <div
-              className="bg-neutral-900 h-3 rounded-full transition-all duration-500"
-              style={{ width: `${loyaltyProgress}%` }}
-            />
-          </div>
-        </div>
-
-        {milestones.length > 0 && (
-          <div className="space-y-2">
-            {milestones.map((m: any) => {
-              const target = m.target_amount || m.amount || 0;
-              const reached = totalSpending >= target;
-              return (
-                <div
-                  key={m.id}
-                  className={`flex items-center justify-between p-3 rounded-lg ${
-                    reached ? 'bg-green-50' : 'bg-neutral-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    {reached ? (
-                      <CheckCircle2 size={16} className="text-green-600" />
-                    ) : (
-                      <div className="w-4 h-4 rounded-full border-2 border-neutral-300" />
-                    )}
-                    <span className="text-sm font-medium text-neutral-900">
-                      {m.name || `₱${target.toLocaleString()} Milestone`}
-                    </span>
-                  </div>
-                  <span className="text-xs text-neutral-500">
-                    {reached ? 'Achieved' : `₱${target.toLocaleString()}`}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {milestones.length === 0 && (
-          <div className="text-center py-4">
-            <p className="text-sm text-neutral-500">No milestones configured yet</p>
-          </div>
-        )}
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Referral Section */}
-        <div className="card">
-          <h2 className="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
-            <Users size={18} /> Referrals
-          </h2>
-
-          <div className="bg-neutral-50 rounded-xl p-4 mb-4">
-            <p className="text-xs text-neutral-500 uppercase tracking-wide mb-1">Your Referral Code</p>
-            <div className="flex items-center gap-3">
-              <p className="font-mono text-lg font-semibold text-neutral-900 flex-1">
-                {referralCode || 'N/A'}
-              </p>
-              {referralCode && (
-                <button onClick={copyReferralCode} className="btn-ghost text-sm">
-                  <Copy size={14} /> Copy
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between p-4 bg-neutral-50 rounded-xl mb-4">
-            <span className="text-sm text-neutral-500">Available Credit</span>
-            <span className="text-xl font-bold text-neutral-900">₱{referralBalance.toLocaleString()}</span>
-          </div>
-
-          <button onClick={() => setReferralModalOpen(true)} className="btn-primary w-full">
-            <Send size={16} /> Refer a Friend
-          </button>
-        </div>
-
         {/* Gift Membership */}
         {is12Month && (
           <div className="card">
@@ -801,42 +662,6 @@ export default function Membership() {
           </div>
         )}
       </div>
-
-      {/* Refer a Friend Modal */}
-      <Modal open={referralModalOpen} onClose={() => setReferralModalOpen(false)} title="Refer a Friend">
-        <div className="space-y-4">
-          <p className="text-sm text-neutral-500">
-            Share the experience! Your friend will receive a special offer when they visit.
-          </p>
-          <div>
-            <label className="label">Friend's Name</label>
-            <input
-              value={referralName}
-              onChange={(e) => setReferralName(e.target.value)}
-              className="input-field"
-              placeholder="Juan Dela Cruz"
-            />
-          </div>
-          <div>
-            <label className="label">Friend's Email</label>
-            <input
-              type="email"
-              value={referralEmail}
-              onChange={(e) => setReferralEmail(e.target.value)}
-              className="input-field"
-              placeholder="juan@example.com"
-            />
-          </div>
-          <div className="flex gap-3 justify-end pt-2">
-            <button onClick={() => setReferralModalOpen(false)} className="btn-secondary">
-              Cancel
-            </button>
-            <button onClick={handleReferFriend} disabled={submitting} className="btn-primary">
-              {submitting ? 'Sending...' : 'Send Referral'}
-            </button>
-          </div>
-        </div>
-      </Modal>
 
       {/* Gift Membership Modal */}
       <Modal open={giftModalOpen} onClose={() => setGiftModalOpen(false)} title="Gift a Membership">

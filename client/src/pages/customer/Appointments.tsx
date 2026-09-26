@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Calendar, Clock, User, Trash2, Filter } from 'lucide-react';
+import { Calendar, Clock, User, Trash2, Filter, ArrowUp, ArrowDown } from 'lucide-react';
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
 import { appointmentsApi } from '@/api';
@@ -20,13 +20,14 @@ export default function Appointments() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [filter, setFilter] = useState<FilterType>('all');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [cancelModal, setCancelModal] = useState<any>(null);
   const [cancelling, setCancelling] = useState(false);
 
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = { page: String(page), limit: '10' };
+      const params: Record<string, string> = { page: String(page), limit: '10', sort_by: 'appointment_date', sort_order: sortOrder };
       if (user?.customer?.id) {
         params.customer_id = String(user.customer.id);
       }
@@ -46,7 +47,7 @@ export default function Appointments() {
     } finally {
       setLoading(false);
     }
-  }, [page, filter]);
+  }, [page, filter, sortOrder]);
 
   useEffect(() => {
     fetchAppointments();
@@ -81,6 +82,11 @@ export default function Appointments() {
     { value: 'upcoming', label: 'Upcoming' },
     { value: 'past', label: 'Past' },
   ];
+
+  const toggleSort = () => {
+    setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'));
+    setPage(1);
+  };
 
   return (
     <div className="space-y-6">
@@ -118,7 +124,16 @@ export default function Appointments() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-neutral-50 text-left text-neutral-500">
-                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Date</th>
+                    <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">
+                      <button
+                        onClick={toggleSort}
+                        className="inline-flex items-center gap-1 hover:text-neutral-800 transition"
+                        title={sortOrder === 'desc' ? 'Newest to oldest — click to sort oldest to newest' : 'Oldest to newest — click to sort newest to oldest'}
+                      >
+                        Date
+                        {sortOrder === 'desc' ? <ArrowDown size={12} /> : <ArrowUp size={12} />}
+                      </button>
+                    </th>
                     <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Time</th>
                     <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Service</th>
                     <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500">Staff</th>
