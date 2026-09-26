@@ -86,7 +86,7 @@ export class AppointmentService {
   }
 
   private withServices(a: any): any {
-    const { services, transactions, ...rest } = a;
+    const { services, transactions, appointment_date, ...rest } = a;
     const mapped = (services ?? []).map((as: any) => ({
       id: as.service_id,
       name: as.service.name,
@@ -94,7 +94,7 @@ export class AppointmentService {
       duration_minutes: as.duration_minutes ?? as.service.duration_minutes,
     }));
     const paid = (transactions ?? []).some((t: any) => t.payment_status === 'paid');
-    return { ...rest, services: mapped, paid };
+    return { ...rest, appointment_date, date: appointment_date, services: mapped, paid };
   }
 
   async getById(id: number) {
