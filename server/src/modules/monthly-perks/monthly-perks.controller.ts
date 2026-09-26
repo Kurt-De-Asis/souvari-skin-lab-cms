@@ -83,7 +83,7 @@ export class MonthlyPerksController {
 
       const perk = await monthlyPerksService.usePerk(
         membership_id,
-        discount_amount,
+        discount_amount ?? 300,
         transaction_id
       );
 

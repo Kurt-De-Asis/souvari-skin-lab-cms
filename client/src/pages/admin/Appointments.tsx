@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, CheckCircle2, XCircle, RefreshCw, LogIn, ArrowUp, ArrowDown } from 'lucide-react';
+import { CheckCircle2, XCircle, RefreshCw, LogIn, ArrowUp, ArrowDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import dayjs from 'dayjs';
 import { appointmentsApi, customersApi, staffApi, servicesApi } from '@/api';
@@ -29,15 +29,6 @@ interface Customer { id: number; first_name: string; last_name: string; }
 interface StaffMember { id: number; first_name: string; last_name: string; }
 interface ServiceItem { id: number; name: string; duration: number; price: number; }
 
-interface AppointmentForm {
-  customer_id: number;
-  staff_id: number;
-  service_id: number;
-  date: string;
-  start_time: string;
-  notes: string;
-}
-
 interface RescheduleForm {
   appointment_date: string;
   start_time: string;
@@ -63,10 +54,6 @@ export default function Appointments() {
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [servicesList, setServicesList] = useState<ServiceItem[]>([]);
 
-  // Create modal
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [createSubmitting, setCreateSubmitting] = useState(false);
-
   // Reschedule modal
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const [rescheduleAppointment, setRescheduleAppointment] = useState<Appointment | null>(null);
@@ -90,16 +77,9 @@ export default function Appointments() {
     }
   };
 
-  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<AppointmentForm>({
-    defaultValues: { customer_id: 0, staff_id: 0, service_id: 0, date: '', start_time: '', notes: '' },
-  });
-
   const { register: registerReschedule, handleSubmit: handleSubmitReschedule, reset: resetReschedule, formState: { errors: rescheduleErrors } } = useForm<RescheduleForm>({
     defaultValues: { appointment_date: '', start_time: '', reschedule_reason: '' },
   });
-
-  const selectedServiceId = watch('service_id');
-  const selectedService = servicesList.find((s) => s.id === Number(selectedServiceId));
 
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
@@ -136,26 +116,6 @@ export default function Appointments() {
   useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
   useEffect(() => { fetchDropdownData(); }, [fetchDropdownData]);
   useEffect(() => { setPage(1); }, [dateFrom, dateTo, statusFilter, staffFilter]);
-
-  const onCreateSubmit = async (values: AppointmentForm) => {
-    setCreateSubmitting(true);
-    try {
-      await appointmentsApi.create({
-        ...values,
-        customer_id: Number(values.customer_id),
-        staff_id: Number(values.staff_id),
-        service_id: Number(values.service_id),
-      });
-      toast.success('Appointment created');
-      setCreateModalOpen(false);
-      reset({ customer_id: 0, staff_id: 0, service_id: 0, date: '', start_time: '', notes: '' });
-      fetchAppointments();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to create appointment');
-    } finally {
-      setCreateSubmitting(false);
-    }
-  };
 
   const onRescheduleSubmit = async (values: RescheduleForm) => {
     if (!rescheduleAppointment) return;
@@ -217,10 +177,6 @@ export default function Appointments() {
           <h1 className="text-2xl font-sans font-semibold text-neutral-900">Appointments</h1>
           <p className="text-sm text-neutral-500 mt-1">Manage all clinic appointments</p>
         </div>
-        <button onClick={() => { setCreateModalOpen(true); reset({ customer_id: 0, staff_id: 0, service_id: 0, date: '', start_time: '', notes: '' }); }} className="btn-primary">
-          <Plus size={18} />
-          New Appointment
-        </button>
       </div>
 
       {/* Filters */}
@@ -387,69 +343,6 @@ export default function Appointments() {
           </div>
         )}
       </div>
-
-      {/* Create Appointment Modal */}
-      <Modal open={createModalOpen} onClose={() => setCreateModalOpen(false)} title="New Appointment" maxWidth="max-w-xl">
-        <form onSubmit={handleSubmit(onCreateSubmit)} className="space-y-4">
-          <div>
-            <label className="label">Customer</label>
-            <select className="select-field" {...register('customer_id', { required: 'Required', valueAsNumber: true })}>
-              <option value={0}>Select customer</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
-              ))}
-            </select>
-            {errors.customer_id && <p className="text-xs text-red-600 mt-1">{errors.customer_id.message}</p>}
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Service</label>
-              <select className="select-field" {...register('service_id', { required: 'Required', valueAsNumber: true })}>
-                <option value={0}>Select service</option>
-                {servicesList.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.duration}min)</option>
-                ))}
-              </select>
-              {errors.service_id && <p className="text-xs text-red-600 mt-1">{errors.service_id.message}</p>}
-            </div>
-            <div>
-              <label className="label">Staff</label>
-              <select className="select-field" {...register('staff_id', { required: 'Required', valueAsNumber: true })}>
-                <option value={0}>Select staff</option>
-                {staffList.map((s) => (
-                  <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
-                ))}
-              </select>
-              {errors.staff_id && <p className="text-xs text-red-600 mt-1">{errors.staff_id.message}</p>}
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Date</label>
-              <input type="date" className="input-field" {...register('date', { required: 'Required' })} />
-              {errors.date && <p className="text-xs text-red-600 mt-1">{errors.date.message}</p>}
-            </div>
-            <div>
-              <label className="label">Start Time</label>
-              <input type="time" className="input-field" {...register('start_time', { required: 'Required' })} />
-              {errors.start_time && <p className="text-xs text-red-600 mt-1">{errors.start_time.message}</p>}
-            </div>
-          </div>
-          {selectedService && (
-            <p className="text-xs text-neutral-500">Duration: {selectedService.duration} minutes</p>
-          )}
-          <div>
-            <label className="label">Notes</label>
-            <textarea className="input-field" rows={2} placeholder="Optional notes" {...register('notes')} />
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setCreateModalOpen(false)} className="btn-secondary">Cancel</button>
-            <button type="submit" disabled={createSubmitting} className="btn-primary">
-              {createSubmitting ? 'Creating...' : 'Create Appointment'}
-            </button>
-          </div>
-        </form>
-      </Modal>
 
       {/* Reschedule Modal */}
       <Modal open={rescheduleModalOpen} onClose={() => setRescheduleModalOpen(false)} title="Reschedule Appointment">

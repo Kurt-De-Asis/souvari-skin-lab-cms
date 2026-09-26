@@ -7,6 +7,9 @@ import { createReviewSchema, reviewQuerySchema } from './reviews.validation';
 
 const router = Router();
 
+// Public aggregate rating per service (used on the public services pages, no login required).
+router.get('/service/:serviceId/stats', reviewsController.getServiceStats);
+
 router.use(authenticate);
 
 router.get('/', authorize('admin'), validate(reviewQuerySchema, 'query'), reviewsController.list);
@@ -14,8 +17,6 @@ router.get('/', authorize('admin'), validate(reviewQuerySchema, 'query'), review
 router.get('/mine', reviewsController.getMine);
 
 router.get('/appointment/:appointmentId', reviewsController.getByAppointment);
-
-router.get('/service/:serviceId/stats', reviewsController.getServiceStats);
 
 router.post('/', validate(createReviewSchema), reviewsController.create);
 

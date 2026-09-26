@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, ArrowRight } from 'lucide-react';
-import { servicesApi } from '../../api';
+import { Clock, ArrowRight, Star } from 'lucide-react';
+import { servicesApi, reviewsApi } from '../../api';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import EmptyState from '../../components/shared/EmptyState';
 import Reveal from '../../components/ui/Reveal';
@@ -21,6 +21,8 @@ interface Service {
 
 const PREVIEW_PER_CATEGORY = 6;
 
+type ServiceStats = { average_rating: number; total_reviews: number };
+
 const groupKey = (s: Service): string => s.category_name || s.category;
 
 interface Category {
@@ -31,6 +33,7 @@ interface Category {
 
 export default function PublicServices() {
   const [services, setServices] = useState<Service[]>([]);
+  const [stats, setStats] = useState<Record<number, ServiceStats>>({});
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('All');
 
@@ -54,7 +57,20 @@ export default function PublicServices() {
           }
           page++;
         } while (page <= totalPages);
-        setServices(all);
+        const list = all as Service[];
+        setServices(list);
+        if (list.length > 0) {
+          try {
+            const settled = await Promise.allSettled(list.map((s) => reviewsApi.getServiceStats(s.id)));
+            const next: Record<number, ServiceStats> = {};
+            list.forEach((s, i) => {
+              if (settled[i]?.status === 'fulfilled') {
+                next[s.id] = settled[i].value.data.data;
+              }
+            });
+            setStats(next);
+          } catch { /* skip */ }
+        }
       } catch {
         // silent
       } finally {
@@ -103,6 +119,18 @@ export default function PublicServices() {
     [services],
   );
 
+  const renderRating = (service: Service) => {
+    const s = stats[service.id];
+    if (!s || s.total_reviews === 0) return null;
+    return (
+      <div className="mt-1.5 flex items-center gap-1 text-xs text-neutral-500">
+        <Star size={12} className="text-amber-400 fill-amber-400" />
+        <span className="font-medium text-neutral-700">{(Math.round(s.average_rating * 10) / 10).toFixed(1)}</span>
+        <span>({s.total_reviews} review{s.total_reviews > 1 ? 's' : ''})</span>
+      </div>
+    );
+  };
+
   const renderConsultationRow = () => {
     if (!freeConsultation) return null;
     return (
@@ -129,6 +157,7 @@ export default function PublicServices() {
           <div className="mt-1.5 flex items-center gap-2 text-xs text-neutral-400">
             <span className="flex items-center gap-1"><Clock size={11} /> {freeConsultation.duration} min</span>
           </div>
+          {renderRating(freeConsultation)}
         </div>
         <div className="flex items-center gap-4 flex-shrink-0">
           <span className="font-sans text-lg text-primary-700 whitespace-nowrap">{formatServicePrice(freeConsultation.price)}</span>
@@ -154,6 +183,7 @@ export default function PublicServices() {
         <div className="mt-1.5 flex items-center gap-2 text-xs text-neutral-400">
           <span className="flex items-center gap-1"><Clock size={11} /> {service.duration} min</span>
         </div>
+        {renderRating(service)}
       </div>
       <div className="flex items-center gap-4 flex-shrink-0">
         <span className="font-sans text-lg text-primary-700 whitespace-nowrap">{formatServicePrice(service.price)}</span>

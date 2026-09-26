@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   LayoutDashboard, Calendar, CalendarDays, Users, UserCog, Scissors, Package, ShoppingCart,
   ClipboardList, BarChart3, Settings, Bell, Menu, X, LogOut, ChevronDown,
-  ChevronRight, MessageSquare, Clock, BoxesIcon, Crown, Award,
+  ChevronRight, MessageSquare, Clock, BoxesIcon, Crown, Award, Star,
   Layers
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -38,6 +38,7 @@ const adminNav: NavEntry[] = [
   { icon: BarChart3, label: 'Reports', children: [
     { to: '/admin/transactions', icon: ShoppingCart, label: 'Transactions' },
     { to: '/admin/analytics', icon: BarChart3, label: 'Analytics' },
+    { to: '/admin/reviews', icon: Star, label: 'Reviews' },
   ]},
   { icon: Crown, label: 'Memberships', children: [
     { to: '/admin/membership-plans', icon: Crown, label: 'Membership Plans' },

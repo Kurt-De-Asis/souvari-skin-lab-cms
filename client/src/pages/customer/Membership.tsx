@@ -4,7 +4,6 @@ import {
   Copy,
   Check,
   Star,
-  Gift,
   Users,
   Sparkles,
   Clock,
@@ -24,7 +23,6 @@ import {
   membershipPlansApi,
   loyaltyApi,
   monthlyPerksApi,
-  membershipGiftsApi,
 } from '@/api';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -35,13 +33,8 @@ export default function Membership() {
   const [membership, setMembership] = useState<any>(null);
   const [loyalty, setLoyalty] = useState<any>(null);
   const [perk, setPerk] = useState<any>(null);
-  const [gifts, setGifts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [giftModalOpen, setGiftModalOpen] = useState(false);
-  const [giftName, setGiftName] = useState('');
-  const [giftEmail, setGiftEmail] = useState('');
-  const [submitting, setSubmitting] = useState(false);
   const [usingPerk, setUsingPerk] = useState(false);
   const [plans, setPlans] = useState<any[]>([]);
   const [plansLoading, setPlansLoading] = useState(true);
@@ -117,10 +110,9 @@ export default function Membership() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [memRes, perkRes, giftRes] = await Promise.allSettled([
+      const [memRes, perkRes] = await Promise.allSettled([
         membershipsApi.getMe(),
         monthlyPerksApi.getMe(),
-        membershipGiftsApi.getMe(),
       ]);
 
       if (memRes.status === 'fulfilled') {
@@ -133,10 +125,6 @@ export default function Membership() {
       }
       if (perkRes.status === 'fulfilled') {
         setPerk(perkRes.value.data.data);
-      }
-      if (giftRes.status === 'fulfilled') {
-        const gData = giftRes.value.data.data;
-        setGifts(Array.isArray(gData) ? gData : gData?.items || []);
       }
     } catch {
       toast.error('Failed to load membership data');
@@ -162,37 +150,13 @@ export default function Membership() {
   const handleUsePerk = async () => {
     setUsingPerk(true);
     try {
-      await monthlyPerksApi.use({ membership_id: membership?.id });
+      await monthlyPerksApi.use({ membership_id: membership?.id, discount_amount: Number(perk?.max_value ?? 300) });
       toast.success('Monthly perk applied!');
       fetchData();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to use perk');
     } finally {
       setUsingPerk(false);
-    }
-  };
-
-  const handleGiftMembership = async () => {
-    if (!giftName.trim() || !giftEmail.trim()) {
-      toast.error('Please fill in all fields');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await membershipGiftsApi.create({
-        membership_id: membership?.id,
-        recipient_name: giftName.trim(),
-        recipient_email: giftEmail.trim(),
-      });
-      toast.success('Gift nomination submitted!');
-      setGiftModalOpen(false);
-      setGiftName('');
-      setGiftEmail('');
-      fetchData();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to send gift');
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -365,7 +329,6 @@ export default function Membership() {
   const endDate = membership.end_date;
   const daysRemaining = endDate ? Math.max(0, dayjs(endDate).diff(dayjs(), 'day')) : null;
   const totalSpending = Number(loyalty?.progress?.total_spend ?? loyalty?.total_spend ?? loyalty?.total_spent ?? 0);
-  const is12Month = plan.duration_months >= 12 || plan.duration === 12 || plan.duration_months === 12;
 
   const perkStatus = perk?.status || 'unavailable';
   const perkUsedDate = perk?.used_at || perk?.used_date;
@@ -579,43 +542,6 @@ export default function Membership() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Gift Membership */}
-        {is12Month && (
-          <div className="card">
-            <h2 className="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
-              <Gift size={18} /> Gift Membership
-            </h2>
-
-            <p className="text-sm text-neutral-500 mb-4">
-              As a 12-month member, you can nominate a friend to receive a complimentary membership.
-            </p>
-
-            {gifts.length > 0 && (
-              <div className="space-y-3 mb-4">
-                {gifts.map((g: any) => (
-                  <div key={g.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium text-neutral-900">
-                        {g.recipient_name || g.name || 'Friend'}
-                      </p>
-                      <p className="text-xs text-neutral-500">
-                        {g.recipient_email || g.email || ''}
-                      </p>
-                    </div>
-                    <StatusBadge status={g.status || 'pending'} />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <button onClick={() => setGiftModalOpen(true)} className="btn-secondary w-full">
-              <Gift size={16} /> Nominate a Friend
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* Recent Activity */}
       <div className="card">
         <h2 className="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
@@ -663,42 +589,7 @@ export default function Membership() {
         )}
       </div>
 
-      {/* Gift Membership Modal */}
-      <Modal open={giftModalOpen} onClose={() => setGiftModalOpen(false)} title="Gift a Membership">
-        <div className="space-y-4">
-          <p className="text-sm text-neutral-500">
-            Nominate a friend to receive a complimentary membership as a gift.
-          </p>
-          <div>
-            <label className="label">Friend's Name</label>
-            <input
-              value={giftName}
-              onChange={(e) => setGiftName(e.target.value)}
-              className="input-field"
-              placeholder="Juan Dela Cruz"
-            />
-          </div>
-          <div>
-            <label className="label">Friend's Email</label>
-            <input
-              type="email"
-              value={giftEmail}
-              onChange={(e) => setGiftEmail(e.target.value)}
-              className="input-field"
-              placeholder="juan@example.com"
-            />
-          </div>
-          <div className="flex gap-3 justify-end pt-2">
-            <button onClick={() => setGiftModalOpen(false)} className="btn-secondary">
-              Cancel
-            </button>
-            <button onClick={handleGiftMembership} disabled={submitting} className="btn-primary">
-              {submitting ? 'Submitting...' : 'Send Gift'}
-            </button>
-          </div>
-        </div>
-      </Modal>
-    </div>
+      </div>
 
       {availPaymentModal}
     </>

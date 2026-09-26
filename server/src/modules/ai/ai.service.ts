@@ -6,6 +6,9 @@ import crypto from 'crypto';
 class AiService {
   private systemPrompt = '';
 
+  /** In-memory per-session context so follow-ups like "how much for that?" work without an LLM. */
+  private sessionContext = new Map<number, { lastServices: string[]; lastConcern: string | null }>();
+
   /** Strong standalone signals — a single match means the message is clinic-related. */
   private static readonly STRONG_CLINIC_KEYWORDS = [
     'clinic', 'souvari', 'skin lab', 'skincare', 'skin care', 'skin', 'derma', 'dermal',
@@ -113,6 +116,9 @@ class AiService {
 
   private static readonly NAIL_PATTERN = /manicure|pedicure|\bnail(s)?\b|nail art|extension|mermaid|\b3d\b|gel/;
 
+  /** Lower-body / area-specific service names that should never satisfy a facial skin-concern match. */
+  private static readonly BODY_AREA_PATTERN = /bikini|underarm|under arms|armpit|elbows?|knees?|nape|buttocks?|\bheel\b|toes?|\bback\b|thighs?|calves?|feet|foot|hands?|hips?|waist|abdomen|belly|shins?|shoulders?|brasilian|brazilian/;
+
   private static readonly NEW_CLIENT_TRIGGERS = [
     'first time', 'new client', 'new to souvari', 'never been', 'first visit', 'new here', 'first appointment',
   ];
@@ -138,7 +144,7 @@ class AiService {
     const weakHits = AiService.WEAK_CLINIC_KEYWORDS.filter((kw) => lower.includes(kw));
     if (weakHits.length === 0) return false;
 
-    const addressesClinic = /\byou\b|\byour\b|\byours\b/.test(lower);
+    const addressesClinic = /\byou\b|\byour\b|\byours\b|\bfor me\b|\bfor us\b/.test(lower);
     if (addressesClinic) return true;
     if (weakHits.length >= 2) return true;
 
@@ -215,6 +221,26 @@ class AiService {
     const msgTokens = this.tokenize(lowerMessage);
     if (msgTokens.length === 0) return null;
 
+    const normalizedQuery = lowerMessage.trim().replace(/\s+/g, ' ');
+
+    // Fast path: the raw phrase appears verbatim inside a service name
+    // (e.g. "carbon laser" -> "Hollywood Carbon Laser Peel (Face)"). Only fires
+    // for multi-word queries; single tokens fall through to token matching.
+    if (normalizedQuery.split(/\s+/).length >= 2) {
+      const contains = services.filter((s) => s.name.toLowerCase().includes(normalizedQuery));
+      if (contains.length > 0) {
+        const isPkg = (s: any) => /\bsess\b/.test(s.name.toLowerCase());
+        const nonArea = contains.filter((s) => !AiService.BODY_AREA_PATTERN.test(s.name.toLowerCase()));
+        const pool = nonArea.length > 0 ? nonArea : contains;
+        const nonPkg = pool.filter((s) => !isPkg(s));
+        const pool2 = nonPkg.length > 0 ? nonPkg : pool;
+        const pref =
+          pool2.find((s) => s.name.toLowerCase().startsWith(normalizedQuery)) ??
+          pool2.reduce((a, b) => (a.name.length <= b.name.length ? a : b));
+        return { service: pref, score: 100 };
+      }
+    }
+
     let best: { service: any; score: number; name: string } | null = null;
 
     for (const s of services) {
@@ -252,12 +278,18 @@ class AiService {
         if (firstTokenExact && exact === 1 && nameTokens.length > 1 && score < 3) score = 3;
         if (exact === 1 && nameTokens.length === 1 && score < 3) score = 3;
         const candidate = { service: s, score, name: s.name.toLowerCase() };
-        if (
-          !best ||
-          candidate.score > best.score ||
-          (candidate.score === best.score && candidate.name.length < best.name.length)
-        ) {
+        if (!best || candidate.score > best.score) {
           best = candidate;
+        } else if (candidate.score === best.score) {
+          // Prefer a service whose full name starts with the query phrase
+          // (e.g. "carbon laser" -> "Carbon Laser ...", not "Knees – Carbon Laser ...").
+          const candStarts = candidate.name.startsWith(normalizedQuery);
+          const bestStarts = best.name.startsWith(normalizedQuery);
+          if (candStarts && !bestStarts) {
+            best = candidate;
+          } else if (candStarts === bestStarts && candidate.name.length < best.name.length) {
+            best = candidate;
+          }
         }
       }
     }
@@ -304,9 +336,18 @@ class AiService {
       reasons.set(id, r);
     };
 
-    // A) Direct / fuzzy service-name hit gets the strongest priority.
+    // Concern-group keyword matching across name + description + category (computed first so the
+    // direct-name bump below yields to genuine skin-concern signals).
+    const msgConcernGroups: Array<{ group: (typeof AiService.SKIN_CONCERNS)[number]; hits: string[] }> = [];
+    for (const group of AiService.SKIN_CONCERNS) {
+      const hits = this.concernHits(lowerMessage, msgTokens, group);
+      if (hits.length > 0) msgConcernGroups.push({ group, hits });
+    }
+
+    // A) Direct / fuzzy service-name hit gets the strongest priority — unless the message is
+    // really about a skin concern (so a generic name like "Face" can't beat real acne picks).
     const svcHit = this.findServiceByMessage(lowerMessage, services);
-    if (svcHit) {
+    if (svcHit && msgConcernGroups.length === 0) {
       bump(svcHit.service.id, 100, 'This matches exactly what you asked about');
       services
         .filter((s) => s.id !== svcHit.service.id && s.category === svcHit.service.category)
@@ -315,13 +356,7 @@ class AiService {
     }
 
     // B) Concern-group keyword matching across name + description + category.
-    const activeGroups: Array<{ group: (typeof AiService.SKIN_CONCERNS)[number]; hits: string[] }> = [];
-    for (const group of AiService.SKIN_CONCERNS) {
-      const hits = this.concernHits(lowerMessage, msgTokens, group);
-      if (hits.length > 0) activeGroups.push({ group, hits });
-    }
-
-    for (const { group, hits } of activeGroups) {
+    for (const { group, hits } of msgConcernGroups) {
       let touched = false;
       const tokensToCheck = [...group.tokens, ...group.phrases];
       for (const s of services) {
@@ -335,7 +370,8 @@ class AiService {
       // Knowledge-base hook: known treatments for this concern even when descriptions are terse.
       for (const target of group.targets || []) {
         for (const s of services) {
-          if (s.name.toLowerCase().includes(target)) {
+          const name = s.name.toLowerCase();
+          if (name.includes(target) && !AiService.BODY_AREA_PATTERN.test(name)) {
             bump(s.id, 30, `Ideal for ${group.label}`);
             touched = true;
           }
@@ -356,7 +392,7 @@ class AiService {
     }
 
     // D) General cosine retrieval for on-topic queries that matched nothing specific.
-    if (activeGroups.length === 0 && !svcHit && !category) {
+    if (msgConcernGroups.length === 0 && !svcHit && !category) {
       for (const s of services) {
         const sim = this.cosineSimilarity(msgTokens, this.tokenize(this.serviceText(s)));
         if (sim >= 0.3) bump(s.id, Math.round(sim * 30), 'Closely matches what you described');
@@ -547,7 +583,7 @@ You should be friendly, professional, and helpful while staying within these bou
         }
       }
     } else {
-      botResponse = await this.ruleBasedResponse(input.message);
+      botResponse = await this.ruleBasedResponse(input.message, session.id);
     }
 
     await prisma.chat_messages.create({
@@ -570,7 +606,7 @@ You should be friendly, professional, and helpful while staying within these bou
       return await this.callOpenAI(message, sessionId);
     } catch (error) {
       console.error('LLM call failed, falling back to rule-based engine:', error);
-      return this.ruleBasedResponse(message);
+      return this.ruleBasedResponse(message, sessionId);
     }
   }
 
@@ -734,7 +770,42 @@ You should be friendly, professional, and helpful while staying within these bou
     }
   }
 
-  private async ruleBasedResponse(message: string): Promise<string> {
+  private rememberContext(sessionId: number | undefined, lastServices: string[], lastConcern: string | null): void {
+    if (!sessionId) return;
+    this.sessionContext.set(sessionId, { lastServices, lastConcern });
+    if (this.sessionContext.size > 300) {
+      const oldest = this.sessionContext.keys().next().value;
+      if (oldest !== undefined) this.sessionContext.delete(oldest);
+    }
+  }
+
+  /** Resolve vague follow-ups ("how much for that?", "tell me more about it") using session context. */
+  private followUpResponse(sessionId: number | undefined, lowerMessage: string, services: any[]): string | null {
+    if (!sessionId) return null;
+    const ctx = this.sessionContext.get(sessionId);
+    if (!ctx || ctx.lastServices.length === 0) return null;
+
+    const wantsPrice = /\bhow much\b|price|cost|fee|rate|prices/.test(lowerMessage);
+    const wantsDetails = /\bmore\b|details|about|that|it\b|tell me|first|second|third|which|info/.test(lowerMessage);
+    if (!wantsPrice && !wantsDetails) return null;
+
+    const known = services.filter((s) => ctx.lastServices.includes(s.name));
+
+    if (wantsPrice) {
+      const lines =
+        known.length > 0
+          ? known.map((s) => `- ${s.name}: ${this.formatPrice(s.price)} (${s.duration_minutes} min)`).join('\n')
+          : ctx.lastServices.map((n) => `- ${n}`).join('\n');
+      return `Here are the prices for what we discussed:\n${lines}\n\nPlease consult with our clinic professionals for personalized advice.`;
+    }
+
+    if (known.length === 0) return null;
+    return `More on what we discussed:\n\n${known
+      .map((s) => `- ${s.name} (${this.formatPrice(s.price)}, ${s.duration_minutes} min): ${s.description ? s.description.trim() : 'Contact us for full details.'}`)
+      .join('\n')}\n\nPlease consult with our clinic professionals for personalized advice.`;
+  }
+
+  private async ruleBasedResponse(message: string, sessionId?: number): Promise<string> {
     const services = await this.getActiveServices();
     const lowerMessage = message.toLowerCase();
 
@@ -751,6 +822,10 @@ You should be friendly, professional, and helpful while staying within these bou
     if (this.isEmergency(lowerMessage)) {
       return this.emergencyResponse();
     }
+
+    // Follow-up referencing a recent recommendation (e.g. "how much for that?")
+    const followUp = this.followUpResponse(sessionId, lowerMessage, services);
+    if (followUp) return followUp;
 
     // Strict topic gate: refuse anything not related to the clinic
     if (!this.isClinicRelated(lowerMessage, services)) {
@@ -808,6 +883,7 @@ You should be friendly, professional, and helpful while staying within these bou
       if (recommended.length === 0) {
         return `Based on what we offer, I'd recommend booking our FREE "Consultation First (Recommended for New Clients)" so our professionals can create a personalized plan for you.\n\nPlease consult with our clinic professionals for personalized advice.`;
       }
+      this.rememberContext(sessionId, recommended.slice(0, 3).map((r) => r.service.name), 'recommendations');
       return `Here are my top recommendations for you:\n\n${recommended
         .slice(0, 3)
         .map((r) => `- ${r.service.name} (${this.formatPrice(r.service.price)}, ${r.service.duration_minutes} min) ${r.reasons[0] ? `— ${r.reasons[0]}` : ''}`)
@@ -826,6 +902,34 @@ You should be friendly, professional, and helpful while staying within these bou
     // --- Booking ---
     if (lowerMessage.includes('book') || lowerMessage.includes('appointment') || lowerMessage.includes('schedule') || lowerMessage.includes('reserve')) {
       return `To book an appointment, please contact us directly or use our online booking system.\n\nAvailable services:\n${services.map((s) => this.formatServiceLine(s)).join('\n')}\n\nPlease consult with our clinic professionals for personalized advice.`;
+    }
+
+    // --- Skin-concern queries beat generic area/long-name matches (e.g. "acne on my face") ---
+    const concernTokens = this.tokenize(lowerMessage);
+    const concernGroups = AiService.SKIN_CONCERNS.filter((g) => this.concernHits(lowerMessage, concernTokens, g).length > 0);
+    if (concernGroups.length > 0) {
+      const preNameHit = services.find((s) => {
+        const name = s.name.toLowerCase();
+        return name.length >= 4 && lowerMessage.includes(name);
+      });
+      const fuzzyPre = this.findServiceByMessage(lowerMessage, services);
+      const namePre = preNameHit || (fuzzyPre ? fuzzyPre.service : undefined);
+      const areaMatch = namePre && AiService.BODY_AREA_PATTERN.test(namePre.name.toLowerCase());
+      const nameContainsConcern =
+        namePre &&
+        concernGroups.some((g) =>
+          [...g.tokens, ...g.phrases].some((t) => t.length >= 3 && namePre.name.toLowerCase().includes(t))
+        );
+      if (!namePre || areaMatch || !nameContainsConcern) {
+        const recommended = this.recommend(lowerMessage, services);
+        if (recommended.length > 0) {
+          this.rememberContext(sessionId, recommended.slice(0, 3).map((r) => r.service.name), concernGroups.map((g) => g.label).join(', '));
+          return `For ${concernGroups.map((g) => g.label).join(', ')}, here are my top picks:\n\n${recommended
+            .slice(0, 3)
+            .map((r) => `- ${r.service.name} (${this.formatPrice(r.service.price)}, ${r.service.duration_minutes} min) ${r.reasons[0] ? `— ${r.reasons[0]}` : ''}`)
+            .join('\n')}\n\nWant details on any of these? Please consult with our clinic professionals for personalized advice.`;
+        }
+      }
     }
 
     // --- Service details (exact or fuzzy name match) ---
@@ -886,6 +990,7 @@ You should be friendly, professional, and helpful while staying within these bou
       if (this.hasSpecificNeed(lowerMessage, services)) {
         const recommended = this.recommend(lowerMessage, services);
         if (recommended.length > 0) {
+          this.rememberContext(sessionId, recommended.slice(0, 3).map((r) => r.service.name), 'recommendations');
           return `Based on what you described, here are my top picks:\n\n${recommended
             .slice(0, 3)
             .map((r) => `- ${r.service.name} (${this.formatPrice(r.service.price)}, ${r.service.duration_minutes} min) ${r.reasons[0] ? `— ${r.reasons[0]}` : ''}`)

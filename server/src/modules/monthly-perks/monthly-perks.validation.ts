@@ -13,7 +13,7 @@ export const monthlyPerksQuerySchema = z.object({
 export const usePerkSchema = z.object({
   membership_id: z.number().int().positive('Membership ID is required'),
   transaction_id: z.number().int().positive().optional(),
-  discount_amount: z.number().min(0, 'Discount must be non-negative').max(300, 'Discount cannot exceed 300'),
+  discount_amount: z.number().min(0, 'Discount must be non-negative').max(300, 'Discount cannot exceed 300').optional(),
 });
 
 export const resetPerkSchema = z.object({

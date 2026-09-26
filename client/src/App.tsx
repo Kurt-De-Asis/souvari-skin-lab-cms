@@ -49,6 +49,7 @@ import AdminMembershipPlans from './pages/admin/MembershipPlans';
 import AdminMemberships from './pages/admin/Memberships';
 import AdminPackages from './pages/admin/Packages';
 import AdminNotifications from './pages/admin/Notifications';
+import AdminReviews from './pages/admin/Reviews';
 
 import NotFound from './pages/errors/NotFound';
 
@@ -121,6 +122,7 @@ export default function App() {
         <Route path="calendar" element={<AdminCalendar />} />
         <Route path="transactions" element={<AdminTransactions />} />
         <Route path="analytics" element={<AdminAnalytics />} />
+        <Route path="reviews" element={<AdminReviews />} />
         <Route path="settings" element={<AdminSettings />} />
         <Route path="membership-plans" element={<AdminMembershipPlans />} />
         <Route path="memberships" element={<AdminMemberships />} />

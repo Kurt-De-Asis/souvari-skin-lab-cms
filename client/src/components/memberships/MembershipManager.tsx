@@ -129,7 +129,7 @@ export default function MembershipManager({ mode }: Props) {
     try {
       const [custRes, planRes] = await Promise.all([
         customersApi.list({ limit: '200' }),
-        membershipPlansApi.list({ status: 'active', limit: '100' }),
+        membershipPlansApi.list({ is_active: 'true', limit: '100' }),
       ]);
       setCustomers(custRes.data.data?.data || custRes.data.data || []);
       setPlans(planRes.data.data?.data || planRes.data.data || []);

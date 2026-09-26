@@ -509,6 +509,83 @@ export default function Products() {
       </Drawer>
 
       {/* Add/Edit Modal */}
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editingProduct ? 'Edit Product' : 'Add Product'}
+      >
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div>
+            <label className="label">Name</label>
+            <input className="input-field" placeholder="Product name" {...register('name', { required: 'Required' })} />
+            {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name.message}</p>}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label">Category</label>
+              <select className="select-field" {...register('product_category_id')}>
+                <option value="">No category</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Unit</label>
+              <select className="select-field" {...register('unit')}>
+                {UNIT_OPTIONS.map((u) => (
+                  <option key={u} value={u}>{u}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label">Unit Price (₱)</label>
+              <input type="number" step="0.01" min="0" className="input-field" {...register('unit_price', { required: 'Required', valueAsNumber: true })} />
+              {errors.unit_price && <p className="text-xs text-red-600 mt-1">{errors.unit_price.message}</p>}
+            </div>
+            <div>
+              <label className="label">Unit Cost (₱)</label>
+              <input type="number" step="0.01" min="0" className="input-field" {...register('unit_cost', { required: 'Required', valueAsNumber: true })} />
+              {errors.unit_cost && <p className="text-xs text-red-600 mt-1">{errors.unit_cost.message}</p>}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label">Current Stock</label>
+              <input type="number" min="0" step="1" className="input-field" {...register('current_stock', { required: 'Required', valueAsNumber: true })} />
+              {errors.current_stock && <p className="text-xs text-red-600 mt-1">{errors.current_stock.message}</p>}
+            </div>
+            <div>
+              <label className="label">Min Stock</label>
+              <input type="number" min="0" step="1" className="input-field" {...register('minimum_stock', { required: 'Required', valueAsNumber: true })} />
+              {errors.minimum_stock && <p className="text-xs text-red-600 mt-1">{errors.minimum_stock.message}</p>}
+            </div>
+          </div>
+          <div>
+            <label className="label">Status</label>
+            <select className="select-field" {...register('status')}>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="discontinued">Discontinued</option>
+            </select>
+          </div>
+          {editingProduct && (
+            <div>
+              <label className="label">SKU</label>
+              <input className="input-field bg-neutral-50" value={editingProduct.sku} disabled />
+              <p className="text-xs text-neutral-400 mt-1">Auto-generated on creation</p>
+            </div>
+          )}
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={() => setModalOpen(false)} className="btn-secondary">Cancel</button>
+            <button type="submit" disabled={submitting} className="btn-primary">
+              {submitting ? 'Saving...' : editingProduct ? 'Update' : 'Create'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

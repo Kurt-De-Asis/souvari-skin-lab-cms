@@ -24,7 +24,8 @@ interface TransactionItem {
 
 interface Transaction {
   id: number;
-  reference_number: string;
+  reference_number?: string;
+  transaction_number: string;
   created_at: string;
   customer: { id: number; first_name: string; last_name: string } | null;
   items: TransactionItem[];
@@ -241,7 +242,7 @@ export default function Transactions() {
                           {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                         </td>
                         <td className="px-6 py-4 text-neutral-600">{dayjs(txn.created_at).format('MMM D, YYYY')}</td>
-                        <td className="px-6 py-4 font-mono text-xs text-neutral-600">{txn.reference_number}</td>
+                        <td className="px-6 py-4 font-mono text-xs text-neutral-600">{txn.transaction_number || txn.reference_number || '—'}</td>
                         <td className="px-6 py-4 font-medium text-neutral-900">
                           {txn.customer ? `${txn.customer.first_name} ${txn.customer.last_name}` : 'Walk-in'}
                         </td>
@@ -330,8 +331,8 @@ export default function Transactions() {
         {voidModal && (
           <div className="space-y-4">
             <p className="text-sm text-neutral-600">
-              Void transaction <span className="font-semibold">{voidModal.reference_number}</span> for{' '}
-              <span className="font-semibold">{formatCurrency(voidModal.total)}</span>?
+              Void transaction <span className="font-semibold">{voidModal.transaction_number || voidModal.reference_number || '—'}</span> for{' '}
+              <span className="font-semibold">{formatCurrency(Number(voidModal.total_amount ?? voidModal.total ?? 0))}</span>?
             </p>
             <div>
               <label className="label">Reason</label>
@@ -357,8 +358,8 @@ export default function Transactions() {
         {refundModal && (
           <div className="space-y-4">
             <p className="text-sm text-neutral-600">
-              Refund transaction <span className="font-semibold">{refundModal.reference_number}</span> for{' '}
-              <span className="font-semibold">{formatCurrency(refundModal.total)}</span>?
+              Refund transaction <span className="font-semibold">{refundModal.transaction_number || refundModal.reference_number || '—'}</span> for{' '}
+              <span className="font-semibold">{formatCurrency(Number(refundModal.total_amount ?? refundModal.total ?? 0))}</span>?
             </p>
             <div>
               <label className="label">Reason</label>

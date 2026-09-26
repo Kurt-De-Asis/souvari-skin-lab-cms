@@ -765,6 +765,13 @@ export class AppointmentService {
       throw new AppError('service_id and date are required', 400);
     }
 
+    if (date < this.localDateString()) {
+      throw new AppError(
+        'Cannot check availability for a past date. Please choose a current or future date.',
+        422
+      );
+    }
+
     const service = await prisma.services.findFirst({
       where: { id: serviceId, deleted_at: null },
     });
@@ -926,7 +933,7 @@ export class AppointmentService {
   // appointments. Runs once daily (see server.ts scheduler). Each appointment
   // is reminded at most once, guarded by the `reminder_sent` flag.
   async processAppointmentReminders(): Promise<{ reminded: number; failed: number }> {
-    const tomorrow = this.localDateString(new Date(Date.now() + 24 * 60 * 60 * 1000));
+    const tomorrow = this.localDateString(new Date(this.clinicNow().getTime() + 24 * 60 * 60 * 1000));
 
     const rows = await prisma.appointments.findMany({
       where: {
@@ -1064,8 +1071,16 @@ private async validateUpdateWindow(
     return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
   }
 
+  private clinicNow(): Date {
+    // Asia/Manila is UTC+8 with no DST: getTimezoneOffset() === -480.
+    const TARGET_OFFSET_MIN = -480;
+    const now = new Date();
+    const diffMin = TARGET_OFFSET_MIN - now.getTimezoneOffset();
+    return new Date(now.getTime() + diffMin * 60000);
+  }
+
   private localDateString(date?: Date): string {
-    const now = date ?? new Date();
+    const now = date ?? this.clinicNow();
     const y = now.getFullYear();
     const m = String(now.getMonth() + 1).padStart(2, '0');
     const d = String(now.getDate()).padStart(2, '0');
@@ -1073,7 +1088,7 @@ private async validateUpdateWindow(
   }
 
   private localTimeString(): string {
-    const now = new Date();
+    const now = this.clinicNow();
     const h = String(now.getHours()).padStart(2, '0');
     const m = String(now.getMinutes()).padStart(2, '0');
     return `${h}:${m}`;

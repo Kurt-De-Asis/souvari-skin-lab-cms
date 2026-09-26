@@ -26,7 +26,9 @@ export default function DateSelector({
   const closedSet = useMemo(() => new Set(closedWeekdays.map((d) => d.toLowerCase())), [closedWeekdays]);
 
   const dates = useMemo(() => {
-    const start = baseDate ? dayjs(baseDate) : dayjs();
+    const today = dayjs().startOf('day');
+    const from = baseDate ? dayjs(baseDate) : today;
+    const start = from.isBefore(today) ? today : from;
     return Array.from({ length: 7 }, (_, i) => {
       const d = start.add(i, 'day');
       return {

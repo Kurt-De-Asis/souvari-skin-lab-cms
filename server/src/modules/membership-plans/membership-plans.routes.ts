@@ -20,7 +20,7 @@ router.use(authenticate);
 
 router.get(
   '/',
-  authorize('admin'),
+  authorize('admin', 'staff'),
   validate(membershipPlanQuerySchema, 'query'),
   membershipPlanController.list
 );

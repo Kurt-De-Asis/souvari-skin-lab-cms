@@ -137,10 +137,16 @@ export default function BookingPage() {
   const [serviceCategory, setServiceCategory] = useState(() => restore?.serviceCategory || 'All');
   const [selectedServices, setSelectedServices] = useState<Service[]>(() => restore?.selectedServices || []);
 
-  const [baseDate, setBaseDate] = useState(() =>
-    restore?.selectedDate || dayjs().format('YYYY-MM-DD')
-  );
-  const [selectedDate, setSelectedDate] = useState(() => restore?.selectedDate || '');
+  const [baseDate, setBaseDate] = useState(() => {
+    const restored = restore?.selectedDate;
+    const today = dayjs().format('YYYY-MM-DD');
+    return restored && restored >= today ? restored : today;
+  });
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const restored = restore?.selectedDate;
+    const today = dayjs().format('YYYY-MM-DD');
+    return restored && restored >= today ? restored : '';
+  });
 
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -599,7 +605,14 @@ export default function BookingPage() {
                   selectedDate={selectedDate}
                   onSelectDate={handleSelectDate}
                   baseDate={baseDate}
-                  onPrevWeek={() => setBaseDate((d) => dayjs(d).subtract(7, 'day').format('YYYY-MM-DD'))}
+                  onPrevWeek={() =>
+                    setBaseDate((d) => {
+                      const prev = dayjs(d).subtract(7, 'day');
+                      return prev.isBefore(dayjs().startOf('day'))
+                        ? dayjs().format('YYYY-MM-DD')
+                        : prev.format('YYYY-MM-DD');
+                    })
+                  }
                   onNextWeek={() => setBaseDate((d) => dayjs(d).add(7, 'day').format('YYYY-MM-DD'))}
                   closedWeekdays={closedWeekdays}
                 />

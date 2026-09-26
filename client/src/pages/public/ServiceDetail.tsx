@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Clock, ArrowLeft } from 'lucide-react';
-import { servicesApi } from '../../api';
+import { Clock, ArrowLeft, Star } from 'lucide-react';
+import { servicesApi, reviewsApi } from '../../api';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import formatCategory from '../../utils/formatCategory';
 import { formatPosition, formatServicePrice } from '../../utils/format';
@@ -28,6 +28,7 @@ interface ServiceDetail {
 export default function ServiceDetail() {
   const { id } = useParams<{ id: string }>();
   const [service, setService] = useState<ServiceDetail | null>(null);
+  const [stats, setStats] = useState<{ average_rating: number; total_reviews: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -41,6 +42,10 @@ export default function ServiceDetail() {
           price: Number(raw.price) || 0,
           duration: Number(raw.duration || raw.duration_minutes) || 0,
         });
+        try {
+          const statsRes = await reviewsApi.getServiceStats(Number(id));
+          setStats(statsRes.data.data);
+        } catch { /* skip */ }
       } catch {
         setError('Service not found.');
       } finally {
@@ -131,6 +136,14 @@ export default function ServiceDetail() {
                       <span className="text-primary-600">—</span>
                       <span>{formatCategory(service.category_name || service.category)}</span>
                     </div>
+                    {stats && stats.total_reviews > 0 && (
+                      <div className="flex items-center gap-2 text-sm text-neutral-600">
+                        <span className="flex items-center gap-1"><Star size={15} className="text-amber-400 fill-amber-400" />
+                          <span className="font-medium text-neutral-900">{(Math.round(stats.average_rating * 10) / 10).toFixed(1)}</span>
+                        </span>
+                        <span>({stats.total_reviews} review{stats.total_reviews > 1 ? 's' : ''})</span>
+                      </div>
+                    )}
                   </div>
                   <Link to="/booking" state={{ serviceId: service.id }} className="btn-primary w-full justify-center mt-7">
                     Book This Service
