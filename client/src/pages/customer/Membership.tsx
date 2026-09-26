@@ -52,7 +52,6 @@ export default function Membership() {
   const [usingPerk, setUsingPerk] = useState(false);
   const [plans, setPlans] = useState<any[]>([]);
   const [plansLoading, setPlansLoading] = useState(true);
-  const [availingPlanId, setAvailingPlanId] = useState<number | null>(null);
   const [availPaymentOpen, setAvailPaymentOpen] = useState(false);
   const [availPaymentPlan, setAvailPaymentPlan] = useState<any>(null);
   const [availSubmitting, setAvailSubmitting] = useState(false);
@@ -237,6 +236,72 @@ export default function Membership() {
     }
   };
 
+  const availPaymentModal = availPaymentOpen && availPaymentPlan
+    ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="w-full max-w-md bg-white rounded-md shadow-xl">
+            <div className="p-4 border-b border-neutral-200">
+              <h2 className="text-lg font-semibold text-neutral-900">Avail Membership</h2>
+              <p className="text-sm text-neutral-500 mt-1">{availPaymentPlan.name}</p>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="bg-neutral-50 p-3 rounded-md">
+                <div className="flex justify-between text-sm">
+                  <span>Plan Price</span>
+                  <span className="font-semibold">₱{Number(availPaymentPlan.promo_price ?? availPaymentPlan.regular_price ?? 0).toLocaleString()}</span>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-neutral-700">Payment Type</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setAvailPaymentType('FULL'); setAvailAmountPaid(Number(availPaymentPlan.promo_price ?? availPaymentPlan.regular_price ?? 0)); }}
+                    className={`flex-1 py-2 px-3 text-sm rounded-md border transition ${availPaymentType === 'FULL' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 text-neutral-700 hover:border-primary-500'}`}
+                  >
+                    Full Payment
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAvailPaymentType('DOWN_PAYMENT'); setAvailAmountPaid(Math.round(Number(availPaymentPlan.promo_price ?? availPaymentPlan.regular_price ?? 0) * 0.3)); }}
+                    className={`flex-1 py-2 px-3 text-sm rounded-md border transition ${availPaymentType === 'DOWN_PAYMENT' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 text-neutral-700 hover:border-primary-500'}`}
+                  >
+                    Down Payment (30%)
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-neutral-700">Payment Method</label>
+                <select value={availPaymentMethod} onChange={e => setAvailPaymentMethod(e.target.value)} className="select-field">
+                  {PAYMENT_METHODS.map(m => (
+                    <option key={m} value={m}>{formatPaymentMethod(m)}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-neutral-700">Amount Paid</label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className="input-field hide-number-spinners"
+                  value={availAmountPaid ? formatAmountInput(String(availAmountPaid)) : ''}
+                  onChange={e => setAvailAmountPaid(parseAmountInput(e.target.value) || 0)}
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t border-neutral-200 flex gap-3 justify-end">
+              <button onClick={() => { setAvailPaymentOpen(false); setAvailPaymentPlan(null); }} className="btn-secondary" disabled={availSubmitting}>
+                Cancel
+              </button>
+              <button onClick={handleAvailPaymentSubmit} disabled={availSubmitting} className="btn-primary">
+                {availSubmitting ? 'Processing...' : 'Confirm & Avail'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )
+    : null;
+
   if (loading) return <LoadingSpinner fullScreen />;
 
   if (!membership) {
@@ -270,7 +335,6 @@ export default function Membership() {
                 const regular = p.regular_price != null ? Number(p.regular_price) : null;
                 const displayPrice = promo ?? regular ?? 0;
                 const hasDiscount = promo != null && regular != null && promo < regular;
-                const isAvailing = availingPlanId === p.id;
                 return (
                   <div key={p.id} className="card flex flex-col">
                     <div className="flex items-start justify-between mb-3">
@@ -315,10 +379,9 @@ export default function Membership() {
 
                     <button
                       onClick={() => handleAvailPlan(p.id)}
-                      disabled={isAvailing}
                       className="btn-primary w-full mt-auto"
                     >
-                      {isAvailing ? 'Processing...' : 'Avail Membership'}
+                      Avail Membership
                     </button>
                   </div>
                 );
@@ -326,6 +389,8 @@ export default function Membership() {
             </div>
           )}
         </div>
+
+        {availPaymentModal}
       </div>
     );
   }
@@ -810,70 +875,7 @@ export default function Membership() {
       </Modal>
     </div>
 
-      {/* Avail Payment Modal */}
-      {availPaymentOpen && availPaymentPlan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="w-full max-w-md bg-white rounded-md shadow-xl">
-            <div className="p-4 border-b border-neutral-200">
-              <h2 className="text-lg font-semibold text-neutral-900">Avail Membership</h2>
-              <p className="text-sm text-neutral-500 mt-1">{availPaymentPlan.name}</p>
-            </div>
-            <div className="p-4 space-y-4">
-              <div className="bg-neutral-50 p-3 rounded-md">
-                <div className="flex justify-between text-sm">
-                  <span>Plan Price</span>
-                  <span className="font-semibold">₱{Number(availPaymentPlan.promo_price ?? availPaymentPlan.regular_price ?? 0).toLocaleString()}</span>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-neutral-700">Payment Type</label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { setAvailPaymentType('FULL'); setAvailAmountPaid(Number(availPaymentPlan.promo_price ?? availPaymentPlan.regular_price ?? 0)); }}
-                    className={`flex-1 py-2 px-3 text-sm rounded-md border transition ${availPaymentType === 'FULL' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 text-neutral-700 hover:border-primary-500'}`}
-                  >
-                    Full Payment
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setAvailPaymentType('DOWN_PAYMENT'); setAvailAmountPaid(Math.round(Number(availPaymentPlan.promo_price ?? availPaymentPlan.regular_price ?? 0) * 0.3)); }}
-                    className={`flex-1 py-2 px-3 text-sm rounded-md border transition ${availPaymentType === 'DOWN_PAYMENT' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 text-neutral-700 hover:border-primary-500'}`}
-                  >
-                    Down Payment (30%)
-                  </button>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-neutral-700">Payment Method</label>
-                <select value={availPaymentMethod} onChange={e => setAvailPaymentMethod(e.target.value)} className="select-field">
-                  {PAYMENT_METHODS.map(m => (
-                    <option key={m} value={m}>{formatPaymentMethod(m)}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-neutral-700">Amount Paid</label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  className="input-field hide-number-spinners"
-                  value={availAmountPaid ? formatAmountInput(String(availAmountPaid)) : ''}
-                  onChange={e => setAvailAmountPaid(parseAmountInput(e.target.value) || 0)}
-                />
-              </div>
-            </div>
-            <div className="p-4 border-t border-neutral-200 flex gap-3 justify-end">
-              <button onClick={() => { setAvailPaymentOpen(false); setAvailPaymentPlan(null); }} className="btn-secondary" disabled={availSubmitting}>
-                Cancel
-              </button>
-              <button onClick={handleAvailPaymentSubmit} disabled={availSubmitting} className="btn-primary">
-                {availSubmitting ? 'Processing...' : 'Confirm & Avail'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {availPaymentModal}
     </>
   );
 }
