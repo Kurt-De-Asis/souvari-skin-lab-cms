@@ -148,7 +148,7 @@ export default function PublicServices() {
       {/* Sticky category filter */}
       {categories.length > 0 && (
         <div className="sticky top-0 z-20 bg-neutral-50/95 backdrop-blur border-b border-neutral-200">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex gap-2 overflow-x-auto scrollbar-hide">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex gap-2 overflow-x-auto scrollbar-hide md:overflow-x-visible md:flex-wrap">
             <button
               onClick={() => selectCategory('All')}
               className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition ${

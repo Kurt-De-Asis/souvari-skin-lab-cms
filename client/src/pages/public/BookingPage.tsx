@@ -38,6 +38,10 @@ function serviceCategoryName(s: { category?: string; category_name?: string | nu
   return s.group?.name ?? s.category_name ?? s.category ?? '';
 }
 
+function cleanGroupDescription(d?: string | null): string {
+  return (d ?? '').replace(/\s*Base retail pricing from README.*$/i, '');
+}
+
 interface TimeSlot {
   start: string;
   end: string;
@@ -171,7 +175,7 @@ export default function BookingPage() {
       } else {
         byKey.set(key, {
           label: serviceCategoryName(s),
-          description: s.group?.description ?? '',
+          description: cleanGroupDescription(s.group?.description),
           order: s.group?.display_order ?? 999,
           count: 1,
         });
