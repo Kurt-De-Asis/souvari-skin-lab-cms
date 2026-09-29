@@ -358,7 +358,8 @@ export default function BookingGrid({
                       return (
                         <div
                           key={a.id}
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setOpenMenu(null);
                             onAppointmentClick(a);
                           }}

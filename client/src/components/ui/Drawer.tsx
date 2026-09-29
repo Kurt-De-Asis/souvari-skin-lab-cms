@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Transition from './Transition';
 
 interface DrawerProps {
@@ -21,10 +22,10 @@ export default function Drawer({ open, onClose, title, subtitle, children, maxWi
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  return (
+  return createPortal(
     <Transition show={open} duration={250}>
       {({ active }) => (
-        <div className="fixed inset-0 z-50">
+        <div className="fixed inset-0 z-[60]">
           <div className={`absolute inset-0 bg-black/40 ${active ? 'anim-fade-in' : 'anim-fade-out'}`} onClick={onClose} />
           <aside
             className={`absolute right-0 top-0 bottom-0 w-full ${maxWidth} bg-white shadow-2xl border-l border-neutral-200 flex flex-col ${
@@ -44,6 +45,7 @@ export default function Drawer({ open, onClose, title, subtitle, children, maxWi
           </aside>
         </div>
       )}
-    </Transition>
+    </Transition>,
+    document.body
   );
 }
