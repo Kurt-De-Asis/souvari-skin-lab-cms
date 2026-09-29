@@ -14,20 +14,24 @@ import { Decimal } from '@prisma/client/runtime/library';
 
 export class ProductService {
   async generateSku(): Promise<string> {
-    const lastProduct = await prisma.products.findFirst({
-      orderBy: { id: 'desc' },
+    // Derive the next SKU from the highest PRD- number ever used (including
+    // soft-deleted rows, which still occupy their SKU string). Falling back to
+    // the latest row by id is wrong: a newer deleted product with a
+    // non-PRD SKU would reset the counter and collide with an existing one.
+    const products = await prisma.products.findMany({
       select: { sku: true },
     });
 
-    let nextNumber = 1;
-    if (lastProduct) {
-      const match = lastProduct.sku.match(/PRD-(\d+)/);
+    let maxNumber = 0;
+    for (const { sku } of products) {
+      const match = sku.match(/PRD-(\d+)/);
       if (match) {
-        nextNumber = parseInt(match[1], 10) + 1;
+        const n = parseInt(match[1], 10);
+        if (n > maxNumber) maxNumber = n;
       }
     }
 
-    return `PRD-${String(nextNumber).padStart(5, '0')}`;
+    return `PRD-${String(maxNumber + 1).padStart(5, '0')}`;
   }
 
   async createProduct(data: CreateProductInput) {

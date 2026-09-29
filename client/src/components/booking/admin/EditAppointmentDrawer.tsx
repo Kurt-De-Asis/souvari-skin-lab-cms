@@ -114,24 +114,26 @@ export default function EditAppointmentDrawer({
   );
   const derivedEndTime = addMinutes(startTime, totalDuration);
 
+  const serviceList = Array.isArray(services) ? services : [];
+
   const categories = useMemo(() => {
     const seen: string[] = [];
-    for (const s of services) {
+    for (const s of serviceList) {
       const c = s.category_name || s.category;
       if (c && !seen.includes(c)) seen.push(c);
     }
     return seen;
-  }, [services]);
+  }, [serviceList]);
 
   const filteredServices = useMemo(() => {
     const q = serviceQuery.trim().toLowerCase();
-    return services.filter((s) => {
+    return serviceList.filter((s) => {
       const c = s.category_name || s.category;
       if (activeCategory !== 'all' && c !== activeCategory) return false;
       if (!q) return true;
       return s.name.toLowerCase().includes(q) || (s.description ?? '').toLowerCase().includes(q);
     });
-  }, [services, serviceQuery, activeCategory]);
+  }, [serviceList, serviceQuery, activeCategory]);
 
   const staffOptions = useMemo(() => {
     // Only specialists scheduled on the selected date are offered, so the

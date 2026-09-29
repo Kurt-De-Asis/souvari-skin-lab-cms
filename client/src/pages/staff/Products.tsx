@@ -52,6 +52,10 @@ export default function Products() {
   }, []);
 
   const addToCart = (p: Product) => {
+    if (p.status !== 'active') {
+      toast.error(`"${p.name}" is ${p.status} and cannot be sold`);
+      return;
+    }
     if (Number(p.current_stock) <= 0) {
       toast.error('Product is out of stock');
       return;
@@ -99,6 +103,12 @@ export default function Products() {
     }
     setCheckingOut(true);
     try {
+      const invalid = cartItems.filter((item) => item.product.status !== 'active');
+      if (invalid.length > 0) {
+        toast.error(`"${invalid[0].product.name}" is ${invalid[0].product.status} and cannot be sold`);
+        setCartItems((prev) => prev.filter((item) => item.product.status === 'active'));
+        return;
+      }
       const payload = {
         customer_id: selectedCustomerId ? Number(selectedCustomerId) : null,
         type: 'sale',

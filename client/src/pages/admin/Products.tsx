@@ -55,6 +55,7 @@ export default function Products() {
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<ProductForm>({
@@ -77,6 +78,10 @@ export default function Products() {
   }, []);
 
   const addToCart = (p: Product) => {
+    if (p.status !== 'active') {
+      toast.error(`"${p.name}" is ${p.status} and cannot be sold`);
+      return;
+    }
     if (Number(p.current_stock) <= 0) {
       toast.error('Product is out of stock');
       return;
@@ -124,6 +129,12 @@ export default function Products() {
     }
     setCheckingOut(true);
     try {
+      const invalid = cartItems.filter((item) => item.product.status !== 'active');
+      if (invalid.length > 0) {
+        toast.error(`"${invalid[0].product.name}" is ${invalid[0].product.status} and cannot be sold`);
+        setCartItems((prev) => prev.filter((item) => item.product.status === 'active'));
+        return;
+      }
       const payload = {
         customer_id: selectedCustomerId ? Number(selectedCustomerId) : null,
         type: 'sale',
@@ -225,6 +236,21 @@ export default function Products() {
       fetchProducts();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Operation failed');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteProduct) return;
+    setSubmitting(true);
+    try {
+      await productsApi.delete(deleteProduct.id);
+      toast.success(`Product "${deleteProduct.name}" deleted`);
+      setDeleteProduct(null);
+      fetchProducts();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to delete product');
     } finally {
       setSubmitting(false);
     }
@@ -342,15 +368,18 @@ export default function Products() {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => addToCart(p)}
-                            title="Add to POS Cart"
+                            title={p.status !== 'active' ? `Cannot sell ${p.status} products` : 'Add to POS Cart'}
                             className="btn-primary !py-1.5 !px-2.5 text-xs flex items-center gap-1"
-                            disabled={Number(p.current_stock) <= 0 || Number(p.unit_price) <= 0}
+                            disabled={p.status !== 'active' || Number(p.current_stock) <= 0 || Number(p.unit_price) <= 0}
                           >
                             <ShoppingCart size={16} />
                             Add
                           </button>
                           <button onClick={() => openEditModal(p)} title="Edit" className="p-2 text-neutral-500 hover:text-primary-600 hover:bg-primary-50 rounded-md transition">
                             <Pencil size={16} />
+                          </button>
+                          <button onClick={() => setDeleteProduct(p)} title="Delete" className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-md transition">
+                            <Trash2 size={16} />
                           </button>
                         </div>
                       </td>
@@ -585,6 +614,22 @@ export default function Products() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Delete Product Modal */}
+      <Modal open={deleteProduct !== null} onClose={() => setDeleteProduct(null)} title="Delete Product" maxWidth="max-w-sm">
+        <div className="space-y-4">
+          <p className="text-sm text-neutral-600">
+            Are you sure you want to delete <span className="font-semibold text-neutral-900">{deleteProduct?.name}</span>?
+          </p>
+          <p className="text-xs text-neutral-400">This hides the product from lists. Existing transactions and inventory history are preserved.</p>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={() => setDeleteProduct(null)} className="btn-secondary">Cancel</button>
+            <button type="button" onClick={handleDelete} disabled={submitting} className="btn-danger">
+              {submitting ? 'Deleting...' : 'Delete'}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

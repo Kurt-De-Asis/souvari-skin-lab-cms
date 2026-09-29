@@ -7,6 +7,7 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
 import Pagination from '@/components/ui/Pagination';
 import Modal from '@/components/ui/Modal';
+import { useAuth } from '@/context/AuthContext';
 
 type ReadFilter = 'all' | 'unread' | 'read';
 
@@ -16,6 +17,7 @@ function parseNotificationData(data: string | null): Record<string, any> {
 }
 
 export default function Notifications() {
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -144,7 +146,7 @@ export default function Notifications() {
           <div className="space-y-2">
             {notifications.map((n: any) => {
               const parsed = parseNotificationData(n.data);
-              const isCompletedSession = n.type === 'appointment_update' && parsed.new_status === 'completed' && parsed.appointment_id;
+              const isCompletedSession = user?.role === 'customer' && n.type === 'appointment_update' && parsed.new_status === 'completed' && parsed.appointment_id;
 
               return (
                 <div key={n.id} onClick={() => n.status === 'unread' && handleMarkRead(n.id)}

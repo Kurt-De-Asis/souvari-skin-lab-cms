@@ -145,7 +145,7 @@ export default function Calendar() {
         ...payload,
         service_ids: Array.isArray(payload.service_ids) ? payload.service_ids : [payload.service_id],
       });
-      toast.success('Appointment scheduled. Payment is collected at the POS when it is marked complete.');
+      toast.success('Appointment scheduled. Payment at checkout.');
       setCreateOpen(false);
       fetchAppointments();
       return true;
@@ -369,6 +369,7 @@ export default function Calendar() {
         open={checkoutOpen}
         onClose={() => { setCheckoutOpen(false); setCheckoutAppt(null); }}
         onSuccess={() => {
+          setDetailsAppt(null);
           fetchAppointments();
           toast.success(
             checkoutMode === 'balance'

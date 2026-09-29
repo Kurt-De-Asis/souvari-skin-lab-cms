@@ -6,18 +6,16 @@ import {
   UserCheck,
   XCircle,
   ClipboardCheck,
-  Plus,
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
-import { appointmentsApi, servicesApi, treatmentRecordsApi } from '@/api';
+import { appointmentsApi, treatmentRecordsApi } from '@/api';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Modal from '@/components/ui/Modal';
 import CheckoutModal from '@/components/checkout/CheckoutModal';
-import CreateBookingDrawer from '@/components/booking/admin/CreateBookingDrawer';
 import CustomerDetailDrawer from '@/components/admin/CustomerDetailDrawer';
 
 interface Appointment {
@@ -59,29 +57,10 @@ export default function Appointments() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [checkoutMode, setCheckoutMode] = useState<'full' | 'balance'>('full');
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [servicesList, setServicesList] = useState<any[]>([]);
 
   useEffect(() => {
     fetchAppointments();
   }, [dateFilter, statusFilter]);
-
-  // The new-booking drawer needs the services catalog; it is stable data, so
-  // it is fetched once rather than on every filter change.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data } = await servicesApi.list();
-        if (!cancelled) setServicesList(data.data || data || []);
-      } catch {
-        if (!cancelled) setServicesList([]);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const fetchAppointments = async () => {
     setLoading(true);
@@ -213,10 +192,6 @@ export default function Appointments() {
             <h1 className="text-2xl font-sans font-semibold text-neutral-900">Appointments</h1>
             <p className="text-sm text-neutral-500 mt-1">Manage your daily appointments</p>
           </div>
-          <button onClick={() => setCreateOpen(true)} className="btn-primary whitespace-nowrap">
-            <Plus size={15} className="mr-1" />
-            New Appointment
-          </button>
         </div>
       </div>
 
@@ -343,28 +318,6 @@ export default function Appointments() {
         isStaff={true}
         treatmentNotes={treatmentNotes}
         treatmentRecommendations={recommendations}
-      />
-
-      {/* New Appointment — same drawer the admin calendar uses, so staff get
-          the identical booking, discount, and POS flow. */}
-      <CreateBookingDrawer
-        open={createOpen}
-        date={dateFilter || dayjs().format('YYYY-MM-DD')}
-        services={servicesList}
-        onClose={() => setCreateOpen(false)}
-        onCreate={async (payload) => {
-          try {
-            await appointmentsApi.createGroup(payload);
-            toast.success('Appointment created. Payment is collected at the POS when it is marked complete.');
-            setCreateOpen(false);
-            setDateFilter(payload.appointment_date);
-            fetchAppointments();
-            return true;
-          } catch (err: any) {
-            toast.error(err?.response?.data?.message || 'Failed to create appointment');
-            return false;
-          }
-        }}
       />
 
       {/* Customer Detail Drawer */}

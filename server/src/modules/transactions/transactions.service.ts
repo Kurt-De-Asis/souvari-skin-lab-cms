@@ -46,6 +46,12 @@ export class TransactionService {
           if (!product) {
             throw new AppError(`Product with ID ${item.product_id} not found`, 404);
           }
+          if (product.status !== 'active') {
+            throw new AppError(
+              `Product "${product.name}" is ${product.status} and cannot be sold`,
+              400
+            );
+          }
 
           const quantity = new Decimal(item.quantity.toString());
           const currentStock = new Decimal(product.current_stock.toString());
