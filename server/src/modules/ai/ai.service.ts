@@ -32,6 +32,100 @@ class AiService {
     'which service', 'what to get',
   ];
 
+  /** Concise, on-topic answers for one-word / very short questions (e.g. "acne", "nails", "botox"). */
+  private static readonly SHORT_TOPICS: Array<{ tokens: string[]; blurb: string; needles: string[] }> = [
+    {
+      tokens: ['acne'],
+      blurb: 'Acne and breakouts are one of the most common concerns we treat — with deep-cleansing facials, laser treatments, and skin-repairing microneedling.',
+      needles: ['acne clear', 'carbon laser', 'pico laser', 'dermapen'],
+    },
+    {
+      tokens: ['botox'],
+      blurb: 'Botox relaxes fine lines and wrinkles for a smoother, fresher look — we also offer dermal fillers and non-injectable lifting options.',
+      needles: ['botox', 'dermal filler', 'rf face', 'mesobotox'],
+    },
+    {
+      tokens: ['filler', 'fillers'],
+      blurb: 'Dermal fillers restore lost volume and shape — commonly used for the lips, cheeks, and nasolabial folds.',
+      needles: ['dermal filler', 'botox'],
+    },
+    {
+      tokens: ['nail', 'nails'],
+      blurb: 'We offer manicures, pedicures, BIAB, and gel services to keep your nails healthy, strong, and styled.',
+      needles: ['manicure', 'pedicure', 'biab', 'gel nails'],
+    },
+    {
+      tokens: ['laser'],
+      blurb: 'Our lasers treat skin rejuvenation, pigmentation, stubborn acne marks, and unwanted hair across the face and body.',
+      needles: ['laser'],
+    },
+    {
+      tokens: ['facial', 'facials'],
+      blurb: 'Facials are custom, glow-boosting treatments — from classic cleansing and anti-aging to hydra and diamond finishes.',
+      needles: ['facial'],
+    },
+    {
+      tokens: ['hydrafacial', 'hydra facial'],
+      blurb: 'HydraFacials deeply cleanse, exfoliate, and hydrate for an instant glow with zero downtime.',
+      needles: ['hydrafacial'],
+    },
+    {
+      tokens: ['hifu'],
+      blurb: 'HIFU uses focused ultrasound to lift and tighten the face and neck without surgery or downtime.',
+      needles: ['hifu'],
+    },
+    {
+      tokens: ['whitening', 'whiten'],
+      blurb: 'Whitening and brightening treatments even out skin tone and add radiance.',
+      needles: ['whitening', 'glutathione', 'vitamin c'],
+    },
+    {
+      tokens: ['glow'],
+      blurb: 'Our glow-boosting treatments hydrate, exfoliate, and brighten for instant radiance.',
+      needles: ['glow'],
+    },
+    {
+      tokens: ['dermapen'],
+      blurb: 'Dermapen micro-needling stimulates collagen to smooth scars, pores, and skin texture.',
+      needles: ['dermapen'],
+    },
+    {
+      tokens: ['pico'],
+      blurb: 'Pico laser treatments target pigmentation, acne marks, and tattoos with minimal downtime.',
+      needles: ['pico laser'],
+    },
+    {
+      tokens: ['carbon'],
+      blurb: 'Carbon laser peeling softens the skin, refines pores, and clears excess oil and breakouts.',
+      needles: ['carbon laser'],
+    },
+    {
+      tokens: ['unwanted hair', 'hair removal', 'remove hair'],
+      blurb: 'Laser hair removal safely reduces unwanted hair on the face, underarms, arms, and body.',
+      needles: ['hair removal', 'laser hair removal'],
+    },
+    {
+      tokens: ['contour', 'contouring', 'slimming', 'slim', 'lipo', 'fat freeze'],
+      blurb: 'Body contouring and slimming treatments target stubborn fat and tone the body.',
+      needles: ['body contour', 'lipo', 'fat', 'slim'],
+    },
+    {
+      tokens: ['peel', 'peels'],
+      blurb: 'Chemical peels exfoliate and renew the skin to fade pigmentation and smooth texture.',
+      needles: ['chemical peel', 'diamond peel'],
+    },
+    {
+      tokens: ['package', 'packages'],
+      blurb: 'We offer session packages that bundle popular treatments at a better rate.',
+      needles: [],
+    },
+    {
+      tokens: ['membership', 'member', 'vip'],
+      blurb: 'We offer VIP memberships with exclusive discounts and perks.',
+      needles: [],
+    },
+  ];
+
   /** Skin-concern knowledge map used for scored recommendations. */
   private static readonly SKIN_CONCERNS = [
     {
@@ -130,6 +224,11 @@ class AiService {
     // 1) Strong clinic word alone is enough.
     for (const kw of AiService.STRONG_CLINIC_KEYWORDS) {
       if (lower.includes(kw)) return true;
+    }
+
+    // 1b) A bare topic word (e.g. "acne", "nails", "botox") is on-topic on its own.
+    for (const topic of AiService.SHORT_TOPICS) {
+      if (topic.tokens.some((tok) => lower.includes(tok))) return true;
     }
 
     // 2) Any active service name/category counts as a strong signal.
@@ -413,20 +512,19 @@ class AiService {
 
   private readonly OFF_TOPIC_REPLY =
     "I'm here to answer questions about Souvari Skin Lab — our services, pricing, " +
-    'clinic hours, location, and appointments. That question is outside what I can help with. ' +
-    'If you have any questions about our treatments, pricing, or booking, feel free to ask!';
+    'clinic hours, and location. That question is outside what I can help with. ' +
+    'If you have any questions about our treatments or pricing, feel free to ask!';
 
   private readonly HELP_REPLY =
     "I can help you with:\n" +
     "- Information about our services and treatments\n" +
     "- Service pricing and packages\n" +
     "- Our best-selling and recommended services\n" +
-    "- Clinic hours, location, and contact details\n" +
-    "- Booking or rescheduling appointments\n\n" +
+    "- Clinic hours, location, and contact details\n\n" +
     "What would you like to know?";
 
   private greetingResponse(): string {
-    return `Hello! Welcome to Souvari Skin Lab. I can help you with:\n- Service information and pricing\n- Best-selling and recommended services\n- Clinic hours and contact details\n- Booking appointments\n\nNew to Souvari? We recommend starting with a free Consultation First (recommended for new clients).\n\nHow can I assist you today?\n\nPlease consult with our clinic professionals for personalized advice.`;
+    return `Hello! Welcome to Souvari Skin Lab. I can help you with:\n- Service information and pricing\n- Best-selling and recommended services\n- Clinic hours and contact details\n\nHow can I assist you today?\n\nPlease consult with our clinic professionals for personalized advice.`;
   }
 
   private thanksResponse(): string {
@@ -497,7 +595,7 @@ AVAILABLE SERVICES:
 ${serviceList || 'No services currently listed. Please contact the clinic directly.'}
 
 FREE CONSULTATION:
-- The "Consultation First (Recommended for New Clients)" service is FREE (₱0). Always describe it as free.
+- The FREE "Free Skin Consultation" service costs ₱0 and is open to every client — new and returning alike. Always describe it as free.
 
 BEST-SELLING SERVICES (most booked):
 ${popularList || 'Booking data not yet available.'}
@@ -510,20 +608,21 @@ IMPORTANT SAFETY INSTRUCTIONS:
 - Always include a disclaimer: "Please consult with our clinic professionals for personalized advice."
 - If you are uncertain about anything, say: "I don't have enough information. Please contact the clinic directly."
 - Do not make up services, prices, or information not provided above
-- Focus on booking inquiries, service information, clinic hours, best-selling services, and general beauty/aesthetics questions
+- Focus on service information, pricing, clinic hours, best-selling services, and general beauty/aesthetics questions
 
 STRICT TOPIC RULE:
-- You may ONLY answer questions directly related to this clinic, its services, pricing, hours, location, contact details, bookings, and general beauty/aesthetics care provided by this clinic.
+- You may ONLY answer questions directly related to this clinic, its services, pricing, hours, location, contact details, and general beauty/aesthetics care provided by this clinic.
 - For ANY question that is not about this clinic or its services (for example politics, sports, current events, recipes, programming, or any unrelated topic), respond ONLY with: "${this.OFF_TOPIC_REPLY}"
 - Do not engage with, elaborate on, or answer off-topic questions under any circumstances.
 
 RESPONSE GUIDELINES:
 - Be concise. Aim for at most 3-4 short sentences per answer. When listing services, give at most 3 options, each with a one-line reason.
+- If the user asks a one-word or very short question naming a treatment, service, or concern (e.g. "acne", "nails", "botox", "laser", "hifu"), answer immediately with 1-2 short sentences and 1-2 matching services with prices. Do NOT ask a clarifying question first; keep it brief.
 - NEVER dump the full service menu or the full price list.
 - CLARIFY FIRST, BUT ONLY ONCE: If the user asks a broad service, recommendation, or pricing question (such as "what services do you have", "recommend something", "what should I get", or "prices") WITHOUT naming a skin concern, a specific area, or a specific treatment, do NOT answer with a list yet. Ask ONE short question to understand their need — e.g. their main skin concern/goal and whether it is for their face or body.
 - After the user answers, respond with 2-3 targeted services and a one-line reason for each, then invite them to ask about any of them.
-- If the follow-up answer is still vague, do NOT ask again. Give a brief fallback: the top 3 best-selling services, or the FREE "Consultation First (Recommended for New Clients)".
-- For new clients, always mention the FREE "Consultation First (Recommended for New Clients)".
+- If the follow-up answer is still vague, do NOT ask again. Give a brief fallback: the top 3 best-selling services, or the FREE "Free Skin Consultation".
+- Mention the FREE "Free Skin Consultation" as a great way to start whenever a client is deciding what to book.
 - Example — User: "recommend something for me" -> You: "I would love to help! Could you tell me your main skin concern or goal (e.g. acne, dark spots, wrinkles, dryness, whitening) and whether it is for your face or body?"
 - Example — User: "I have acne" -> You: "For acne and breakouts, our top picks are: 1) Acne Clear — deep-cleansing with extraction; 2) Carbon Laser — targets breakouts and oil; 3) Dermapen — helps with acne marks. Want more details on any of these?"
 
@@ -758,7 +857,7 @@ You should be friendly, professional, and helpful while staying within these bou
     const concern =
       'Could you tell me your main skin concern or goal — for example acne, dark spots, wrinkles, dryness, or whitening — and whether it is for your face or body?';
     const free =
-      'You can also start with our FREE "Consultation First (Recommended for New Clients)" and our professionals will build the right plan for you.';
+      'You can also start with our FREE "Free Skin Consultation" — available to new and returning clients — and our professionals will build the right plan for you.';
     switch (kind) {
       case 'recommend':
         return `I would love to recommend the right treatment for you. ${concern}\n\n${free}`;
@@ -805,6 +904,32 @@ You should be friendly, professional, and helpful while staying within these bou
       .join('\n')}\n\nPlease consult with our clinic professionals for personalized advice.`;
   }
 
+  /** Pick 1-2 matching services for a short-topic answer (from the active catalog). */
+  private pickTopicServices(needles: string[], services: any[], limit = 2): any[] {
+    if (needles.length === 0) return [];
+    const scored = services.filter((s) => {
+      const name = s.name.toLowerCase();
+      return needles.some((n) => name.includes(n));
+    });
+    const nonArea = scored.filter((s) => !AiService.BODY_AREA_PATTERN.test(s.name.toLowerCase()));
+    const pool = nonArea.length > 0 ? nonArea : scored;
+    return [...pool].sort((a, b) => a.name.length - b.name.length).slice(0, limit);
+  }
+
+  /** Concise answer for a one-word / very short topic question, or null. */
+  private shortTopicResponse(lowerMessage: string, services: any[]): string | null {
+    const hit = AiService.SHORT_TOPICS.find((t) => t.tokens.some((tok) => lowerMessage.includes(tok)));
+    if (!hit) return null;
+
+    const picked = this.pickTopicServices(hit.needles, services);
+    const lines =
+      picked.length > 0
+        ? picked.map((s, i) => `${i + 1}) ${s.name} (${this.formatPrice(s.price)}, ${s.duration_minutes} min)`).join('\n')
+        : 'Ask me for the specific options and I\u2019ll help you choose.';
+
+    return `${hit.blurb}\n\n${lines}\n\nPlease consult with our clinic professionals for personalized advice.`;
+  }
+
   private async ruleBasedResponse(message: string, sessionId?: number): Promise<string> {
     const services = await this.getActiveServices();
     const lowerMessage = message.toLowerCase();
@@ -832,6 +957,12 @@ You should be friendly, professional, and helpful while staying within these bou
       return this.OFF_TOPIC_REPLY;
     }
 
+    // One-word / very short topic questions (e.g. "acne", "nails", "botox") get a concise answer.
+    if (this.tokenize(lowerMessage).length <= 2) {
+      const short = this.shortTopicResponse(lowerMessage, services);
+      if (short) return short;
+    }
+
     // --- Best-selling services ---
     if (
       lowerMessage.includes('best seller') ||
@@ -857,9 +988,9 @@ You should be friendly, professional, and helpful while staying within these bou
       return `Our best-selling treatments:\n\n${lines.join('\n')}\n\nWant more details on any? Please consult with our clinic professionals for personalized advice.`;
     }
 
-    // --- New clients: free consultation nudge ---
+    // --- Free consultation nudge ---
     if (AiService.NEW_CLIENT_TRIGGERS.some((t) => lowerMessage.includes(t))) {
-      return `If you're new to Souvari Skin Lab, we recommend starting with a free Consultation First (recommended for new clients). Our professionals will assess your skin and build a personalized treatment plan before you commit to any service.\n\nWould you like to see our best-selling treatments, or would you prefer to book the consultation?\n\nPlease consult with our clinic professionals for personalized advice.`;
+      return `Our FREE "Free Skin Consultation" is a great way to start — whether you're a first-time visitor or a returning client. Our professionals will assess your skin and build a personalized treatment plan before you commit to any service.\n\nWould you like to see our best-selling treatments or how the free consultation works?\n\nPlease consult with our clinic professionals for personalized advice.`;
     }
 
     // --- Recommendations (NLP retrieval engine) ---
@@ -881,7 +1012,7 @@ You should be friendly, professional, and helpful while staying within these bou
       }
       const recommended = this.recommend(lowerMessage, services);
       if (recommended.length === 0) {
-        return `Based on what we offer, I'd recommend booking our FREE "Consultation First (Recommended for New Clients)" so our professionals can create a personalized plan for you.\n\nPlease consult with our clinic professionals for personalized advice.`;
+        return `Based on what we offer, I'd recommend booking our FREE "Free Skin Consultation" — open to every client — so our professionals can create a personalized plan for you.\n\nPlease consult with our clinic professionals for personalized advice.`;
       }
       this.rememberContext(sessionId, recommended.slice(0, 3).map((r) => r.service.name), 'recommendations');
       return `Here are my top recommendations for you:\n\n${recommended
@@ -896,12 +1027,12 @@ You should be friendly, professional, and helpful while staying within these bou
         where: { setting_key: 'clinic_hours' },
       });
       const hours = settings?.setting_value?.replace(/"/g, '') || 'Monday-Saturday: 9:00 AM - 6:00 PM, Sunday: Closed';
-      return `Our clinic hours are:\n${hours}\n\nPlease consult with our clinic professionals for personalized advice. For appointments, please contact us directly.`;
+      return `Our clinic hours are:\n${hours}\n\nPlease consult with our clinic professionals for personalized advice.`;
     }
 
-    // --- Booking ---
+    // --- Booking / appointments: informational only, no booking walkthrough ---
     if (lowerMessage.includes('book') || lowerMessage.includes('appointment') || lowerMessage.includes('schedule') || lowerMessage.includes('reserve')) {
-      return `To book an appointment, please contact us directly or use our online booking system.\n\nAvailable services:\n${services.map((s) => this.formatServiceLine(s)).join('\n')}\n\nPlease consult with our clinic professionals for personalized advice.`;
+      return `Appointments are made through the website's booking page or by contacting the clinic directly. I can help with questions about our services, pricing, hours, and recommendations — what would you like to know?\n\nPlease consult with our clinic professionals for personalized advice.`;
     }
 
     // --- Skin-concern queries beat generic area/long-name matches (e.g. "acne on my face") ---

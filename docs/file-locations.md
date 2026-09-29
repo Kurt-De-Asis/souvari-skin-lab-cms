@@ -186,8 +186,9 @@ Every feature you see in the browser, and every API that powers it, lives in a p
 | File | Purpose |
 |------|---------|
 | `BookingGrid.tsx` | Calendar/time grid for admin |
+| `BookingBlockMenu.tsx` | Inline dropdown on a calendar block: set status, assign specialist, add services, reschedule |
 | `CreateBookingDrawer.tsx` | Admin creates a booking |
-| `EditAppointmentDrawer.tsx` | Admin edits a booking |
+| `EditAppointmentDrawer.tsx` | Admin edits a booking (services, specialist, date/time, notes) |
 | `AppointmentDetailsDrawer.tsx` | Booking detail panel |
 | `types.ts` | Shared types for the above |
 
@@ -216,6 +217,7 @@ Every feature you see in the browser, and every API that powers it, lives in a p
 | Auth state provider (current user, login/logout) | `client/src/context/AuthContext.tsx` |
 | Currency / date / percent formatters | `client/src/utils/format.ts` |
 | Service category label helper | `client/src/utils/formatCategory.ts` |
+| Appointment status palette, labels, menu statuses, editability | `client/src/utils/appointmentStatus.ts` |
 
 ### Styling system
 | What | File |

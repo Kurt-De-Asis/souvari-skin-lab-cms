@@ -145,7 +145,7 @@ export default function PublicServices() {
               Free
             </span>
             <span className="rounded-full bg-primary-100 text-primary-800 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5">
-              Recommended for New Clients
+              Free Consultation
             </span>
           </div>
           <h3 className="mt-1.5 font-sans text-lg md:text-xl text-neutral-900 group-hover:text-primary-700 transition">

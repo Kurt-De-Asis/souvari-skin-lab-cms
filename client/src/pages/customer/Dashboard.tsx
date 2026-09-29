@@ -25,6 +25,7 @@ export default function Dashboard() {
         const [apptRes, notifRes, txRes] = await Promise.allSettled([
           appointmentsApi.list({
             date_from: today,
+            status: 'pending,confirmed,checked_in',
             limit: '1',
             sort_by: 'appointment_date',
             sort_order: 'asc',

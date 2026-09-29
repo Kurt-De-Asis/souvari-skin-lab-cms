@@ -1,25 +1,22 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import dayjs from 'dayjs';
+import { Check, ChevronDown } from 'lucide-react';
 import EmptyState from '../../shared/EmptyState';
 import CustomerDetailDrawer from '../../../components/admin/CustomerDetailDrawer';
 import LoadingSpinner from '../../shared/LoadingSpinner';
 import { formatPosition } from '../../../utils/format';
+import { isBookingEditable, statusBlockClass, statusLabel, APPOINTMENT_STATUS_META } from '../../../utils/appointmentStatus';
+import BookingBlockMenu, { CompletedLockBadge } from './BookingBlockMenu';
 import type { BookingAppointment, StaffMember } from './types';
-
-const STATUS_COLORS: Record<string, string> = {
-  confirmed: 'bg-green-500',
-  completed: 'bg-primary-600',
-  pending: 'bg-yellow-500',
-  cancelled: 'bg-red-500',
-  checked_in: 'bg-primary-600',
-  in_progress: 'bg-primary-600',
-  no_show: 'bg-red-400',
-};
 
 const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 const HOUR_HEIGHT = 80;
 const GUTTER_W = 80;
 const COL_MIN_W = 160;
+const MENU_OFFSET = 6;
+// Height of the sticky staff header, so an auto-scroll never parks the open
+// menu underneath it.
+const HEADER_GUARD = 56;
 
 function toMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number);
@@ -29,7 +26,7 @@ function toMinutes(time: string): number {
 function toTimeString(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  return `${String(h).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
 
 function formatHour(minutes: number): string {
@@ -62,6 +59,12 @@ interface BookingGridProps {
   loading: boolean;
   onSlotClick: (staffId: number, startTime: string) => void;
   onAppointmentClick: (appt: BookingAppointment) => void;
+  onStatusChange: (appt: BookingAppointment, status: string, reason?: string) => Promise<boolean>;
+  onAssignStaff: (appt: BookingAppointment, staffId: number) => Promise<boolean>;
+  onAddService: (appt: BookingAppointment) => void;
+  onEdit: (appt: BookingAppointment) => void;
+  busyAppointmentId: number | null;
+  selectedAppointmentId?: number | null;
 }
 
 export default function BookingGrid({
@@ -71,6 +74,12 @@ export default function BookingGrid({
   loading,
   onSlotClick,
   onAppointmentClick,
+  onStatusChange,
+  onAssignStaff,
+  onAddService,
+  onEdit,
+  busyAppointmentId,
+  selectedAppointmentId,
 }: BookingGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -81,6 +90,16 @@ export default function BookingGrid({
 
   const [hoverSlot, setHoverSlot] = useState<{ staffId: number; minutes: number } | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
+  // The open menu is tracked with its block geometry so the popover can be
+  // rendered as a sibling of the block: the block itself is `overflow-hidden`
+  // and would clip the dropdown.
+  const [openMenu, setOpenMenu] = useState<{
+    id: number;
+    staffId: number;
+    top: number;
+    height: number;
+  } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const columns: ScheduledStaff[] = staff
     .filter((s) => (s.schedules ?? []).length > 0)
@@ -120,6 +139,51 @@ export default function BookingGrid({
     }
   }, [isToday, scheduled.length]);
 
+  // Close the open menu when the day or data changes out from under it.
+  useEffect(() => {
+    setOpenMenu(null);
+  }, [date, appointments]);
+
+  // The customer drawer covers the page with a full-screen backdrop, so an open
+  // block menu would stay visible through it, floating outside the drawer.
+  useEffect(() => {
+    if (selectedCustomer) setOpenMenu(null);
+  }, [selectedCustomer]);
+
+  const toggleMenu = useCallback((appt: BookingAppointment, blockTop: number, blockHeight: number) => {
+    setOpenMenu((prev) =>
+      prev?.id === appt.id
+        ? null
+        : { id: appt.id, staffId: appt.staff.id, top: blockTop, height: blockHeight }
+    );
+  }, []);
+
+  // The menu always renders below its block. When the block sits low in the
+  // scroll viewport, scroll just enough to bring the whole menu into view
+  // instead of flipping it up over the block it belongs to. Measured with real
+  // rects so the sticky header offset never skews the maths.
+  useEffect(() => {
+    if (!openMenu) return;
+    const container = containerRef.current;
+    const menu = menuRef.current;
+    if (!container || !menu) return;
+    const keepVisible = () => {
+      const cRect = container.getBoundingClientRect();
+      const mRect = menu.getBoundingClientRect();
+      if (mRect.bottom > cRect.bottom) {
+        container.scrollBy({ top: mRect.bottom - cRect.bottom + 8, behavior: 'smooth' });
+      } else if (mRect.top < cRect.top + HEADER_GUARD) {
+        container.scrollBy({ top: mRect.top - cRect.top - HEADER_GUARD, behavior: 'smooth' });
+      }
+    };
+    keepVisible();
+    // Sub-panels (status / specialist / cancel) have different heights, so
+    // re-check whenever the menu grows or shrinks.
+    const ro = new ResizeObserver(keepVisible);
+    ro.observe(menu);
+    return () => ro.disconnect();
+  }, [openMenu]);
+
   const handleTrackClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>, staffId: number) => {
       const rect = e.currentTarget.getBoundingClientRect();
@@ -146,11 +210,13 @@ export default function BookingGrid({
 
   const gridMinWidth = GUTTER_W + columns.length * COL_MIN_W;
 
+  const scheduledStaff = scheduled;
+
   return (
     <div className="flex flex-col h-full">
       {loading ? (
         <LoadingSpinner fullScreen={false} />
-      ) : scheduled.length === 0 ? (
+      ) : scheduledStaff.length === 0 ? (
         <EmptyState
           title="No staff scheduled for this day"
           description="Configure staff shifts (Team → Scheduled Shifts) to see the booking grid."
@@ -160,10 +226,10 @@ export default function BookingGrid({
           {/* Legend */}
           <div className="flex flex-wrap gap-3 text-xs text-neutral-500 shrink-0 px-4 py-2 border-b border-neutral-100">
             <span className="font-medium mr-1">Status:</span>
-            {Object.entries(STATUS_COLORS).map(([status, color]) => (
+            {APPOINTMENT_LEGEND.map(({ status, dot }) => (
               <span key={status} className="flex items-center gap-1">
-                <span className={`w-2.5 h-2.5 rounded-full ${color}`} />
-                {status.replace(/_/g, ' ')}
+                <span className="w-2.5 h-2.5 rounded-full" style={{ background: dot }} />
+                {statusLabel(status)}
               </span>
             ))}
           </div>
@@ -286,42 +352,106 @@ export default function BookingGrid({
                       const serviceLabel = (a.services && a.services.length > 0)
                         ? a.services.map((s) => s.name).join(', ')
                         : a.service.name;
+                      const editable = isBookingEditable(a.status);
+                      const menuOpen = openMenu?.id === a.id;
+                      const isSelected = selectedAppointmentId === a.id;
                       return (
-                          <div className={`absolute left-1 right-1 rounded-md px-1.5 py-1 text-left text-white overflow-hidden transition z-10 flex flex-col justify-between ${STATUS_COLORS[a.status] || 'bg-neutral-400'}`} style={{ top, height }}>
-                            <div>
+                        <div
+                          key={a.id}
+                          onClick={() => {
+                            setOpenMenu(null);
+                            onAppointmentClick(a);
+                          }}
+                          className={`absolute left-1 right-1 rounded-md px-1.5 py-1 text-left text-white overflow-hidden transition z-10 flex flex-col justify-between cursor-pointer ${statusBlockClass(a.status)}${
+                            isSelected ? ' ring-2 ring-inset ring-white/80' : ''
+                          }`}
+                          style={{ top, height }}
+                          title="Open appointment details"
+                        >
+                          <div>
+                            <div className="flex items-start gap-1">
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setSelectedCustomer(a.customer);
                                 }}
-                                className="font-semibold truncate text-[11px] leading-tight hover:underline text-left w-full text-white"
+                                className="font-semibold truncate text-[11px] leading-tight hover:underline text-left flex-1 text-white"
                                 title="View complete patient clinical workspace"
                               >
                                 {a.customer.first_name} {a.customer.last_name}
                               </button>
-                              <p className="truncate text-[10px] leading-tight opacity-90">{a.start_time} – {a.end_time}</p>
-      {/* Customer Detail Drawer */}
-      <CustomerDetailDrawer
-        open={selectedCustomer !== null}
-        onClose={() => setSelectedCustomer(null)}
-        customer={selectedCustomer}
-      />
-    </div>
+                              {editable ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleMenu(a, top, height);
+                                  }}
+                                  // The open menu dismisses on any outside mousedown.
+                                  // Swallow it on the trigger itself, otherwise the
+                                  // document handler would close the menu just before
+                                  // this click re-opens it and the chevron could never
+                                  // toggle it shut.
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  className="flex-shrink-0 -mt-0.5 -mr-0.5 p-0.5 rounded text-white/80 hover:bg-white/25 hover:text-white transition"
+                                  title="Booking actions"
+                                  aria-label={`Actions for ${a.customer.first_name} ${a.customer.last_name}`}
+                                  aria-haspopup="menu"
+                                  aria-expanded={menuOpen}
+                                >
+                                  <ChevronDown size={13} />
+                                </button>
+                              ) : (
+                                <span className="flex-shrink-0"><CompletedLockBadge /></span>
+                              )}
+                            </div>
+                            <p className="truncate text-[10px] leading-tight opacity-90">{a.start_time} – {a.end_time}</p>
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                setOpenMenu(null);
                                 onAppointmentClick(a);
                               }}
-                              className="truncate text-[10px] leading-tight opacity-90 hover:opacity-100 text-left underline w-full"
+                              className={`truncate text-[10px] leading-tight opacity-90 hover:opacity-100 text-left underline w-full ${isSelected ? 'font-semibold' : ''}`}
                               title="Open appointment details"
                             >
+                              {isSelected && <span className="inline-flex items-center"><Check size={11} className="inline mr-1 -mt-0.5" /></span>}
                               {serviceLabel}
                             </button>
                           </div>
+                        </div>
                       );
                     })}
+
+                    {/* Inline action menu — sibling of the blocks so the
+                        `overflow-hidden` on a block cannot clip it. */}
+                    {openMenu && openMenu.staffId === c.staff.id && (() => {
+                      const a = appointments.find((x) => x.id === openMenu.id);
+                      if (!a || !isBookingEditable(a.status)) return null;
+                      return (
+                        <div
+                          ref={menuRef}
+                          className="absolute left-1 right-1 z-40"
+                          style={{ top: openMenu.top + openMenu.height + MENU_OFFSET }}
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                        >
+                          <BookingBlockMenu
+                            appointment={a}
+                            staff={staff}
+                            busyStatus={busyAppointmentId === a.id ? a.status : ''}
+                            onStatus={onStatusChange}
+                            onAssignStaff={onAssignStaff}
+                            onAddService={onAddService}
+                            onEdit={onEdit}
+                            onDetails={onAppointmentClick}
+                            onClose={() => setOpenMenu(null)}
+                          />
+                        </div>
+                      );
+                    })()}
 
                     {/* Off-day notice */}
                     {c.off && (
@@ -342,10 +472,21 @@ export default function BookingGrid({
               })}
             </div>
           </div>
-        </div>
+          </div>
         </>
       )}
 
+      {/* Customer Detail Drawer — mounted once, not per appointment block. */}
+      <CustomerDetailDrawer
+        open={selectedCustomer !== null}
+        onClose={() => setSelectedCustomer(null)}
+        customer={selectedCustomer}
+      />
     </div>
   );
 }
+
+/** Legend swatches, derived from the shared status palette. */
+const APPOINTMENT_LEGEND: Array<{ status: string; dot: string }> = Object.entries(
+  APPOINTMENT_STATUS_META
+).map(([status, meta]) => ({ status, dot: meta.dot }));

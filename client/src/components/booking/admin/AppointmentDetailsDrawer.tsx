@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Clock, Loader2 } from 'lucide-react';
+import { Clock, Loader2, Lock } from 'lucide-react';
 import dayjs from 'dayjs';
 import Drawer from '../../ui/Drawer';
 import StatusBadge from '../../ui/StatusBadge';
 import { formatServicePrice } from '../../../utils/format';
+import { isBookingEditable } from '../../../utils/appointmentStatus';
+import { staffWorksOnDate } from '../../../utils/staffSchedule';
 import type { BookingAppointment, ServiceOption, StaffMember } from './types';
 
 interface AppointmentDetailsDrawerProps {
@@ -52,15 +54,26 @@ export default function AppointmentDetailsDrawer({
 
   if (!appointment) return null;
 
+  // Completed bookings are terminal: no status actions, no reschedule, no
+  // reassignment. The server rejects all of these too.
+  const locked = !isBookingEditable(appointment.status);
+
   const dateLabel = dayjs(appointment.date).format('MMMM D, YYYY');
-  const showReschedule = ['pending', 'confirmed'].includes(appointment.status);
-  const showCancel = ['pending', 'confirmed'].includes(appointment.status);
+  const showReschedule = !locked && ['pending', 'confirmed', 'checked_in', 'in_progress'].includes(appointment.status);
+  const showCancel = !locked && ['pending', 'confirmed', 'checked_in', 'in_progress'].includes(appointment.status);
   const showConfirm = appointment.status === 'pending';
   const showCheckIn = appointment.status === 'confirmed';
+  const showNoShow = ['confirmed', 'checked_in'].includes(appointment.status);
+  const showStart = appointment.status === 'checked_in';
   const showComplete = ['confirmed', 'checked_in', 'in_progress'].includes(appointment.status);
-  const canReassign = REASSIGNABLE.includes(appointment.status);
+  const canReassign = !locked && REASSIGNABLE.includes(appointment.status);
 
-  const staffOptions = staff.filter((s) => s.status !== 'inactive');
+  // Only specialists scheduled to work on the appointment's date are offered —
+  // never someone on a day off. The current assignee is kept so the drawer
+  // still shows who owns the booking.
+  const staffOptions = staff.filter(
+    (s) => s.status !== 'inactive' && staffWorksOnDate(s, appointment.date)
+  );
   if (appointment && !staffOptions.some((s) => s.id === appointment.staff.id)) {
     staffOptions.unshift({
       id: appointment.staff.id,
@@ -113,8 +126,8 @@ export default function AppointmentDetailsDrawer({
     <Drawer
       open={!!appointment}
       onClose={onClose}
-      title="Appointment Details"
-      subtitle={`${appointment.customer.first_name} ${appointment.customer.last_name}`}
+      title={`${appointment.customer.first_name} ${appointment.customer.last_name}`}
+      subtitle={`${dateLabel} • ${formatTime(appointment.start_time)}`}
       maxWidth="max-w-md"
     >
       <div className="space-y-6">
@@ -228,6 +241,16 @@ export default function AppointmentDetailsDrawer({
           </div>
         )}
 
+        {locked && (
+          <div className="flex items-start gap-2.5 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+            <Lock size={15} className="text-neutral-400 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-neutral-600">
+              This appointment is completed and is now locked. Services, specialist, and status can no
+              longer be changed.
+            </p>
+          </div>
+        )}
+
         {/* Cancel confirmation */}
         {showCancel && (
           <div className="rounded-md border border-red-100 bg-red-50/50 p-4 space-y-3">
@@ -258,7 +281,7 @@ export default function AppointmentDetailsDrawer({
         )}
 
         {/* Actions */}
-        {(showConfirm || showCheckIn || showComplete || showReschedule) && (
+        {(showConfirm || showCheckIn || showStart || showComplete || showNoShow || showReschedule) && (
           <div className="flex flex-col gap-2 border-t border-neutral-200 pt-4">
             {showConfirm && (
               <button onClick={() => runAction('confirmed')} disabled={!!busy} className="btn-primary w-full">
@@ -269,7 +292,13 @@ export default function AppointmentDetailsDrawer({
             {showCheckIn && (
               <button onClick={() => runAction('checked_in')} disabled={!!busy} className="btn-primary w-full">
                 {busy === 'checked_in' ? <Loader2 size={16} className="animate-spin" /> : null}
-                Check In
+                Mark Arrived
+              </button>
+            )}
+            {showStart && (
+              <button onClick={() => runAction('in_progress')} disabled={!!busy} className="btn-primary w-full">
+                {busy === 'in_progress' ? <Loader2 size={16} className="animate-spin" /> : null}
+                Start Session
               </button>
             )}
             {showComplete && (
@@ -278,9 +307,15 @@ export default function AppointmentDetailsDrawer({
                 Mark Complete
               </button>
             )}
+            {showNoShow && (
+              <button onClick={() => runAction('no_show')} disabled={!!busy} className="btn-secondary w-full">
+                {busy === 'no_show' ? <Loader2 size={16} className="animate-spin" /> : null}
+                Mark No-Show
+              </button>
+            )}
             {showReschedule && (
               <button onClick={() => onEdit(appointment)} disabled={!!busy} className="btn-secondary w-full">
-                Reschedule / Edit
+                Edit / Add Services
               </button>
             )}
           </div>

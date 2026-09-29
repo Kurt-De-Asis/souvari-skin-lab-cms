@@ -86,6 +86,9 @@ export default function CreateBookingDrawer({
 
   const [selectedStaffId, setSelectedStaffId] = useState(0);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
+  // Draft text for the time field. Kept separate from `selectedSlot` so an
+  // invalid typed time can show its error instead of being wiped.
+  const [timeInput, setTimeInput] = useState('');
 
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -235,6 +238,7 @@ export default function CreateBookingDrawer({
     if (!open || availability.length === 0) {
       setSelectedStaffId(0);
       setSelectedSlot(null);
+      setTimeInput('');
       return;
     }
     const target = prefill?.staff_id && availability.some((s) => s.staff_id === prefill.staff_id)
@@ -249,11 +253,14 @@ export default function CreateBookingDrawer({
     const staffSlots = availability.filter((s) => s.staff_id === selectedStaffId);
     if (staffSlots.length === 0) {
       setSelectedSlot(null);
+      setTimeInput('');
       return;
     }
     const prefTime = prefill?.staff_id === selectedStaffId ? prefill.start_time : null;
     const match = prefTime ? staffSlots.find((s) => s.start === prefTime) : undefined;
-    setSelectedSlot(match ?? staffSlots[0]);
+    const next = match ?? staffSlots[0];
+    setSelectedSlot(next);
+    setTimeInput(next.start);
   }, [open, availability, selectedStaffId, prefill]);
 
   const categories = useMemo(() => {
@@ -287,6 +294,30 @@ export default function CreateBookingDrawer({
     () => availability.filter((s) => s.staff_id === selectedStaffId),
     [availability, selectedStaffId]
   );
+
+  // Any minute the specialist is free for is a valid booking, including
+  // off-grid times like 10:07. What isn't valid is a time that is past, outside
+  // the clinic day, or already taken.
+  const handleTimeChange = (value: string) => {
+    setTimeInput(value);
+    if (!value) {
+      setSelectedSlot(null);
+      return;
+    }
+    setSelectedSlot(staffSlots.find((s) => s.start === value) ?? null);
+  };
+
+  const timeError = useMemo(() => {
+    if (staffSlots.length === 0) return 'No available times for this specialist.';
+    if (!timeInput) return 'Select a start time.';
+    if (appointmentDate === TODAY && timeInput <= dayjs().format('HH:mm')) {
+      return 'This time has already passed.';
+    }
+    if (!staffSlots.some((s) => s.start === timeInput)) {
+      return `${formatTime(timeInput)} is not available for this specialist.`;
+    }
+    return null;
+  }, [staffSlots, timeInput, appointmentDate]);
 
   const addService = (s: ServiceOption) => {
     setSelectedServices((prev) => (prev.some((x) => x.id === s.id) ? prev : [...prev, s]));
@@ -731,33 +762,37 @@ export default function CreateBookingDrawer({
                     ))}
                   </div>
                 )}
-                <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
-                  {staffSlots.map((slot) => {
-                    const active = selectedSlot?.start === slot.start;
-                    const past = appointmentDate === TODAY && slot.start <= dayjs().format('HH:mm');
-                    return (
-                      <button
-                        key={`${slot.start}-${slot.staff_id}`}
-                        onClick={() => setSelectedSlot(slot)}
-                        disabled={past}
-                        title={past ? 'This time has already passed' : undefined}
-                        className={`px-1.5 py-2 rounded-md border text-xs font-medium transition ${
-                          past
-                            ? 'opacity-40 cursor-not-allowed'
-                            : active
-                            ? 'bg-neutral-900 border-neutral-900 text-white'
-                            : 'bg-white border-neutral-200 text-neutral-900 hover:border-neutral-300'
-                        }`}
-                      >
-                        {formatTime(slot.start)}
-                        {slot.staff_name && (
-                          <span className={`block text-[10px] font-normal mt-0.5 truncate ${active ? 'text-neutral-300' : 'text-neutral-400'}`}>
-                            {slot.staff_name}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
+                {slotStaff.length === 1 && (
+                  <p className="mb-2 text-xs text-neutral-500">
+                    Specialist · <span className="font-medium text-neutral-700">{slotStaff[0].name}</span>
+                  </p>
+                )}
+                <div>
+                  <label htmlFor="booking-time" className="block text-xs font-medium text-neutral-600 mb-1">
+                    Start time
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      id="booking-time"
+                      type="time"
+                      step={60}
+                      value={timeInput}
+                      onChange={(e) => handleTimeChange(e.target.value)}
+                      className={`input-field w-40 ${timeError ? 'border-red-400' : ''}`}
+                    />
+                    {selectedSlot && (
+                      <span className="text-sm text-neutral-600">
+                        &ndash; {formatTime(selectedSlot.end)}
+                      </span>
+                    )}
+                  </div>
+                  {timeError ? (
+                    <p className="mt-1.5 text-xs text-red-600">{timeError}</p>
+                  ) : (
+                    <p className="mt-1.5 text-xs text-neutral-400">
+                      Any free start time works, including off-grid times.
+                    </p>
+                  )}
                 </div>
               </>
             )}

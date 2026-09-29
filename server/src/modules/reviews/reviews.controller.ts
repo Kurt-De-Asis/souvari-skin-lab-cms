@@ -43,6 +43,15 @@ export class ReviewsController {
     }
   }
 
+  async getPublicList(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await reviewService.getPublicList(req.query as any);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getServiceStats(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const serviceId = parseInt(String(req.params.serviceId), 10);

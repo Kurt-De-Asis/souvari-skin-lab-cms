@@ -11,7 +11,40 @@ import {
   CreateGroupAppointmentInput,
   UpdateAppointmentInput,
   ListAppointmentsQuery,
+  WeekdayName,
 } from './appointments.validation';
+
+/** Who is performing an update. Drives the permissions the service enforces. */
+export interface AppointmentActor {
+  role?: 'admin' | 'staff' | 'customer';
+  userId?: number;
+}
+
+/** Statuses a customer is still allowed to cancel from. */
+const CUSTOMER_CANCELLABLE_STATUSES = ['pending', 'confirmed'];
+
+/** Default audit-trail reason recorded when a customer cancels their own booking. */
+const CUSTOMER_CANCEL_REASON = 'Cancelled by customer';
+
+/**
+ * Weekday names indexed directly by JS `Date.getDay()` (0 = Sunday), so a date
+ * read out of the DB can be resolved with no arithmetic.
+ */
+const WEEKDAY_NAMES_BY_JS: WeekdayName[] = [
+  'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday',
+];
+
+/** Result of resolving + pricing a replacement service list. */
+interface ServiceChangePlan {
+  serviceIds: number[];
+  serviceNames: string[];
+  endTime: string;
+  quotedPrice: number;
+  priceType: string | null;
+  lines: Array<{ service_id: number; unit_price: number; duration_minutes: number }>;
+  addedServiceNames: string[];
+  changed: boolean;
+}
 
 export class AppointmentService {
   async quote(serviceId: number, customerId?: number, membershipCode?: string) {
@@ -484,10 +517,64 @@ export class AppointmentService {
       throw new AppError('Staff member already has an appointment during this time slot', 409);
     }
 
+    // A booking can never be placed with a specialist who is off on that date,
+    // and the window must fit their shift and break — mirrors getAvailability.
+    await this.assertStaffWorkable(staffId, appointmentDate, startTime, endTime);
+
     return staff;
   }
 
-  async update(id: number, data: UpdateAppointmentInput) {
+  // Validates that a specialist is actually scheduled to work during the given
+  // window on the given date. Mirrors getAvailability's per-staff rules: no
+  // schedule row for the weekday, an inactive schedule, or an explicit off-day
+  // (00:00-00:00) all mean the specialist is unavailable. Used by both the
+  // create path (resolveStaff) and the update/reschedule path.
+  private async assertStaffWorkable(
+    staffId: number,
+    appointmentDate: string,
+    startTime: string,
+    endTime: string
+  ): Promise<void> {
+    const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+    const weekday = weekdays[new Date(`${appointmentDate}T00:00:00`).getDay()];
+    const schedule = await prisma.staff_schedules.findFirst({
+      where: { staff_id: staffId, day_of_week: weekday },
+    });
+
+    const isOffDay =
+      !schedule ||
+      !schedule.is_active ||
+      (schedule.start_time === '00:00' && schedule.end_time === '00:00');
+    if (isOffDay) {
+      throw new AppError(
+        'This specialist is not scheduled to work on the selected date.',
+        422
+      );
+    }
+
+    const windowStartMin = this.timeToMinutes(startTime);
+    const windowEndMin = this.timeToMinutes(endTime);
+    const shiftStartMin = this.timeToMinutes(schedule.start_time);
+    const shiftEndMin = this.timeToMinutes(schedule.end_time);
+    if (windowStartMin < shiftStartMin || windowEndMin > shiftEndMin) {
+      throw new AppError(
+        "The requested time falls outside this specialist's working hours for the selected date.",
+        422
+      );
+    }
+    if (schedule.break_start && schedule.break_end) {
+      const bStart = this.timeToMinutes(schedule.break_start);
+      const bEnd = this.timeToMinutes(schedule.break_end);
+      if (windowStartMin < bEnd && windowEndMin > bStart) {
+        throw new AppError(
+          "The requested time overlaps this specialist's break on the selected date.",
+          422
+        );
+      }
+    }
+  }
+
+  async update(id: number, data: UpdateAppointmentInput, context?: AppointmentActor) {
     const existing = await prisma.appointments.findFirst({
       where: { id, deleted_at: null },
     });
@@ -495,6 +582,41 @@ export class AppointmentService {
     if (!existing) {
       throw new AppError('Appointment not found', 404);
     }
+
+    // Completed appointments are terminal and immutable — for every role,
+    // including admins. No field edits and no status transitions.
+    if (existing.status === 'completed') {
+      throw new AppError(
+        'Completed appointments can no longer be edited or have their status changed.',
+        422
+      );
+    }
+
+    const isCustomerSelfService = context?.role === 'customer';
+
+    // A customer may only cancel their own appointment, and only while it is
+    // still cancellable. Enforced here so it cannot be bypassed by calling the
+    // endpoint directly with a different status value.
+    if (isCustomerSelfService) {
+      if (data.status !== 'cancelled') {
+        throw new AppError('Customers can only cancel their appointments', 403);
+      }
+      if (!CUSTOMER_CANCELLABLE_STATUSES.includes(existing.status)) {
+        throw new AppError(
+          'This appointment can no longer be cancelled. Please contact the clinic.',
+          422
+        );
+      }
+    }
+
+    // Resolve the replacement service list up front. It determines the new
+    // block length, which must feed the conflict check below — otherwise a
+    // lengthening edit would validate against the *old* end_time and could
+    // silently overlap a neighbouring booking.
+    const servicePlan =
+      data.service_ids !== undefined
+        ? await this.planServiceChange(existing, data.service_ids, data.start_time)
+        : null;
 
     // Validate the resulting appointment window when the booking details change.
     // Guards against clinic-closed days, staff conflicts, and staff reassigned
@@ -504,7 +626,8 @@ export class AppointmentService {
       data.appointment_date !== undefined ||
       data.start_time !== undefined ||
       data.end_time !== undefined ||
-      data.staff_id !== undefined;
+      data.staff_id !== undefined ||
+      servicePlan !== null;
 
     if (slotOrStaffChanged) {
       // Past-date gate: only explicit date changes are checked, so notes/staff
@@ -517,7 +640,7 @@ export class AppointmentService {
       }
       const effectiveDate = data.appointment_date ?? new Date(existing.appointment_date).toISOString().slice(0, 10);
       const effectiveStart = data.start_time ?? existing.start_time;
-      const effectiveEnd = data.end_time ?? existing.end_time;
+      const effectiveEnd = servicePlan?.endTime ?? data.end_time ?? existing.end_time;
       const effectiveStaffId = data.staff_id ?? existing.staff_id;
 
       // Same-day past-time gate: the new start time must still be in the future.
@@ -541,15 +664,21 @@ export class AppointmentService {
     if (data.staff_id !== undefined) updateData.staff_id = data.staff_id;
     if (data.appointment_date !== undefined) updateData.appointment_date = new Date(data.appointment_date);
     if (data.start_time !== undefined) updateData.start_time = data.start_time;
-    if (data.end_time !== undefined) updateData.end_time = data.end_time;
+    if (data.end_time !== undefined && !servicePlan) updateData.end_time = data.end_time;
     if (data.notes !== undefined) updateData.notes = data.notes;
     if (data.service_id !== undefined) updateData.service_id = data.service_id;
     if (data.cancellation_reason !== undefined) updateData.cancellation_reason = data.cancellation_reason;
     if (data.reschedule_reason !== undefined) updateData.reschedule_reason = data.reschedule_reason;
 
-    // Cancellation requires a message so the customer can be informed why
+    // Cancellation requires a message so the customer can be informed why.
+    // Customer self-cancellation is exempt — they supply their own reason and
+    // the service fills in a default for the audit trail and the SMS.
     if (data.status === 'cancelled' && !data.cancellation_reason?.trim()) {
-      throw new AppError('Please provide a reason for cancelling the appointment', 400);
+      if (isCustomerSelfService) {
+        updateData.cancellation_reason = CUSTOMER_CANCEL_REASON;
+      } else {
+        throw new AppError('Please provide a reason for cancelling the appointment', 400);
+      }
     }
 
     // Recompute quoted price when service or membership changes
@@ -568,10 +697,7 @@ export class AppointmentService {
     }
 
     if (data.status) {
-      await prisma.appointments.update({
-        where: { id },
-        data: updateData,
-      });
+      await this.persistUpdate(id, updateData, servicePlan);
 
       const updated = await prisma.appointments.update({
         where: { id },
@@ -595,6 +721,7 @@ export class AppointmentService {
           old_status: existing.status,
           new_status: data.status,
           reason: data.cancellation_reason ?? null,
+          changed_by: context?.userId ?? null,
         },
       });
 
@@ -615,24 +742,57 @@ export class AppointmentService {
         const apptDate = new Date(existing.appointment_date).toLocaleDateString('en-PH', {
           year: 'numeric', month: 'long', day: 'numeric',
         });
+        const serviceLabel = servicePlan?.serviceNames.join(', ') ?? updated.service.name;
 
-        await notificationDispatch.dispatchAppointmentStatus({
-          appointmentId: id,
-          oldStatus: existing.status,
-          newStatus: data.status,
-          customerUserId: customerUser?.id ?? customerRecord?.user_id ?? 0,
-          customerName: `${updated.customer.first_name} ${updated.customer.last_name}`,
-          customerPhone: customerUser?.phone ?? null,
-          staffUserId: staffRecord?.user_id ?? null,
-          staffName: `${updated.staff.first_name} ${updated.staff.last_name}`,
-          serviceName: updated.service.name,
-          appointmentDate: apptDate,
-          appointmentTime: existing.start_time,
-          cancellationReason: data.cancellation_reason ?? null,
-          adminUserIds,
-        });
+        // Cancelling always goes through the dedicated dispatcher so the
+        // customer gets an automatic SMS regardless of which entry point
+        // initiated the cancellation (admin, staff, or the customer).
+        if (data.status === 'cancelled') {
+          await notificationDispatch.dispatchAppointmentCancelled({
+            appointmentId: id,
+            customerUserId: customerUser?.id ?? customerRecord?.user_id ?? 0,
+            customerName: `${updated.customer.first_name} ${updated.customer.last_name}`,
+            customerPhone: customerUser?.phone ?? null,
+            staffUserId: staffRecord?.user_id ?? null,
+            staffName: `${updated.staff.first_name} ${updated.staff.last_name}`,
+            serviceName: serviceLabel,
+            appointmentDate: apptDate,
+            appointmentTime: existing.start_time,
+            reason: updateData.cancellation_reason ?? data.cancellation_reason ?? null,
+            cancelledByCustomer: isCustomerSelfService,
+            adminUserIds,
+          });
+        } else {
+          await notificationDispatch.dispatchAppointmentStatus({
+            appointmentId: id,
+            oldStatus: existing.status,
+            newStatus: data.status,
+            customerUserId: customerUser?.id ?? customerRecord?.user_id ?? 0,
+            customerName: `${updated.customer.first_name} ${updated.customer.last_name}`,
+            customerPhone: customerUser?.phone ?? null,
+            staffUserId: staffRecord?.user_id ?? null,
+            staffName: `${updated.staff.first_name} ${updated.staff.last_name}`,
+            serviceName: serviceLabel,
+            appointmentDate: apptDate,
+            appointmentTime: existing.start_time,
+            adminUserIds,
+          });
+        }
       } catch (err: any) {
         // Notification failure should not block status update
+      }
+
+      // Tell the customer their booking now covers a different service set.
+      if (servicePlan?.changed) {
+        try {
+          await this.dispatchServiceChangeNotice(
+            existing,
+            servicePlan,
+            data.reschedule_reason ?? data.notes ?? null
+          );
+        } catch (err: any) {
+          // Notification failure should not block the service change
+        }
       }
 
       // Auto-create treatment record so the customer's treatment history is populated
@@ -673,21 +833,27 @@ export class AppointmentService {
       throw new AppError('Please provide a message explaining the reschedule', 400);
     }
 
-    const appointment = await prisma.appointments.update({
-      where: { id },
-      data: updateData,
-      include: {
-        customer: {
-          select: { id: true, first_name: true, last_name: true },
-        },
-        staff: {
-          select: { id: true, first_name: true, last_name: true, position: true },
-        },
-        service: {
-          select: { id: true, name: true, price: true, duration_minutes: true },
-        },
+    const appointment = await this.persistUpdateReturning(id, updateData, servicePlan, {
+      customer: { select: { id: true, first_name: true, last_name: true } },
+      staff: { select: { id: true, first_name: true, last_name: true, position: true } },
+      service: { select: { id: true, name: true, price: true, duration_minutes: true } },
+      services: {
+        include: { service: { select: { id: true, name: true, price: true, duration_minutes: true } } },
+        orderBy: { id: 'asc' },
       },
     });
+
+    if (servicePlan?.changed) {
+      try {
+        await this.dispatchServiceChangeNotice(
+          existing,
+          servicePlan,
+          data.reschedule_reason ?? data.notes ?? null
+        );
+      } catch (err: any) {
+        // Notification failure should not block the service change
+      }
+    }
 
     if (isReschedule) {
       // Audit trail in status history (status unchanged, reason carries the message)
@@ -754,6 +920,15 @@ export class AppointmentService {
       throw new AppError('Appointment not found', 404);
     }
 
+    // Deleting writes status = 'cancelled', which would slip past the
+    // completed lock enforced in update().
+    if (existing.status === 'completed') {
+      throw new AppError(
+        'Completed appointments can no longer be deleted.',
+        422
+      );
+    }
+
     await prisma.appointments.update({
       where: { id },
       data: { deleted_at: new Date(), status: 'cancelled' },
@@ -799,7 +974,6 @@ export class AppointmentService {
     }
 
     const durationMinutes = durationOverride || service.duration_minutes;
-    const slotsNeeded = Math.ceil(durationMinutes / 30);
 
     // Resolve which staff to check availability for.
     let staffList: any[];
@@ -838,15 +1012,8 @@ export class AppointmentService {
       select: { staff_id: true, start_time: true, end_time: true },
     });
 
-    const dayGrid: string[] = [];
-    for (let h = 0; h < 24; h++) {
-      for (let m = 0; m < 60; m += 30) {
-        dayGrid.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-      }
-    }
-
     const isToday = date === this.localDateString();
-    const nowTime = this.localTimeString();
+    const nowMin = this.timeToMinutes(this.localTimeString());
 
     const availableSlots: Array<{
       start: string;
@@ -855,6 +1022,11 @@ export class AppointmentService {
       staff_name: string;
     }> = [];
 
+    // Per-minute availability: every minute inside a specialist's shift is a
+    // real, bookable slot as long as the full service duration fits inside the
+    // shift, no booked minute falls inside the window, the window does not
+    // overlap a break, and it is not in the past (same-day). The customer's
+    // exact pick (e.g. 12:10) is always honoured — it is never snapped.
     for (const staff of staffList) {
       const schedule = scheduleByStaff.get(staff.id);
 
@@ -866,49 +1038,43 @@ export class AppointmentService {
       if (!schedule.is_active) continue;
       if (schedule.start_time === '00:00' && schedule.end_time === '00:00') continue;
 
-      const windowStart = schedule.start_time;
-      const windowEnd = schedule.end_time;
-      const breakStart = schedule.break_start ?? null;
-      const breakEnd = schedule.break_end ?? null;
+      const shiftStartMin = this.timeToMinutes(schedule.start_time);
+      const shiftEndMin = this.timeToMinutes(schedule.end_time);
+      if (shiftEndMin <= shiftStartMin) continue;
 
-      const startIdx = dayGrid.indexOf(windowStart);
-      const endIdx = dayGrid.indexOf(windowEnd);
-      if (startIdx < 0 || endIdx < 0 || endIdx <= startIdx) continue;
+      const breakStart = schedule.break_start ? this.timeToMinutes(schedule.break_start) : null;
+      const breakEnd = schedule.break_end ? this.timeToMinutes(schedule.break_end) : null;
 
-      const booked = new Set<string>();
+      // Mark every booked minute of this specialist's day so an arbitrary
+      // start time can be checked against the exact window it occupies.
+      const booked = new Set<number>();
       for (const appt of existingAppointments) {
         if (appt.staff_id !== staff.id) continue;
-        for (const slot of dayGrid) {
-          if (slot >= appt.start_time && slot < appt.end_time) booked.add(slot);
-        }
+        const aStart = this.timeToMinutes(appt.start_time);
+        const aEnd = this.timeToMinutes(appt.end_time);
+        for (let m = aStart; m < aEnd; m++) booked.add(m);
       }
 
-      for (let idx = startIdx; idx + slotsNeeded <= endIdx; idx++) {
-        const slot = dayGrid[idx];
-        if (booked.has(slot)) continue;
+      const lastStart = shiftEndMin - durationMinutes;
+      for (let s = shiftStartMin; s <= lastStart; s++) {
+        if (isToday && s <= nowMin) continue;
 
         let free = true;
-        for (let i = 0; i < slotsNeeded; i++) {
-          if (!dayGrid[idx + i] || booked.has(dayGrid[idx + i])) {
+        for (let i = 0; i < durationMinutes; i++) {
+          if (booked.has(s + i)) {
             free = false;
             break;
           }
         }
         if (!free) continue;
 
-        if (breakStart && breakEnd) {
-          const slotStartMin = this.timeToMinutes(slot);
-          const slotEndMin = slotStartMin + durationMinutes;
-          const bStart = this.timeToMinutes(breakStart);
-          const bEnd = this.timeToMinutes(breakEnd);
-          if (slotStartMin < bEnd && slotEndMin > bStart) continue;
+        if (breakStart !== null && breakEnd !== null) {
+          if (s < breakEnd && s + durationMinutes > breakStart) continue;
         }
 
-        if (isToday && slot <= nowTime) continue;
-
         availableSlots.push({
-          start: slot,
-          end: this.addMinutesToTime(slot, durationMinutes),
+          start: this.minutesToTime(s),
+          end: this.minutesToTime(s + durationMinutes),
           staff_id: staff.id,
           staff_name: `${staff.first_name} ${staff.last_name}`,
         });
@@ -1020,6 +1186,11 @@ private async validateUpdateWindow(
       );
     }
 
+    // A booking may never be moved to a specialist who is off on the effective
+    // date, and the window must fit their shift and break — enforced for both
+    // updates here and creates in resolveStaff.
+    await this.assertStaffWorkable(staffId, appointmentDate, startTime, endTime);
+
     const conflicts = await prisma.appointments.findMany({
       where: {
         staff_id: staffId,
@@ -1037,10 +1208,232 @@ private async validateUpdateWindow(
     }
   }
 
+  // ─── Service list replacement ────────────────────────────────────────
+  // Resolves and prices a replacement service list without writing anything.
+  // Returned separately from the write so the caller can feed the derived
+  // end_time into validateUpdateWindow before any mutation happens.
+  private async planServiceChange(
+    existing: any,
+    requestedIds: number[],
+    startTime?: string
+  ): Promise<ServiceChangePlan> {
+    // Dedupe while preserving the caller's ordering.
+    const serviceIds = [...new Set(requestedIds)];
+
+    const services = await prisma.services.findMany({
+      where: { id: { in: serviceIds }, deleted_at: null },
+    });
+    if (services.length !== serviceIds.length) {
+      throw new AppError('One or more services not found', 404);
+    }
+    const ordered = serviceIds
+      .map((id) => services.find((s) => s.id === id))
+      .filter((s): s is NonNullable<typeof s> => !!s);
+
+    const totalDuration = ordered.reduce((sum, s) => sum + s.duration_minutes, 0);
+    // Anchor the derived end time to the start the appointment will actually
+    // have, so changing both the time and the services in one request is safe.
+    const effectiveStart = startTime ?? existing.start_time;
+    const endTime = this.addMinutesToTime(effectiveStart, totalDuration);
+
+    // Re-price every line so membership and monthly-perk discounts stay
+    // accurate on the enlarged booking.
+    const lines: ServiceChangePlan['lines'] = [];
+    let quotedPrice = 0;
+    let priceType: string | null = null;
+    for (const svc of ordered) {
+      let unitPrice = Number(svc.price);
+      try {
+        const pricing = await pricingService.calculatePrice(
+          { serviceId: svc.id, membershipCode: existing.membership_code ?? undefined },
+          existing.customer_id
+        );
+        unitPrice = pricing.applicablePrice;
+        quotedPrice += pricing.finalTotal;
+        if (!priceType) priceType = pricing.priceType;
+      } catch {
+        quotedPrice += unitPrice;
+      }
+      lines.push({
+        service_id: svc.id,
+        unit_price: Math.round(unitPrice * 100) / 100,
+        duration_minutes: svc.duration_minutes,
+      });
+    }
+
+    // Skip the write entirely when the selection is unchanged, so an
+    // idempotent save does not churn rows or re-notify the customer.
+    const currentRows = await prisma.appointment_services.findMany({
+      where: { appointment_id: existing.id },
+      select: { service_id: true },
+      orderBy: { id: 'asc' },
+    });
+    const currentIds = currentRows.map((r) => r.service_id);
+    const changed =
+      currentIds.length !== serviceIds.length ||
+      currentIds.some((id, i) => id !== serviceIds[i]);
+
+    const previousIds = new Set(currentIds);
+    const serviceNames = ordered.map((s) => s.name);
+    const addedServiceNames = serviceNames.filter((_, i) => !previousIds.has(serviceIds[i]));
+
+    return {
+      serviceIds,
+      serviceNames,
+      endTime,
+      quotedPrice: Math.round(quotedPrice * 100) / 100,
+      priceType,
+      lines,
+      addedServiceNames,
+      changed,
+    };
+  }
+
+  // Merges the derived service fields into the appointment field update.
+  private buildAppointmentUpdate(updateData: any, plan: ServiceChangePlan | null): any {
+    if (!plan) return updateData;
+    return {
+      ...updateData,
+      end_time: plan.endTime,
+      quoted_price: plan.quotedPrice,
+      price_type: plan.priceType,
+      service_id: plan.serviceIds[0],
+    };
+  }
+
+  private buildServiceRows(id: number, plan: ServiceChangePlan) {
+    return plan.lines.map((l) => ({
+      appointment_id: id,
+      service_id: l.service_id,
+      unit_price: l.unit_price,
+      duration_minutes: l.duration_minutes,
+    }));
+  }
+
+  /** Writes the appointment fields plus the replacement service rows atomically. */
+  private async persistUpdate(
+    id: number,
+    updateData: any,
+    plan: ServiceChangePlan | null
+  ): Promise<void> {
+    const data = this.buildAppointmentUpdate(updateData, plan);
+
+    if (!plan || !plan.changed) {
+      await prisma.appointments.update({ where: { id }, data });
+      return;
+    }
+
+    await prisma.$transaction([
+      prisma.appointments.update({ where: { id }, data }),
+      prisma.appointment_services.deleteMany({ where: { appointment_id: id } }),
+      prisma.appointment_services.createMany({ data: this.buildServiceRows(id, plan) }),
+    ]);
+  }
+
+  /** Same as {@link persistUpdate} but returns the row with its relations. */
+  private async persistUpdateReturning(
+    id: number,
+    updateData: any,
+    plan: ServiceChangePlan | null,
+    include: any
+  ): Promise<any> {
+    const data = this.buildAppointmentUpdate(updateData, plan);
+
+    if (!plan || !plan.changed) {
+      return prisma.appointments.update({ where: { id }, data, include });
+    }
+
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.appointments.update({ where: { id }, data, include });
+      await tx.appointment_services.deleteMany({ where: { appointment_id: id } });
+      await tx.appointment_services.createMany({ data: this.buildServiceRows(id, plan) });
+      return updated;
+    });
+  }
+
+  // Notifies the customer (in-app + SMS) that their booking now covers a
+  // different set of services, plus the assigned staff and admins.
+  private async dispatchServiceChangeNotice(
+    existing: any,
+    plan: ServiceChangePlan,
+    note: string | null
+  ): Promise<void> {
+    const [customerRecord, staffRecord, adminUserIds] = await Promise.all([
+      prisma.customers.findUnique({
+        where: { id: existing.customer_id },
+        select: { user_id: true, first_name: true, last_name: true },
+      }),
+      prisma.staff.findUnique({
+        where: { id: existing.staff_id },
+        select: { user_id: true, first_name: true, last_name: true },
+      }),
+      notificationDispatch.getAdminUserIds(),
+    ]);
+
+    const customerUser = customerRecord
+      ? await prisma.users.findUnique({
+          where: { id: customerRecord.user_id },
+          select: { id: true, phone: true },
+        })
+      : null;
+
+    const apptDate = new Date(existing.appointment_date).toLocaleDateString('en-PH', {
+      year: 'numeric', month: 'long', day: 'numeric',
+    });
+
+    await notificationDispatch.dispatchAppointmentServicesChanged({
+      appointmentId: existing.id,
+      customerUserId: customerUser?.id ?? customerRecord?.user_id ?? 0,
+      customerName: customerRecord
+        ? `${customerRecord.first_name} ${customerRecord.last_name}`
+        : 'Customer',
+      customerPhone: customerUser?.phone ?? null,
+      staffUserId: staffRecord?.user_id ?? null,
+      staffName: staffRecord ? `${staffRecord.first_name} ${staffRecord.last_name}` : '',
+      serviceNames: plan.serviceNames,
+      addedServiceNames: plan.addedServiceNames,
+      appointmentDate: apptDate,
+      appointmentTime: existing.start_time,
+      newEndTime: plan.endTime,
+      quotedPrice: plan.quotedPrice,
+      note: note?.trim() || null,
+      adminUserIds,
+    });
+  }
+
+  /**
+   * Counts upcoming, still-actionable bookings per weekday. Backs the admin
+   * "days the store is open" warning so closing a day does not silently
+   * strand customers who already have bookings on it.
+   */
+  async getOperatingDaysImpact(days: WeekdayName[]) {
+    const from = new Date(this.localDateString());
+    const rows = await prisma.appointments.findMany({
+      where: {
+        appointment_date: { gte: from },
+        status: { notIn: ['cancelled', 'no_show', 'completed'] },
+        deleted_at: null,
+      },
+      select: { appointment_date: true },
+    });
+
+    const byWeekday = new Map<WeekdayName, number>();
+    for (const row of rows) {
+      // appointment_date is a DATE column stored at UTC midnight; read the UTC
+      // components so the weekday matches what the calendar displays.
+      const name = WEEKDAY_NAMES_BY_JS[row.appointment_date.getUTCDay()];
+      byWeekday.set(name, (byWeekday.get(name) ?? 0) + 1);
+    }
+
+    return days.map((day) => ({ day, upcoming_count: byWeekday.get(day) ?? 0 }));
+  }
+
   // ─── Weekday helpers for clinic-wide closed-day enforcement. ─────────
-  // JS getDay() numbering: 0=Sunday … 6=Saturday.
+  // JS getDay() numbering: 0=Sunday … 6=Saturday. appointment_date is a DATE
+  // column stored at UTC midnight, so read the weekday in UTC too — otherwise
+  // the server's own timezone can shift the answer by a day.
   private weekdayOf(dateStr: string): number {
-    return new Date(`${dateStr}T00:00:00`).getDay();
+    return new Date(`${dateStr}T00:00:00Z`).getUTCDay();
   }
 
   // Weekdays the clinic is routinely closed. Computed as the complement of the
@@ -1062,6 +1455,12 @@ private async validateUpdateWindow(
   private timeToMinutes(time: string): number {
     const [hours, minutes] = time.split(':').map(Number);
     return hours * 60 + minutes;
+  }
+
+  private minutesToTime(total: number): string {
+    const hours = Math.floor(total / 60);
+    const minutes = total % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
   }
 
   private addMinutesToTime(time: string, minutes: number): string {

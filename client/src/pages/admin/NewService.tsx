@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { X, Save, Package, Plug, ArrowLeft } from 'lucide-react';
+import { X, Save, Plug, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { servicesApi, serviceCategoriesApi, resourcesApi, serviceAddonsApi } from '@/api';
+import { servicesApi, serviceCategoriesApi, serviceAddonsApi } from '@/api';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import { registerMoney } from '@/utils/money';
 import { formatAmountInput, parseAmountInput } from '@/utils/format';
@@ -20,25 +20,18 @@ interface ServiceForm {
   status: string;
 }
 
-interface Resource {
-  id: number;
-  name: string;
-  type: string;
-  is_active: boolean;
-}
-
 interface ServiceAddon {
+  id?: number;
   name: string;
   description: string;
   price: number;
   additional_duration_minutes: number;
 }
 
-type Tab = 'basic' | 'resources' | 'addons';
+type Tab = 'basic' | 'addons';
 
 const TABS: { key: Tab; label: string; icon: any }[] = [
   { key: 'basic', label: 'Basic Details', icon: null },
-  { key: 'resources', label: 'Resources', icon: Package },
   { key: 'addons', label: 'Service Add-ons', icon: Plug },
 ];
 
@@ -54,9 +47,8 @@ export default function NewService() {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
-  const [allResources, setAllResources] = useState<Resource[]>([]);
-  const [assignedResourceIds, setAssignedResourceIds] = useState<number[]>([]);
   const [addons, setAddons] = useState<ServiceAddon[]>([]);
+  const [originalAddonIds, setOriginalAddonIds] = useState<number[]>([]);
 
   const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<ServiceForm>({
     defaultValues: {
@@ -84,10 +76,6 @@ export default function NewService() {
       const catRes = await serviceCategoriesApi.list({ limit: '100' });
       setCategories(catRes.data.data?.data || catRes.data.data || []);
     } catch {}
-    try {
-      const resRes = await resourcesApi.list({ limit: '100', is_active: 'true' });
-      setAllResources(resRes.data.data?.data || resRes.data.data || []);
-    } catch {}
   };
 
   const loadServiceData = async () => {
@@ -107,21 +95,17 @@ export default function NewService() {
         status: svc.status || 'active',
       });
 
-      // Load allocated resources
-      try {
-        const resRes = await resourcesApi.getServiceResources(Number(id));
-        setAssignedResourceIds((resRes.data.data || []).map((r: any) => r.resource_id));
-      } catch {}
-
       // Load addons
       try {
         const addonRes = await serviceAddonsApi.list({ service_id: String(id) });
         const addonData = addonRes.data.data || [];
+        setOriginalAddonIds(addonData.map((a: any) => a.id));
         setAddons(addonData.map((a: any) => ({
+          id: a.id,
           name: a.name,
           description: a.description || '',
-          price: a.price || 0,
-          additional_duration_minutes: a.additional_duration_minutes || 0,
+          price: Number(a.price) || 0,
+          additional_duration_minutes: Number(a.additional_duration_minutes) || 0,
         })));
       } catch {}
     } catch {
@@ -135,46 +119,52 @@ export default function NewService() {
     setSaving(true);
     try {
       let serviceId: number;
-      const payload = {
-        ...values,
+      const { category, ...rest } = values;
+      const payload: Record<string, any> = {
+        ...rest,
         price: Number(values.price),
         duration_minutes: Number(values.duration_minutes),
         category_id: values.category_id ? Number(values.category_id) : null,
       };
+      if (category) payload.category = category;
 
       if (isEdit) {
         await servicesApi.update(Number(id), payload);
         serviceId = Number(id);
-        toast.success('Service updated');
       } else {
         const { data } = await servicesApi.create(payload);
         serviceId = data.data?.id || data.id;
-        toast.success('Service created');
       }
 
-      // Save resource assignments
-      await resourcesApi.assignToService(serviceId, { resource_ids: assignedResourceIds });
-      // Save addons
-      const existingAddons = await serviceAddonsApi.list({ service_id: String(serviceId) });
-      for (const existing of (existingAddons.data.data || [])) {
-        await serviceAddonsApi.remove(existing.id);
+      // Save addons (diff: remove deleted, update existing, create new)
+      const currentAddonIds = new Set(addons.filter((a) => a.id).map((a) => a.id as number));
+      for (const originalId of originalAddonIds) {
+        if (!currentAddonIds.has(originalId)) {
+          await serviceAddonsApi.remove(originalId);
+        }
       }
       for (const addon of addons) {
-        if (addon.name.trim()) {
-          await serviceAddonsApi.create({ ...addon, service_id: serviceId });
+        if (!addon.name.trim()) continue;
+        const addonPayload = {
+          name: addon.name,
+          description: addon.description || null,
+          price: Number(addon.price) || 0,
+          additional_duration_minutes: Number(addon.additional_duration_minutes) || 0,
+        };
+        if (addon.id) {
+          await serviceAddonsApi.update(addon.id, addonPayload);
+        } else {
+          await serviceAddonsApi.create({ ...addonPayload, service_id: serviceId });
         }
       }
 
+      toast.success(isEdit ? 'Service updated' : 'Service created');
       navigate('/admin/services');
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to save service');
     } finally {
       setSaving(false);
     }
-  };
-
-  const toggleResource = (resourceId: number) => {
-    setAssignedResourceIds(prev => prev.includes(resourceId) ? prev.filter(id => id !== resourceId) : [...prev, resourceId]);
   };
 
   const addAddon = () => {
@@ -314,33 +304,6 @@ export default function NewService() {
                     <option value="inactive">Inactive</option>
                     <option value="draft">Draft</option>
                   </select>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'resources' && (
-              <div className="card space-y-4">
-                <h2 className="text-lg font-semibold text-neutral-900">Resources</h2>
-                <p className="text-sm text-neutral-500">Assign resources required for this service.</p>
-                <div className="space-y-2">
-                  {allResources.length === 0 ? (
-                    <p className="text-sm text-neutral-400 text-center py-8">No active resources</p>
-                  ) : (
-                    allResources.map(resource => (
-                      <label key={resource.id} className="flex items-center gap-3 p-3 rounded-md border border-neutral-200 hover:bg-neutral-50 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={assignedResourceIds.includes(resource.id)}
-                          onChange={() => toggleResource(resource.id)}
-                          className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
-                        />
-                        <div>
-                          <span className="text-sm font-medium text-neutral-700">{resource.name}</span>
-                          <span className="text-xs text-neutral-500 ml-2 capitalize">({resource.type})</span>
-                        </div>
-                      </label>
-                    ))
-                  )}
                 </div>
               </div>
             )}

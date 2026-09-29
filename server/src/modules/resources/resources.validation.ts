@@ -24,5 +24,6 @@ export const updateResourceSchema = z.object({
 });
 
 export const assignResourceSchema = z.object({
-  resource_ids: z.array(z.number().int().positive()).min(1),
+  // An empty list is valid and clears all assignments for the service.
+  resource_ids: z.array(z.coerce.number().int().positive()),
 });

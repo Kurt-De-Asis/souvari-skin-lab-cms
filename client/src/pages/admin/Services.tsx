@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Pencil, Users, Package, Scissors } from 'lucide-react';
+import { Plus, Pencil, Users, Package, Scissors, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { servicesApi, serviceCategoriesApi } from '@/api';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
@@ -70,14 +70,14 @@ export default function Services() {
     })();
   }, []);
 
-  const handleArchive = async (service: Service) => {
-    if (!confirm(`Archive "${service.name}"?`)) return;
+  const handleDelete = async (service: Service) => {
+    if (!confirm(`Delete "${service.name}"? This hides it everywhere and cannot be undone.`)) return;
     try {
-      await servicesApi.update(service.id, { status: 'inactive', is_active: false });
-      toast.success('Service archived');
+      await servicesApi.delete(service.id);
+      toast.success('Service deleted');
       fetchServices();
     } catch {
-      toast.error('Failed to archive service');
+      toast.error('Failed to delete service');
     }
   };
 
@@ -157,15 +157,13 @@ export default function Services() {
                         >
                           <Pencil size={16} />
                         </button>
-                        {s.status === 'active' && (
-                          <button
-                            onClick={() => handleArchive(s)}
-                            title="Archive"
-                            className="p-2 text-neutral-500 hover:text-amber-600 hover:bg-amber-50 rounded-md transition text-xs"
-                          >
-                            Archive
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleDelete(s)}
+                          title="Delete service"
+                          className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-md transition"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </td>
                   </tr>

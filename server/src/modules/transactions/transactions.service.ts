@@ -292,7 +292,6 @@ export class TransactionService {
             serviceName: appt.service.name,
             appointmentDate: apptDate,
             appointmentTime: appt.start_time ?? '',
-            cancellationReason: null,
             adminUserIds,
           });
         }

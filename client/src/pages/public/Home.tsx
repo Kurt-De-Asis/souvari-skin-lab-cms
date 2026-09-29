@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CheckCircle2, Clock, HeartHandshake, ShieldCheck, Sparkles } from 'lucide-react';
-import { servicesApi } from '../../api';
+import dayjs from 'dayjs';
+import { ArrowRight, CheckCircle2, Clock, HeartHandshake, ShieldCheck, Sparkles, Quote, Star } from 'lucide-react';
+import { servicesApi, reviewsApi } from '../../api';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import Reveal from '../../components/ui/Reveal';
 import formatCategory from '../../utils/formatCategory';
@@ -15,6 +16,16 @@ interface Service {
   duration: number;
   category: string;
   category_name?: string;
+}
+
+interface PublicReview {
+  id: number;
+  rating: number;
+  feedback: string;
+  created_at: string;
+  service_name: string | null;
+  staff_first_name: string | null;
+  author: string;
 }
 
 const MARQUEE_ITEMS = [
@@ -80,9 +91,42 @@ const CONCERNS = [
   'Brows, lashes & nails',
 ];
 
+function Stars({ rating, size = 14 }: { rating: number; size?: number }) {
+  return (
+    <div className="flex items-center gap-0.5" aria-label={`${rating} out of 5 stars`}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Star
+          key={n}
+          size={size}
+          className={n <= rating ? 'text-amber-400 fill-amber-400' : 'text-neutral-600'}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function Home() {
   const [allServices, setAllServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reviews, setReviews] = useState<PublicReview[]>([]);
+  const [reviewStats, setReviewStats] = useState<{ average_rating: number; total_reviews: number }>({ average_rating: 0, total_reviews: 0 });
+
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        const { data } = await reviewsApi.getPublic({ limit: '6' });
+        const result = data.data;
+        setReviews(result?.reviews || []);
+        setReviewStats({
+          average_rating: Number(result?.average_rating) || 0,
+          total_reviews: Number(result?.total_reviews) || 0,
+        });
+      } catch {
+        // silent — the section hides itself when there is nothing to show
+      }
+    };
+    fetchReviews();
+  }, []);
 
   useEffect(() => {
     const fetchServices = async () => {
@@ -430,6 +474,57 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Reviews */}
+      {reviews.length > 0 && (
+        <section className="bg-ink">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-24">
+            <Reveal>
+              <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+                <div className="max-w-2xl">
+                  <p className="text-xs font-medium uppercase tracking-[0.3em] text-primary-300">Reviews</p>
+                  <h2 className="mt-4 text-3xl sm:text-4xl font-sans font-semibold text-neutral-100">
+                    What our clients <em className="italic text-primary-300">say</em>
+                  </h2>
+                </div>
+                {reviewStats.total_reviews > 0 && (
+                  <div className="flex items-center gap-3">
+                    <Stars rating={Math.round(reviewStats.average_rating)} size={16} />
+                    <span className="font-sans text-2xl text-neutral-100">
+                      {(Math.round(reviewStats.average_rating * 10) / 10).toFixed(1)}
+                    </span>
+                    <span className="text-sm text-neutral-400">
+                      {reviewStats.total_reviews} verified review{reviewStats.total_reviews > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </Reveal>
+
+            <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {reviews.map((r, i) => (
+                <Reveal key={r.id} delay={Math.min(i * 80, 240)}>
+                  <figure className="h-full border border-primary-300/25 bg-charcoal p-7 flex flex-col">
+                    <Quote size={22} className="text-primary-300/60" />
+                    <Stars rating={r.rating} />
+                    <blockquote className="mt-4 flex-1 text-neutral-300 leading-relaxed line-clamp-5">
+                      {r.feedback}
+                    </blockquote>
+                    <figcaption className="mt-6 border-t border-neutral-700 pt-4">
+                      <p className="font-semibold text-neutral-100">{r.author}</p>
+                      <p className="mt-1 text-xs uppercase tracking-wide text-neutral-500">
+                        {r.service_name || 'Souvari Skin Lab'}
+                        {r.staff_first_name ? ` · with ${r.staff_first_name}` : ''}
+                        {` · ${dayjs(r.created_at).format('MMM D, YYYY')}`}
+                      </p>
+                    </figcaption>
+                  </figure>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* The Souvari Ritual — dark band */}
       <section className="bg-charcoal text-neutral-100">

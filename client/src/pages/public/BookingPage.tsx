@@ -15,6 +15,7 @@ import TimeSlotPicker from '../../components/booking/TimeSlotPicker';
 import BookingSummary from '../../components/booking/BookingSummary';
 import Modal from '../../components/ui/Modal';
 import { formatServicePrice } from '../../utils/format';
+import { dedupeSlotsByTime } from '../../utils/availability';
 import formatCategory from '../../utils/formatCategory';
 
 interface Service {
@@ -55,6 +56,8 @@ interface MembershipInfo {
   plan_name: string;
   tier: string;
   status: string;
+  discount_pct?: number | null;
+  end_date?: string;
 }
 
 type Mode = 'single' | 'multi';
@@ -80,7 +83,6 @@ interface BookingDraft {
   selectedDate: string;
   selectedSlot: TimeSlot | null;
   membership: MembershipInfo | null;
-  membershipCode: string;
   step: number;
   notes: string;
 }
@@ -97,14 +99,25 @@ function saveDraft(draft: BookingDraft | null) {
   }
 }
 
+// Mirrors the server's pricing.service.ts: a membership uses the flat
+// vip_price when one is set (0 = free for members), otherwise the plan's
+// discount percentage (default 25%) is applied to the base price. Without a
+// membership the non-member price is used.
 function calculateServicePrice(service: Service, membership: MembershipInfo | null): { price: number; isDiscounted: boolean } {
-  if (membership && service.vip_price && service.vip_price < service.price) {
-    return { price: service.vip_price, isDiscounted: true };
+  if (membership) {
+    if (service.vip_price != null) {
+      const vip = Math.round(Number(service.vip_price) * 100) / 100;
+      return { price: vip, isDiscounted: vip < service.price };
+    }
+    const pct = membership.discount_pct != null && membership.discount_pct > 0 ? membership.discount_pct : 25;
+    const discounted = Math.round(service.price * (1 - pct / 100) * 100) / 100;
+    return { price: discounted, isDiscounted: discounted < service.price };
   }
-  return { price: service.price, isDiscounted: false };
+  const nm = service.non_member_price;
+  return { price: nm != null ? nm : service.price, isDiscounted: false };
 }
 
-export default function BookingPage() {
+export default function BookingPage({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -160,9 +173,7 @@ export default function BookingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  const [membershipCode, setMembershipCode] = useState(() => restore?.membershipCode || '');
   const [membership, setMembership] = useState<MembershipInfo | null>(() => restore?.membership || null);
-  const [validatingCode, setValidatingCode] = useState(false);
 
   const steps = mode === 'single' ? SINGLE_STEPS : MULTI_STEPS;
 
@@ -208,11 +219,49 @@ export default function BookingPage() {
       selectedDate,
       selectedSlot,
       membership,
-      membershipCode,
       step,
       notes: customerInfo.notes,
     });
-  }, [mode, serviceCategory, selectedGroup, selectedServices, selectedDate, selectedSlot, membership, membershipCode, step, customerInfo.notes]);
+  }, [mode, serviceCategory, selectedGroup, selectedServices, selectedDate, selectedSlot, membership, step, customerInfo.notes]);
+
+  // Discounts are applied automatically when the logged-in customer has an
+  // active membership on their account — there is no manual code entry.
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) {
+      setMembership(null);
+      return;
+    }
+    membershipsApi
+      .getMe()
+      .then(({ data }) => {
+        if (cancelled) return;
+        const m = data?.data;
+        const activeNow =
+          !!m &&
+          m.status === 'active' &&
+          !!m.end_date &&
+          new Date(m.end_date).getTime() >= dayjs().startOf('day').valueOf();
+        if (activeNow) {
+          setMembership({
+            code: m.code,
+            plan_name: m.plan?.name ?? 'VIP',
+            tier: m.plan?.tier,
+            status: m.status,
+            discount_pct: m.plan?.discount_pct != null ? Number(m.plan?.discount_pct) : null,
+            end_date: m.end_date,
+          });
+        } else {
+          setMembership(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setMembership(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     const fetchServices = async () => {
@@ -308,32 +357,6 @@ export default function BookingPage() {
     fetchSlots();
   }, [isScheduleStep, step, selectedDate, bookingServices]);
 
-  const validateMembershipCode = useCallback(async () => {
-    if (!membershipCode.trim()) return;
-    setValidatingCode(true);
-    try {
-      const { data } = await membershipsApi.validateCode(membershipCode.trim());
-      if (data.success && data.data) {
-        const m = data.data;
-        setMembership({
-          code: m.code,
-          plan_name: m.plan?.name ?? 'VIP',
-          tier: m.plan?.tier,
-          status: m.status,
-        });
-        toast.success(`VIP membership detected: ${m.plan?.name ?? 'VIP'}`);
-      } else {
-        setMembership(null);
-        toast.error('Invalid membership code');
-      }
-    } catch {
-      setMembership(null);
-      toast.error('Invalid membership code');
-    } finally {
-      setValidatingCode(false);
-    }
-  }, [membershipCode]);
-
   const updateNotes = useCallback((value: string) => {
     setCustomerInfo((prev) => ({ ...prev, notes: value }));
   }, []);
@@ -350,7 +373,6 @@ export default function BookingPage() {
           selectedDate,
           selectedSlot,
           membership,
-          membershipCode,
           step,
           notes: customerInfo.notes,
         })
@@ -359,7 +381,7 @@ export default function BookingPage() {
       /* ignore storage errors */
     }
     navigate(path);
-  }, [navigate, mode, serviceCategory, selectedGroup, selectedServices, selectedDate, selectedSlot, membership, membershipCode, step, customerInfo.notes]);
+  }, [navigate, mode, serviceCategory, selectedGroup, selectedServices, selectedDate, selectedSlot, membership, step, customerInfo.notes]);
 
   const formatDate = (dateStr: string): string => {
     return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
@@ -409,8 +431,8 @@ export default function BookingPage() {
   }, [slots]);
 
   const displayedSlots = useMemo(() => {
-    if (!selectedStaffId) return slots;
-    return slots.filter((s) => s.staff_id === selectedStaffId);
+    const filtered = selectedStaffId ? slots.filter((s) => s.staff_id === selectedStaffId) : slots;
+    return dedupeSlotsByTime(filtered);
   }, [slots, selectedStaffId]);
 
   const totalDuration = useMemo(
@@ -473,7 +495,6 @@ export default function BookingPage() {
           staff_id: selectedSlot.staff_id,
           notes: customerInfo.notes,
           customer_id: user?.customer?.id,
-          membership_code: membership?.code,
         });
       } else {
         await appointmentsApi.createGroup({
@@ -483,7 +504,6 @@ export default function BookingPage() {
           staff_id: selectedSlot.staff_id,
           notes: customerInfo.notes,
           customer_id: user?.customer?.id,
-          membership_code: membership?.code,
         });
       }
       saveDraft(null);
@@ -540,26 +560,36 @@ export default function BookingPage() {
   if (loadingServices) return <LoadingSpinner fullScreen />;
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className={`${embedded ? '' : 'min-h-screen'} bg-neutral-50`}>
       {/* Header */}
-      <div className="relative bg-neutral-900 text-white border-b border-neutral-800">
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-30"
-          style={{ backgroundImage: "url('/images/booking-bg.webp')" }}
-          aria-hidden="true"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-black/60" />
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12">
-          <p className="text-xs font-medium uppercase tracking-[0.3em] text-primary-400">Book an appointment</p>
-          <h1 className="mt-4 text-3xl sm:text-4xl font-sans font-semibold">Under a minute. Promise.</h1>
-          <p className="mt-3 text-sm text-neutral-300 max-w-lg leading-relaxed">
+      {embedded ? (
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-primary-600">Book an appointment</p>
+          <h1 className="mt-2 text-2xl font-sans font-semibold text-neutral-900">Under a minute. Promise.</h1>
+          <p className="mt-2 text-sm text-neutral-500 max-w-lg leading-relaxed">
             This sends a request — every booking is reviewed and confirmed personally by Souvari staff. No payment is taken on this site.
           </p>
-          <Link to="/services" className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.2em] text-neutral-300 hover:text-white transition mt-6">
-            <ArrowLeft size={13} /> Back to services
-          </Link>
         </div>
-      </div>
+      ) : (
+        <div className="relative bg-neutral-900 text-white border-b border-neutral-800">
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-30"
+            style={{ backgroundImage: "url('/images/booking-bg.webp')" }}
+            aria-hidden="true"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-black/60" />
+          <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12">
+            <p className="text-xs font-medium uppercase tracking-[0.3em] text-primary-400">Book an appointment</p>
+            <h1 className="mt-4 text-3xl sm:text-4xl font-sans font-semibold">Under a minute. Promise.</h1>
+            <p className="mt-3 text-sm text-neutral-300 max-w-lg leading-relaxed">
+              This sends a request — every booking is reviewed and confirmed personally by Souvari staff. No payment is taken on this site.
+            </p>
+            <Link to="/services" className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.2em] text-neutral-300 hover:text-white transition mt-6">
+              <ArrowLeft size={13} /> Back to services
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <BookingSteps currentStep={step} steps={steps} />
@@ -624,7 +654,10 @@ export default function BookingPage() {
                     loading={loadingSlots}
                     staff={availableStaff}
                     selectedStaffId={selectedStaffId}
-                    onSelectStaff={setSelectedStaffId}
+                    onSelectStaff={(id) => {
+                      setSelectedStaffId(id);
+                      setSelectedSlot(null);
+                    }}
                     date={selectedDate}
                   />
                 )}
@@ -691,48 +724,14 @@ export default function BookingPage() {
                   </div>
                 )}
 
-                {!membership && (
-                  <div className="border border-neutral-200 bg-white p-5">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Crown size={16} className="text-primary-600" />
-                      <p className="text-sm font-medium text-neutral-900">VIP Membership Code</p>
-                    </div>
-                    <p className="text-xs text-neutral-500 mb-3">Enter your SOUVARI VIP code for exclusive discounts on services.</p>
-                    <div className="flex gap-2">
-                      <input
-                        className="input-field flex-1"
-                        placeholder="SOUVARI-VIP-XXXXXX"
-                        value={membershipCode}
-                        onChange={(e) => setMembershipCode(e.target.value.toUpperCase())}
-                        onKeyDown={(e) => e.key === 'Enter' && validateMembershipCode()}
-                      />
-                      <button
-                        onClick={validateMembershipCode}
-                        disabled={validatingCode || !membershipCode.trim()}
-                        className="btn-secondary text-sm"
-                      >
-                        {validatingCode ? <Loader2 size={14} className="animate-spin" /> : 'Validate'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
                 {membership && (
                   <div className="border border-primary-200 bg-primary-50 p-5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Crown size={16} className="text-primary-600" />
-                        <div>
-                          <p className="text-sm font-medium text-primary-800">{membership.plan_name}</p>
-                          <p className="text-xs text-primary-600">{membership.code}</p>
-                        </div>
+                    <div className="flex items-center gap-2">
+                      <Crown size={16} className="text-primary-600" />
+                      <div>
+                        <p className="text-sm font-medium text-primary-800">{membership.plan_name}</p>
+                        <p className="text-xs text-primary-600">VIP pricing applied automatically from your account</p>
                       </div>
-                      <button
-                        onClick={() => { setMembership(null); setMembershipCode(''); }}
-                        className="text-xs text-primary-600 hover:text-primary-800 underline"
-                      >
-                        Remove
-                      </button>
                     </div>
                   </div>
                 )}
@@ -760,7 +759,7 @@ export default function BookingPage() {
                     name: s.name,
                     duration: s.duration,
                     price,
-                    originalPrice: membership ? s.price : undefined,
+                    originalPrice: membership && s.price > 0 ? s.price : undefined,
                   };
                 })}
                 date={selectedDate || undefined}

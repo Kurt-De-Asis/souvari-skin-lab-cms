@@ -76,9 +76,9 @@ const roster: RosterEntry[] = [
     jobTitle: 'Nail and Skin Care Specialist',
     permissionLevel: 'medium',
     schedule: [
-      { day: 'wednesday', start: '11:00', end: '20:00' },
-      { day: 'thursday', start: '11:00', end: '20:00' },
-      { day: 'friday', start: '11:00', end: '20:00' },
+      { day: 'wednesday', start: '10:00', end: '20:00' },
+      { day: 'thursday', start: '10:00', end: '20:00' },
+      { day: 'friday', start: '10:00', end: '20:00' },
     ],
   },
   {
@@ -90,9 +90,9 @@ const roster: RosterEntry[] = [
     jobTitle: 'Nail and Skin Care Specialist',
     permissionLevel: 'medium',
     schedule: [
-      { day: 'wednesday', start: '11:00', end: '20:00' },
-      { day: 'thursday', start: '11:00', end: '20:00' },
-      { day: 'friday', start: '11:00', end: '20:00' },
+      { day: 'wednesday', start: '10:00', end: '20:00' },
+      { day: 'thursday', start: '10:00', end: '20:00' },
+      { day: 'friday', start: '10:00', end: '20:00' },
     ],
   },
   {
@@ -104,11 +104,11 @@ const roster: RosterEntry[] = [
     jobTitle: 'Clinic Head Nurse',
     permissionLevel: 'medium',
     schedule: [
-      { day: 'wednesday', start: '12:00', end: '20:00' },
-      { day: 'thursday', start: '12:00', end: '20:00' },
-      { day: 'friday', start: '12:00', end: '20:00' },
-      { day: 'saturday', start: '12:00', end: '20:00' },
-      { day: 'sunday', start: '12:00', end: '20:00' },
+      { day: 'wednesday', start: '10:00', end: '20:00' },
+      { day: 'thursday', start: '10:00', end: '20:00' },
+      { day: 'friday', start: '10:00', end: '20:00' },
+      { day: 'saturday', start: '10:00', end: '20:00' },
+      { day: 'sunday', start: '10:00', end: '20:00' },
     ],
   },
 ];

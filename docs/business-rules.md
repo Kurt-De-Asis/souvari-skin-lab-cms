@@ -14,13 +14,33 @@
 
 6. **No break overlap**: Appointment cannot overlap with staff break period.
 
-7. **Duration matches service**: Appointment end_time = start_time + service.duration_minutes.
+7. **Duration matches services**: Appointment end_time = start_time + the sum of `duration_minutes` across every booked service. When the service list is edited, the end time is re-derived server-side and the appointment is re-validated for overlaps, staff schedule, and break conflicts before anything is written.
 
 8. **Valid status transitions**:
    - pending → confirmed, cancelled
    - confirmed → checked_in, cancelled
    - checked_in → in_progress, no_show
    - in_progress → completed
+
+## Appointment Editing Rules
+
+1. **Completed is terminal**: Once an appointment is `completed` it is immutable for every role, including admins. Field edits, status changes, service changes, reassignment, and deletion are all rejected. The calendar renders a lock badge and the details drawer is read-only.
+
+2. **Multi-service updates**: Admins and staff may replace the service list on a booking. The server re-prices every line (preserving membership and monthly-perk discounts), rewrites the `appointment_services` join rows, extends the block to the new total duration, and SMSes the customer. Sending the same service list is a no-op: rows are not churned and the customer is not re-notified.
+
+3. **Cancellation requires a reason** for staff and admin cancellations — it is the body of the automatic cancellation SMS. Customer self-cancellation defaults to "Cancelled by customer".
+
+4. **Customer self-service**: A customer may only cancel their own appointment, and only while it is still `pending` or `confirmed`. The service layer forces the status to `cancelled` and ignores any other requested change, so the endpoint cannot be used to reach a different status.
+
+5. **Reschedule requires a message**: Changing the date or start time requires a message explaining why. Changing the time and the service list in one request is supported; the derived end time is anchored to the new start time.
+
+## Operating Days Rules
+
+1. **`business_days` must be non-empty**: The clinic must be open at least one weekday. Only valid weekday names are accepted.
+
+2. **Closed days hide slots**: The availability endpoint returns `closed: true` with no slots for a weekday the clinic is not open on, and booking is rejected for that day.
+
+3. **Closing a day warns, never blocks**: The admin Settings screen calls `GET /api/appointments/operating-days-impact` to report how many upcoming, still-actionable bookings sit on the days being closed. The change is advisory — existing appointments are never removed, they just stop being bookable for new customers.
 
 ## Transaction Rules
 

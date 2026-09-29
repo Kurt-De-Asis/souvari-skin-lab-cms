@@ -9,6 +9,7 @@ import {
   updateAppointmentSchema,
   updateStatusSchema,
   listAppointmentsQuerySchema,
+  operatingDaysImpactQuerySchema,
 } from './appointments.validation';
 
 const router = Router();
@@ -37,6 +38,13 @@ router.get(
 );
 
 router.get(
+  '/operating-days-impact',
+  authorize('admin'),
+  validate(operatingDaysImpactQuerySchema, 'query'),
+  appointmentsController.operatingDaysImpact
+);
+
+router.get(
   '/:id',
   appointmentsController.getById
 );
@@ -55,16 +63,18 @@ router.post(
   appointmentsController.createGroup
 );
 
+// Customers may reach these so they can cancel their own booking; the
+// controller restricts them to cancellations of appointments they own.
 router.patch(
   '/:id/status',
-  authorize('admin', 'staff'),
+  authorize('admin', 'staff', 'customer'),
   validate(updateStatusSchema),
   appointmentsController.updateStatus
 );
 
 router.put(
   '/:id',
-  authorize('admin', 'staff'),
+  authorize('admin', 'staff', 'customer'),
   validate(updateAppointmentSchema),
   appointmentsController.update
 );

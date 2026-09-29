@@ -15,8 +15,7 @@ import type {
   ServiceOption,
   StaffMember,
 } from '../../components/booking/admin/types';
-
-const STATUS_OPTIONS = ['pending', 'confirmed', 'checked_in', 'in_progress', 'completed', 'cancelled', 'no_show'];
+import { ALL_APPOINTMENT_STATUSES, statusLabel } from '../../utils/appointmentStatus';
 
 export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(dayjs());
@@ -33,6 +32,8 @@ export default function Calendar() {
   const [createPrefill, setCreatePrefill] = useState<{ staff_id: number; start_time: string } | null>(null);
   const [detailsAppt, setDetailsAppt] = useState<BookingAppointment | null>(null);
   const [editAppt, setEditAppt] = useState<BookingAppointment | null>(null);
+  // Drives the spinner overlay on whichever booking block is mid-request.
+  const [busyApptId, setBusyApptId] = useState<number | null>(null);
 
   const [checkoutAppt, setCheckoutAppt] = useState<BookingAppointment | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -168,6 +169,7 @@ export default function Calendar() {
   };
 
   const handleAssignStaff = async (appt: BookingAppointment, staffId: number): Promise<boolean> => {
+    setBusyApptId(appt.id);
     try {
       await appointmentsApi.update(appt.id, { staff_id: staffId });
       toast.success('Specialist updated');
@@ -176,10 +178,13 @@ export default function Calendar() {
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to update specialist');
       return false;
+    } finally {
+      setBusyApptId(null);
     }
   };
 
   const handleStatus = async (appt: BookingAppointment, status: string, reason?: string): Promise<boolean> => {
+    setBusyApptId(appt.id);
     try {
       if (status === 'completed') {
         if (appt.paid) {
@@ -189,18 +194,25 @@ export default function Calendar() {
           fetchAppointments();
           return true;
         }
+        setBusyApptId(null);
         setCheckoutAppt(appt);
         setCheckoutOpen(true);
         return true;
       }
       await appointmentsApi.updateStatus(appt.id, { status, reason });
-      toast.success(`Appointment ${status.replace(/_/g, ' ')}`);
+      toast.success(
+        status === 'cancelled'
+          ? 'Appointment cancelled — the customer has been notified by SMS'
+          : `Appointment marked ${statusLabel(status).toLowerCase()}`
+      );
       setDetailsAppt(null);
       fetchAppointments();
       return true;
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to update status');
       return false;
+    } finally {
+      setBusyApptId(null);
     }
   };
 
@@ -260,8 +272,8 @@ export default function Calendar() {
             <label className="label">Status</label>
             <select className="select-field w-full sm:w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="">All Status</option>
-              {STATUS_OPTIONS.map((st) => (
-                <option key={st} value={st}>{st.replace(/_/g, ' ')}</option>
+              {ALL_APPOINTMENT_STATUSES.map((st) => (
+                <option key={st} value={st}>{statusLabel(st)}</option>
               ))}
             </select>
           </div>
@@ -282,6 +294,18 @@ export default function Calendar() {
             loading={false}
             onSlotClick={(staffId, startTime) => openCreate({ staff_id: staffId, start_time: startTime })}
             onAppointmentClick={(appt) => setDetailsAppt(appt)}
+            onStatusChange={handleStatus}
+            onAssignStaff={handleAssignStaff}
+            onAddService={(appt) => {
+              setDetailsAppt(null);
+              setEditAppt(appt);
+            }}
+            onEdit={(appt) => {
+              setDetailsAppt(null);
+              setEditAppt(appt);
+            }}
+            busyAppointmentId={busyApptId}
+            selectedAppointmentId={detailsAppt?.id ?? null}
           />
         )}
       </div>

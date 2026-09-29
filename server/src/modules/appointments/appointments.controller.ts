@@ -1,6 +1,23 @@
 import { Request, Response, NextFunction } from 'express';
 import { appointmentService } from './appointments.service';
+import type { OperatingDaysImpactQuery } from './appointments.validation';
 import prisma from '../../config/database';
+
+/** True when the authenticated customer owns the given appointment.
+ * Module-level helper (no `this`) so it can be shared by controller handlers
+ * that Express invokes as unbound method references. */
+async function ownsAppointment(id: number, req: Request): Promise<boolean> {
+  const customer = await prisma.customers.findFirst({
+    where: { user_id: req.user!.userId, deleted_at: null },
+    select: { id: true },
+  });
+  if (!customer) return false;
+  const appointment = await prisma.appointments.findFirst({
+    where: { id, deleted_at: null },
+    select: { customer_id: true },
+  });
+  return !!appointment && appointment.customer_id === customer.id;
+}
 
 export class AppointmentsController {
   async list(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -194,7 +211,18 @@ export class AppointmentsController {
   async update(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = parseInt(String(req.params.id), 10);
-      const appointment = await appointmentService.update(id, req.body);
+      const role = req.user!.role as 'admin' | 'staff' | 'customer';
+
+      // Customers may only touch their own appointments, and only to cancel.
+      if (role === 'customer' && !(await ownsAppointment(id, req))) {
+        res.status(404).json({ success: false, message: 'Appointment not found' });
+        return;
+      }
+
+      const appointment = await appointmentService.update(id, req.body, {
+        role,
+        userId: req.user!.userId,
+      });
       res.json({
         success: true,
         message: 'Appointment updated successfully',
@@ -208,8 +236,24 @@ export class AppointmentsController {
   async updateStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = parseInt(String(req.params.id), 10);
-      const { status, reason } = req.body;
-      const appointment = await appointmentService.update(id, { status, cancellation_reason: reason });
+      const role = req.user!.role as 'admin' | 'staff' | 'customer';
+      let { status, reason } = req.body;
+
+      if (role === 'customer') {
+        if (!(await ownsAppointment(id, req))) {
+          res.status(404).json({ success: false, message: 'Appointment not found' });
+          return;
+        }
+        // A customer self-service cancellation is always a cancel. Never honour
+        // a status a customer submits directly.
+        status = 'cancelled';
+      }
+
+      const appointment = await appointmentService.update(
+        id,
+        { status, cancellation_reason: reason },
+        { role, userId: req.user!.userId }
+      );
       res.json({
         success: true,
         message: 'Appointment status updated',
@@ -228,6 +272,22 @@ export class AppointmentsController {
         success: true,
         message: 'Appointment deleted successfully',
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Upcoming, still-actionable bookings per weekday. Backs the admin
+   * "days the store is open" warning before a day is closed.
+   */
+  async operatingDaysImpact(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      // Already parsed and validated into weekday names by the route's
+      // `operatingDaysImpactQuerySchema`.
+      const { days } = req.query as unknown as OperatingDaysImpactQuery;
+      const impact = await appointmentService.getOperatingDaysImpact(days);
+      res.json({ success: true, data: impact });
     } catch (error) {
       next(error);
     }

@@ -55,7 +55,6 @@ const staffNav: NavEntry[] = [
   { to: '/staff/calendar', icon: CalendarDays, label: 'Calendar' },
   { to: '/staff/appointments', icon: ClipboardList, label: 'Appointments' },
   { to: '/staff/schedule', icon: Clock, label: 'My Schedule' },
-  { to: '/staff/memberships', icon: Award, label: 'Memberships' },
   { to: '/staff/products', icon: Package, label: 'Products & POS' },
   { to: '/staff/notifications', icon: Bell, label: 'Notifications' },
 ];
@@ -241,7 +240,6 @@ export default function DashboardLayout({ role }: { role: string }) {
               ? <img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-8 w-auto object-contain" />
               : <img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-7 w-auto object-contain" />}
           </Link>
-          {sidebarOpen && <span className="block text-xs text-neutral-400 mt-2">{roleLabel}</span>}
         </div>
 
         <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
@@ -273,7 +271,6 @@ export default function DashboardLayout({ role }: { role: string }) {
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <img src="/images/souvari-logo.png" alt="Souvari Skin Lab" className="h-8 w-auto object-contain" />
-                  <span className="block text-xs text-neutral-400 mt-2">{roleLabel}</span>
                 </div>
                 <button onClick={() => setMobileOpen(false)}><X size={20} /></button>
               </div>

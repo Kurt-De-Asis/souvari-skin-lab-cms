@@ -1,5 +1,7 @@
 import prisma from '../../config/database';
+import { AppError } from '../../middleware/errorHandler';
 import { UpdateSettingsInput } from './settings.validation';
+import { WEEKDAY_NAMES } from '../appointments/appointments.validation';
 
 const PUBLIC_KEYS = [
   'clinic_name',
@@ -10,6 +12,19 @@ const PUBLIC_KEYS = [
   'business_hours_start',
   'business_hours_end',
 ];
+
+const WEEKDAY_SET = new Set<string>(WEEKDAY_NAMES);
+
+/** The clinic must be open at least one day, and only on real weekdays. */
+function assertValidBusinessDays(value: unknown): void {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new AppError('Select at least one day the clinic is open', 400);
+  }
+  const invalid = value.filter((d) => typeof d !== 'string' || !WEEKDAY_SET.has(d.toLowerCase()));
+  if (invalid.length > 0) {
+    throw new AppError(`Invalid day(s): ${invalid.join(', ')}`, 400);
+  }
+}
 
 class SettingsService {
   async getAll() {
@@ -41,6 +56,10 @@ class SettingsService {
   async update(data: UpdateSettingsInput) {
     const updates = await Promise.all(
       data.settings.map(async (item) => {
+        if (item.key === 'business_days') {
+          assertValidBusinessDays(item.value);
+        }
+
         const existing = await prisma.system_settings.findUnique({
           where: { setting_key: item.key },
         });

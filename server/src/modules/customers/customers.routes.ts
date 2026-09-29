@@ -42,7 +42,7 @@ router.post(
 
 router.put(
   '/:id',
-  authorize('admin'),
+  authorize('admin', 'staff'),
   validate(updateCustomerSchema),
   customerController.update
 );

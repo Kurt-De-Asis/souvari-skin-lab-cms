@@ -18,7 +18,6 @@ import Register from './pages/auth/Register';
 
 import CustomerDashboard from './pages/customer/Dashboard';
 import CustomerAppointments from './pages/customer/Appointments';
-import CustomerBookAppointment from './pages/customer/BookAppointment';
 import CustomerTransactions from './pages/customer/Transactions';
 import CustomerNotifications from './pages/customer/Notifications';
 import CustomerProfile from './pages/customer/Profile';
@@ -30,7 +29,6 @@ import StaffAppointments from './pages/staff/Appointments';
 import StaffSchedule from './pages/staff/Schedule';
 import StaffNotifications from './pages/staff/Notifications';
 import StaffProducts from './pages/staff/Products';
-import StaffMemberships from './pages/staff/Memberships';
 
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminCustomers from './pages/admin/Customers';
@@ -88,7 +86,7 @@ export default function App() {
       <Route path="/customer" element={<ProtectedRoute allowedRoles={['customer']}><DashboardLayout role="customer" /></ProtectedRoute>}>
         <Route index element={<CustomerDashboard />} />
         <Route path="appointments" element={<CustomerAppointments />} />
-        <Route path="book" element={<CustomerBookAppointment />} />
+        <Route path="book" element={<BookingPage embedded />} />
         <Route path="transactions" element={<CustomerTransactions />} />
         <Route path="notifications" element={<CustomerNotifications />} />
         <Route path="profile" element={<CustomerProfile />} />
@@ -103,7 +101,6 @@ export default function App() {
         <Route path="calendar" element={<AdminCalendar />} />
         <Route path="schedule" element={<StaffSchedule />} />
         <Route path="products" element={<StaffProducts />} />
-        <Route path="memberships" element={<StaffMemberships />} />
         <Route path="notifications" element={<StaffNotifications />} />
       </Route>
 

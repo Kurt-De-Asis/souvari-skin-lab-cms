@@ -118,7 +118,7 @@ export default function TreatmentSelector({
                     <p className="text-sm font-medium text-neutral-900 min-w-0 flex-1">{s.name}</p>
                     {isFeatured && (
                       <span className="inline-flex items-center px-2 py-0.5 bg-primary-600 text-white text-[10px] font-semibold uppercase tracking-[0.12em] whitespace-nowrap">
-                        Recommended for New Clients
+                        Free Consultation
                       </span>
                     )}
                   </div>

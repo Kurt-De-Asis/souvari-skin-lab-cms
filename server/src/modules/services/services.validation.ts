@@ -13,12 +13,28 @@ const serviceCategoryEnum = z.enum([
   'other',
 ]);
 
+// Accept an empty/invalid category and fall back to 'other' instead of
+// rejecting the whole payload (the client may submit '' when no category
+// was chosen).
+const serviceCategoryCreate = z
+  .enum(['facial', 'body', 'hair_removal', 'skin_rejuvenation', 'injection', 'laser', 'consultation', 'package', 'signature_facial', 'other'])
+  .or(z.literal(''))
+  .default('other')
+  .transform((v) => (v === '' ? 'other' : v));
+
+// On update the field is optional and must not be coerced when absent.
+const serviceCategoryUpdate = z
+  .enum(['facial', 'body', 'hair_removal', 'skin_rejuvenation', 'injection', 'laser', 'consultation', 'package', 'signature_facial', 'other'])
+  .or(z.literal(''))
+  .optional()
+  .transform((v) => (v === '' ? 'other' : v));
+
 const serviceStatusEnum = z.enum(['active', 'inactive', 'draft']);
 
 export const createServiceSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255),
   description: z.string().optional(),
-  category: serviceCategoryEnum.default('other'),
+  category: serviceCategoryCreate,
   category_id: z.coerce.number().int().positive().nullable().optional(),
   price: z.coerce.number().min(0, 'Price must be non-negative'),
   vip_price: z.coerce.number().min(0).optional(),
@@ -32,7 +48,7 @@ export const createServiceSchema = z.object({
 export const updateServiceSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   description: z.string().optional(),
-  category: serviceCategoryEnum.optional(),
+  category: serviceCategoryUpdate,
   category_id: z.coerce.number().int().positive().nullable().optional(),
   price: z.coerce.number().min(0).optional(),
   vip_price: z.coerce.number().min(0).optional().nullable(),

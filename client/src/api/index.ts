@@ -71,6 +71,9 @@ export const appointmentsApi = {
   getAvailability: (params: any) => api.get('/appointments/availability', { params }),
   getQuote: (serviceId: number) => api.get('/appointments/quote', { params: { service_id: String(serviceId) } }),
   getById: (id: number) => api.get(`/appointments/${id}`),
+  /** Upcoming booking counts per weekday, for the open-days settings warning. */
+  getOperatingDaysImpact: (days: string[]) =>
+    api.get('/appointments/operating-days-impact', { params: { days: days.join(',') } }),
   create: (data: any) => api.post('/appointments', data),
   createGroup: (data: any) => api.post('/appointments/group', data),
   updateStatus: (id: number, data: any) => api.patch(`/appointments/${id}/status`, data),
@@ -217,6 +220,7 @@ export const serviceAddonsApi = {
 };
 
 export const reviewsApi = {
+  getPublic: (params?: Record<string, string>) => api.get('/reviews/public', { params }),
   list: (params?: Record<string, string>) => api.get('/reviews', { params }),
   getMine: () => api.get('/reviews/mine'),
   getByAppointment: (appointmentId: number) => api.get(`/reviews/appointment/${appointmentId}`),

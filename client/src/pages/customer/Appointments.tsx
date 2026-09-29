@@ -9,6 +9,7 @@ import EmptyState from '@/components/shared/EmptyState';
 import Pagination from '@/components/ui/Pagination';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Modal from '@/components/ui/Modal';
+import { CUSTOMER_CANCELLABLE_STATUSES } from '@/utils/appointmentStatus';
 
 type FilterType = 'all' | 'upcoming' | 'past';
 
@@ -61,16 +62,28 @@ export default function Appointments() {
     if (!cancelModal) return;
     setCancelling(true);
     try {
-      await appointmentsApi.updateStatus(cancelModal.id, { status: 'cancelled' });
-      toast.success('Appointment cancelled');
+      // Customers are only ever allowed to cancel; the server forces the
+      // status and defaults the reason, and SMSes the confirmation.
+      await appointmentsApi.updateStatus(cancelModal.id, {
+        status: 'cancelled',
+        reason: 'Cancelled by customer',
+      });
+      toast.success('Appointment cancelled. We have sent you a confirmation SMS.');
       setCancelModal(null);
       fetchAppointments();
-    } catch {
-      toast.error('Failed to cancel appointment');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to cancel appointment');
     } finally {
       setCancelling(false);
     }
   };
+
+  // Mirrors the server guard: only pending or confirmed bookings can be
+  // cancelled by the customer. Anything else must go through the clinic.
+  const canCancel = (apt: any) =>
+    CUSTOMER_CANCELLABLE_STATUSES.includes(apt.status) &&
+    isUpcoming(apt) &&
+    !['cancelled', 'completed', 'no_show'].includes(apt.status);
 
   const isUpcoming = (apt: any) => {
     const aptDate = dayjs(apt.appointment_date || apt.date);
@@ -170,7 +183,7 @@ export default function Appointments() {
                         <StatusBadge status={apt.status} />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        {isUpcoming(apt) && apt.status !== 'cancelled' && (
+                        {canCancel(apt) ? (
                           <button
                             onClick={() => setCancelModal(apt)}
                             className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50 transition"
@@ -178,6 +191,8 @@ export default function Appointments() {
                           >
                             <Trash2 size={16} />
                           </button>
+                        ) : (
+                          <span className="text-xs text-neutral-300">—</span>
                         )}
                       </td>
                     </tr>
@@ -196,6 +211,10 @@ export default function Appointments() {
             Are you sure you want to cancel your appointment for{' '}
             <strong>{cancelModal?.service?.name || cancelModal?.service_name || 'this service'}</strong> on{' '}
             <strong>{cancelModal && dayjs(cancelModal.appointment_date || cancelModal.date).format('MMMM D, YYYY')}</strong>?
+          </p>
+          <p className="text-xs text-neutral-500">
+            This frees up the slot for someone else and cannot be undone. We will send you an SMS to
+            confirm.
           </p>
           <div className="flex justify-end gap-3">
             <button

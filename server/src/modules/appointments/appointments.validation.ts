@@ -11,6 +11,19 @@ const appointmentStatusEnum = z.enum([
   'no_show',
 ]);
 
+/** Canonical lowercase weekday names, Monday-first for display ordering. */
+export const WEEKDAY_NAMES = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+] as const;
+
+export type WeekdayName = (typeof WEEKDAY_NAMES)[number];
+
 export const createAppointmentSchema = z.object({
   customer_id: z.number().int().positive('Customer ID is required'),
   staff_id: z.number().int().positive('Staff ID is required').optional(),
@@ -54,6 +67,10 @@ export const createGroupAppointmentSchema = z
 export const updateAppointmentSchema = z.object({
   staff_id: z.number().int().positive().optional(),
   service_id: z.number().int().positive().optional(),
+  // Full replacement of the appointment's service list. Replaces
+  // `service_id` when the booking already holds multiple services, and
+  // drives the derived `end_time` + re-pricing in the service layer.
+  service_ids: z.array(z.number().int().positive()).min(1, 'At least one service is required').optional(),
   appointment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   start_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   end_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
@@ -86,8 +103,21 @@ export const updateStatusSchema = z.object({
   reason: z.string().nullable().optional(),
 });
 
+export const operatingDaysImpactQuerySchema = z.object({
+  days: z
+    .string()
+    .transform((v) =>
+      v
+        .split(',')
+        .map((d) => d.trim().toLowerCase())
+        .filter(Boolean)
+    )
+    .pipe(z.array(z.enum(WEEKDAY_NAMES)).min(1, 'At least one day is required')),
+});
+
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>;
 export type CreateGroupAppointmentInput = z.infer<typeof createGroupAppointmentSchema>;
 export type UpdateAppointmentInput = z.infer<typeof updateAppointmentSchema>;
 export type ListAppointmentsQuery = z.infer<typeof listAppointmentsQuerySchema>;
 export type UpdateStatusInput = z.infer<typeof updateStatusSchema>;
+export type OperatingDaysImpactQuery = z.infer<typeof operatingDaysImpactQuerySchema>;

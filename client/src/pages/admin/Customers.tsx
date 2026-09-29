@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { Search, Plus, Pencil, Trash2, Eye, EyeOff, KeyRound } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { customersApi, staffApi } from '@/api';
+import { customersApi } from '@/api';
 import EmptyState from '@/components/shared/EmptyState';
 import Pagination from '@/components/ui/Pagination';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -17,8 +17,6 @@ interface Customer {
   gender: string;
   date_of_birth?: string;
   address?: string;
-  preferred_staff_id?: number | null;
-  preferred_staff?: { id: number; first_name: string; last_name: string } | null;
   user?: { id: number; email: string; phone: string; status: string };
 }
 
@@ -31,7 +29,6 @@ interface CustomerForm {
   gender: string;
   date_of_birth?: string;
   address?: string;
-  preferred_staff_id?: number | null;
 }
 
 export default function Customers() {
@@ -47,7 +44,6 @@ export default function Customers() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [staffList, setStaffList] = useState<Array<{ id: number; first_name: string; last_name: string }>>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<CustomerForm>();
@@ -78,16 +74,10 @@ export default function Customers() {
 
   useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
 
-  useEffect(() => {
-    staffApi.list({ limit: '100' }).then(({ data }) => {
-      setStaffList(data.data?.data || []);
-    }).catch(() => {});
-  }, []);
-
   const openAddModal = () => {
     setEditingCustomer(null);
     setShowPassword(false);
-    reset({ first_name: '', last_name: '', email: '', password: '', phone: '', gender: 'male', date_of_birth: '', address: '', preferred_staff_id: null });
+    reset({ first_name: '', last_name: '', email: '', password: '', phone: '', gender: 'male', date_of_birth: '', address: '' });
     setModalOpen(true);
   };
 
@@ -102,7 +92,6 @@ export default function Customers() {
       gender: c.gender,
       date_of_birth: c.date_of_birth || '',
       address: c.address || '',
-      preferred_staff_id: c.preferred_staff_id ?? null,
     });
     setModalOpen(true);
   };
@@ -120,10 +109,7 @@ export default function Customers() {
     setSubmitting(true);
     try {
       const { password, ...rest } = values;
-      const payload = {
-        ...rest,
-        preferred_staff_id: values.preferred_staff_id ? Number(values.preferred_staff_id) : null,
-      };
+      const payload = { ...rest };
       if (editingCustomer) {
         if (password?.trim()) (payload as CustomerForm).password = password.trim();
         await customersApi.update(editingCustomer.id, payload);
@@ -318,15 +304,6 @@ export default function Customers() {
           <div>
             <label className="label">Address</label>
             <input className="input-field" placeholder="Address" {...register('address')} />
-          </div>
-          <div>
-            <label className="label">Preferred Staff</label>
-            <select className="select-field" {...register('preferred_staff_id')}>
-              <option value="">None</option>
-              {staffList.map((s) => (
-                <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>
-              ))}
-            </select>
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setModalOpen(false)} className="btn-secondary">Cancel</button>

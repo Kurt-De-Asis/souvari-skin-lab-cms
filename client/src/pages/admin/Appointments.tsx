@@ -1,15 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useForm } from 'react-hook-form';
-import { CheckCircle2, XCircle, RefreshCw, LogIn, ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowUp, ArrowDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import dayjs from 'dayjs';
-import { appointmentsApi, customersApi, staffApi, servicesApi } from '@/api';
+import { appointmentsApi, staffApi } from '@/api';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
 import Pagination from '@/components/ui/Pagination';
 import StatusBadge from '@/components/ui/StatusBadge';
-import Modal from '@/components/ui/Modal';
-import CheckoutModal from '@/components/checkout/CheckoutModal';
 
 interface Appointment {
   id: number;
@@ -25,15 +22,7 @@ interface Appointment {
   notes?: string;
 }
 
-interface Customer { id: number; first_name: string; last_name: string; }
 interface StaffMember { id: number; first_name: string; last_name: string; }
-interface ServiceItem { id: number; name: string; duration: number; price: number; }
-
-interface RescheduleForm {
-  appointment_date: string;
-  start_time: string;
-  reschedule_reason: string;
-}
 
 export default function Appointments() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -50,36 +39,7 @@ export default function Appointments() {
 
 
   // Dropdown data
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
-  const [servicesList, setServicesList] = useState<ServiceItem[]>([]);
-
-  // Reschedule modal
-  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
-  const [rescheduleAppointment, setRescheduleAppointment] = useState<Appointment | null>(null);
-  const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
-
-  // Status confirm modals
-  const [confirmAction, setConfirmAction] = useState<{ appointment: Appointment; action: string } | null>(null);
-  const [actionReason, setActionReason] = useState('');
-
-  // Checkout modal
-  const [checkoutAppointment, setCheckoutAppointment] = useState<Appointment | null>(null);
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
-
-  const openConfirm = (appointment: Appointment, action: string) => {
-    setActionReason('');
-    if (action === 'completed' && !appointment.paid) {
-      setCheckoutAppointment(appointment);
-      setCheckoutOpen(true);
-    } else {
-      setConfirmAction({ appointment, action });
-    }
-  };
-
-  const { register: registerReschedule, handleSubmit: handleSubmitReschedule, reset: resetReschedule, formState: { errors: rescheduleErrors } } = useForm<RescheduleForm>({
-    defaultValues: { appointment_date: '', start_time: '', reschedule_reason: '' },
-  });
 
   const fetchAppointments = useCallback(async () => {
     setLoading(true);
@@ -102,68 +62,14 @@ export default function Appointments() {
 
   const fetchDropdownData = useCallback(async () => {
     try {
-      const [custRes, staffRes, svcRes] = await Promise.all([
-        customersApi.list({ limit: '200' }),
-        staffApi.list({ limit: '200' }),
-        servicesApi.list({ limit: '200' }),
-      ]);
-      setCustomers(custRes.data.data?.customers || custRes.data.data?.data || []);
+      const staffRes = await staffApi.list({ limit: '200' });
       setStaffList(staffRes.data.data?.staff || staffRes.data.data?.data || []);
-      setServicesList(svcRes.data.data?.services || svcRes.data.data?.data || []);
     } catch { /* silent */ }
   }, []);
 
   useEffect(() => { fetchAppointments(); }, [fetchAppointments]);
   useEffect(() => { fetchDropdownData(); }, [fetchDropdownData]);
   useEffect(() => { setPage(1); }, [dateFrom, dateTo, statusFilter, staffFilter]);
-
-  const onRescheduleSubmit = async (values: RescheduleForm) => {
-    if (!rescheduleAppointment) return;
-    setRescheduleSubmitting(true);
-    try {
-      await appointmentsApi.update(rescheduleAppointment.id, {
-        appointment_date: values.appointment_date,
-        start_time: values.start_time,
-        reschedule_reason: values.reschedule_reason.trim(),
-      });
-      toast.success('Appointment rescheduled');
-      setRescheduleModalOpen(false);
-      setRescheduleAppointment(null);
-      fetchAppointments();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to reschedule');
-    } finally {
-      setRescheduleSubmitting(false);
-    }
-  };
-
-  const updateStatus = async (appointmentId: number, status: string, reason?: string) => {
-    try {
-      await appointmentsApi.updateStatus(appointmentId, { status, reason });
-      toast.success(`Appointment ${status}`);
-      setConfirmAction(null);
-      fetchAppointments();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to update status');
-    }
-  };
-
-  const changeStaff = async (apt: Appointment, staffId: number) => {
-    try {
-      await appointmentsApi.update(apt.id, { staff_id: staffId });
-      toast.success('Handled by updated');
-      fetchAppointments();
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to update staff');
-      fetchAppointments();
-    }
-  };
-
-  const openReschedule = (apt: Appointment) => {
-    setRescheduleAppointment(apt);
-    resetReschedule({ appointment_date: apt.date?.split('T')[0] || '', start_time: apt.start_time || '', reschedule_reason: '' });
-    setRescheduleModalOpen(true);
-  };
 
   const toggleSort = () => {
     setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'));
@@ -240,7 +146,6 @@ export default function Appointments() {
                   <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Staff</th>
                   <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Service</th>
                   <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 whitespace-nowrap">Status</th>
-                  <th className="px-6 py-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-500 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
@@ -250,87 +155,13 @@ export default function Appointments() {
                     <td className="px-6 py-4 text-neutral-600">{apt.start_time} - {apt.end_time}</td>
                     <td className="px-6 py-4 font-medium text-neutral-900">{apt.customer?.first_name} {apt.customer?.last_name}</td>
                     <td className="px-6 py-4 text-neutral-600">
-                      <select
-                        title="Handled by"
-                        value={apt.staff?.id ?? ''}
-                        onChange={(e) => changeStaff(apt, Number(e.target.value))}
-                        className="input-field !py-1.5 !px-2 text-sm w-auto min-w-[9rem]"
-                      >
-                        <option value="" disabled>Select staff</option>
-                        {staffList.map((sm) => (
-                          <option key={sm.id} value={sm.id}>{sm.first_name} {sm.last_name}</option>
-                        ))}
-                      </select>
+                      {apt.staff ? `${apt.staff.first_name} ${apt.staff.last_name}` : <span className="text-neutral-400">Unassigned</span>}
                     </td>
                     <td className="px-6 py-4 text-neutral-600">
                       {apt.service?.name}
                       {apt.services && apt.services.length > 1 ? ` +${apt.services.length - 1}` : ''}
                     </td>
                     <td className="px-6 py-4"><StatusBadge status={apt.status} /></td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-1">
-                        {apt.status === 'pending' && (
-                          <button
-                            onClick={() => openConfirm(apt, 'confirmed')}
-                            title="Confirm"
-                            className="p-2 text-neutral-500 hover:text-green-600 hover:bg-green-50 rounded-md transition"
-                          >
-                            <CheckCircle2 size={16} />
-                          </button>
-                        )}
-                        {apt.status === 'pending' && (
-                          <>
-                            <button onClick={() => openReschedule(apt)} title="Reschedule" className="p-2 text-neutral-500 hover:text-primary-700 hover:bg-blue-50 rounded-md transition">
-                              <RefreshCw size={16} />
-                            </button>
-                            <button
-                              onClick={() => openConfirm(apt, 'cancelled')}
-                              title="Cancel"
-                              className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-md transition"
-                            >
-                              <XCircle size={16} />
-                            </button>
-                          </>
-                        )}
-                        {apt.status === 'confirmed' && (
-                          <>
-                            <button
-                              onClick={() => openConfirm(apt, 'checked_in')}
-                              title="Check In"
-                              className="p-2 text-neutral-500 hover:text-primary-700 hover:bg-blue-50 rounded-md transition"
-                            >
-                              <LogIn size={16} />
-                            </button>
-                            <button
-                              onClick={() => openConfirm(apt, 'completed')}
-                              title="Mark Complete"
-                              className="p-2 text-neutral-500 hover:text-green-600 hover:bg-green-50 rounded-md transition"
-                            >
-                              <CheckCircle2 size={16} />
-                            </button>
-                            <button onClick={() => openReschedule(apt)} title="Reschedule" className="p-2 text-neutral-500 hover:text-primary-700 hover:bg-blue-50 rounded-md transition">
-                              <RefreshCw size={16} />
-                            </button>
-                            <button
-                              onClick={() => openConfirm(apt, 'cancelled')}
-                              title="Cancel"
-                              className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-md transition"
-                            >
-                              <XCircle size={16} />
-                            </button>
-                          </>
-                        )}
-                        {apt.status === 'checked_in' && (
-                          <button
-                            onClick={() => openConfirm(apt, 'completed')}
-                            title="Mark Complete"
-                            className="p-2 text-neutral-500 hover:text-green-600 hover:bg-green-50 rounded-md transition"
-                          >
-                            <CheckCircle2 size={16} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -343,111 +174,6 @@ export default function Appointments() {
           </div>
         )}
       </div>
-
-      {/* Reschedule Modal */}
-      <Modal open={rescheduleModalOpen} onClose={() => setRescheduleModalOpen(false)} title="Reschedule Appointment">
-        <form onSubmit={handleSubmitReschedule(onRescheduleSubmit)} className="space-y-4">
-          <p className="text-sm text-neutral-500">
-            Rescheduling appointment for <span className="font-medium text-neutral-700">{rescheduleAppointment?.customer?.first_name} {rescheduleAppointment?.customer?.last_name}</span>
-          </p>
-          <div>
-            <label className="label">New Date</label>
-            <input type="date" className="input-field" {...registerReschedule('appointment_date', { required: 'Required' })} />
-            {rescheduleErrors.appointment_date && <p className="text-xs text-red-600 mt-1">{rescheduleErrors.appointment_date.message}</p>}
-          </div>
-          <div>
-            <label className="label">New Start Time</label>
-            <input type="time" className="input-field" {...registerReschedule('start_time', { required: 'Required' })} />
-            {rescheduleErrors.start_time && <p className="text-xs text-red-600 mt-1">{rescheduleErrors.start_time.message}</p>}
-          </div>
-          <div>
-            <label className="label">Message to Customer <span className="text-red-600">*</span></label>
-            <textarea
-              className="input-field"
-              rows={3}
-              placeholder="Explain the reason for rescheduling — this will be sent to the customer via notification and SMS."
-              {...registerReschedule('reschedule_reason', { required: 'Please provide a message explaining the reschedule' })}
-            />
-            {rescheduleErrors.reschedule_reason && <p className="text-xs text-red-600 mt-1">{rescheduleErrors.reschedule_reason.message}</p>}
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setRescheduleModalOpen(false)} className="btn-secondary">Cancel</button>
-            <button type="submit" disabled={rescheduleSubmitting} className="btn-primary">
-              {rescheduleSubmitting ? 'Rescheduling...' : 'Reschedule'}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-{/* Confirm Action Modal */}
-      <Modal
-        open={confirmAction !== null}
-        onClose={() => setConfirmAction(null)}
-        title={confirmAction?.action === 'confirmed' ? 'Confirmation' : confirmAction?.action === 'cancelled' ? 'Cancellation' : confirmAction?.action === 'checked_in' ? 'Check-In' : 'Completion'}
-        maxWidth="max-w-sm"
-      >
-        {confirmAction && (
-          <div className="space-y-4">
-            <p className="text-sm text-neutral-600">
-              Are you sure you want to <span className="font-semibold">{confirmAction.action === 'checked_in' ? 'check in' : confirmAction.action}</span> the appointment for{' '}
-              <span className="font-semibold">{confirmAction.appointment.customer?.first_name} {confirmAction.appointment.customer?.last_name}</span>?
-            </p>
-            {confirmAction.action === 'cancelled' && (
-              <div>
-                <label className="label">Reason for Cancellation <span className="text-red-600">*</span></label>
-                <textarea
-                  className="input-field"
-                  rows={3}
-                  placeholder="Explain why the appointment is being cancelled — this will be sent to the customer via notification and SMS."
-                  value={actionReason}
-                  onChange={(e) => setActionReason(e.target.value)}
-                />
-              </div>
-            )}
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setConfirmAction(null)} className="btn-secondary">Go Back</button>
-              <button
-                onClick={() => updateStatus(confirmAction.appointment.id, confirmAction.action, confirmAction.action === 'cancelled' ? actionReason.trim() : undefined)}
-                disabled={confirmAction.action === 'cancelled' && !actionReason.trim()}
-                className={confirmAction.action === 'cancelled' ? 'btn-danger' : 'btn-primary'}
-              >
-                {confirmAction.action === 'confirmed' ? 'Confirm' : confirmAction.action === 'cancelled' ? 'Cancel Appointment' : confirmAction.action === 'checked_in' ? 'Check In' : 'Mark Complete'}
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Checkout Modal */}
-      <CheckoutModal
-        open={checkoutOpen}
-        onClose={() => { setCheckoutOpen(false); setCheckoutAppointment(null); }}
-        onSuccess={() => { fetchAppointments(); toast.success('Appointment completed and payment recorded'); }}
-        appointmentId={checkoutAppointment?.id}
-        customerId={checkoutAppointment?.customer?.id ?? 0}
-        staffId={checkoutAppointment?.staff?.id ?? 0}
-        services={
-          checkoutAppointment
-            ? checkoutAppointment.services && checkoutAppointment.services.length > 0
-              ? checkoutAppointment.services.map((s) => ({
-                  id: s.id,
-                  name: s.name,
-                  price: s.price ?? servicesList.find((x) => x.id === s.id)?.price ?? 0,
-                  duration: s.duration_minutes ?? servicesList.find((x) => x.id === s.id)?.duration ?? 0,
-                  category: '',
-                  staff: [],
-                }))
-              : [{
-                  id: checkoutAppointment.service.id,
-                  name: checkoutAppointment.service.name,
-                  price: servicesList.find((s) => s.id === checkoutAppointment.service.id)?.price ?? 0,
-                  duration: servicesList.find((s) => s.id === checkoutAppointment.service.id)?.duration ?? 0,
-                  category: '',
-                  staff: [],
-                }]
-            : []
-        }
-      />
     </div>
   );
 }

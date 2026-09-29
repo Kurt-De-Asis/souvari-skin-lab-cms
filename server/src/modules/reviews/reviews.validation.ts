@@ -18,5 +18,11 @@ export const serviceStatsSchema = z.object({
   serviceId: z.coerce.number().int().positive(),
 });
 
+export const publicReviewQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(24).default(6),
+  service_id: z.coerce.number().int().positive().optional(),
+});
+
 export type CreateReviewInput = z.infer<typeof createReviewSchema>;
 export type ReviewQuery = z.infer<typeof reviewQuerySchema>;
+export type PublicReviewQuery = z.infer<typeof publicReviewQuerySchema>;

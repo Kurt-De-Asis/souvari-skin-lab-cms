@@ -159,6 +159,18 @@ export class CustomerService {
 
     const { phone, email, password, ...customerData } = data;
 
+    // Email is the customer's login identity, so reject a duplicate up front
+    // instead of letting the unique constraint surface as a 500.
+    if (email !== undefined) {
+      const taken = await prisma.users.findFirst({
+        where: { email, id: { not: customer.user_id } },
+        select: { id: true },
+      });
+      if (taken) {
+        throw new AppError('Email already registered', 409);
+      }
+    }
+
     const nullableFields = ['date_of_birth', 'address', 'city', 'state', 'postal_code', 'notes', 'avatar_url', 'gender'];
     const updateData: any = {};
     for (const key of Object.keys(customerData) as (keyof typeof customerData)[]) {

@@ -8,7 +8,7 @@ import { resourceQuerySchema, createResourceSchema, updateResourceSchema, assign
 const router = Router();
 
 // Resource CRUD
-router.get('/', resourcesController.list);
+router.get('/', validate(resourceQuerySchema, 'query'), resourcesController.list);
 router.get('/:id', resourcesController.getById);
 router.post('/', authenticate, authorize('admin'), validate(createResourceSchema), resourcesController.create);
 router.put('/:id', authenticate, authorize('admin'), validate(updateResourceSchema), resourcesController.update);

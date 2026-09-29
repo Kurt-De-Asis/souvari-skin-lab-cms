@@ -185,7 +185,25 @@ Check available time slots.
 
 **Query:** `staff_id`, `service_id`, `date`
 
-Returns array of available time slots (30-min intervals).
+Returns array of available time slots (30-min intervals). If the clinic is closed on that
+weekday per the `business_days` setting, the response is `{ "closed": true, "available_slots": [] }`.
+
+### GET /appointments/operating-days-impact
+Count upcoming, still-actionable bookings on the given weekdays. Admin only.
+
+**Query:** `days` (comma-separated weekday names, e.g. `?days=saturday,sunday`)
+
+```json
+{
+  "data": [
+    { "day": "saturday", "upcoming_count": 4 },
+    { "day": "sunday", "upcoming_count": 0 }
+  ]
+}
+```
+
+`cancelled`, `no_show`, and `completed` appointments are excluded, and past dates are ignored.
+Used by the Settings screen to warn before a day with live bookings is switched off.
 
 ### GET /appointments/:id
 Get appointment details.
@@ -214,8 +232,40 @@ Valid status transitions:
 - checked_in → in_progress, no_show
 - in_progress → completed
 
+Cancelling always sends the customer an automatic SMS; `reason` (or `cancellation_reason` on
+`PUT`) is the message body and is required for staff/admin cancellations. Completed appointments
+reject all status changes.
+
+Customers may call this on their own appointments, but only to cancel, and only while the
+appointment is `pending` or `confirmed`.
+
 ### PATCH /appointments/:id
-Reschedule appointment.
+Update an appointment.
+
+**Body (all optional):**
+```json
+{
+  "service_ids": [3, 7],
+  "staff_id": 2,
+  "appointment_date": "2026-10-02",
+  "start_time": "14:00",
+  "end_time": "15:30",
+  "notes": "Client asked for a quieter room",
+  "reschedule_reason": "Requested a later slot"
+}
+```
+
+- `service_ids` replaces the whole service list: end time is re-derived from the total duration,
+  every line is re-priced, the join rows are rewritten, and the customer is SMSed. Sending the
+  current list again is a no-op.
+- `end_time` is ignored when `service_ids` is present, since it is derived.
+- Changing `appointment_date` or `start_time` requires `reschedule_reason`.
+- Completed appointments are immutable and return `422`.
+- Customers may only cancel their own appointment; any other field is rejected with `403`.
+
+### DELETE /appointments/:id
+Soft-deletes the appointment (sets `deleted_at` and `status = 'cancelled'`). Returns `422` for
+completed appointments.
 
 ---
 
@@ -456,7 +506,15 @@ Update settings (admin only).
 {
   "settings": [
     { "key": "clinic_name", "value": "\"IAVE Beauty & Co.\"" },
-    { "key": "business_hours_start", "value": "\"09:00\"" }
+    { "key": "business_hours_start", "value": "\"09:00\"" },
+    {
+      "key": "business_days",
+      "value": ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+    }
   ]
 }
 ```
+
+`business_days` is validated: it must be a non-empty array of valid weekday names, otherwise the
+whole request is rejected with `400`. Days outside this list are treated as clinic-closed — see
+`GET /appointments/availability` and `GET /appointments/operating-days-impact`.

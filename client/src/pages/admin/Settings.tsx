@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
-import { Save, Building2, Clock } from 'lucide-react';
+import { Save, Building2, Clock, AlertTriangle, CalendarDays } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { settingsApi } from '@/api';
+import { appointmentsApi, settingsApi } from '@/api';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 
 interface SettingsForm {
@@ -14,9 +14,33 @@ interface SettingsForm {
   business_hours_end: string;
 }
 
+/** Monday-first, matching the server's canonical weekday ordering. */
+const DAY_CHOICES = [
+  { value: 'monday', label: 'Mon' },
+  { value: 'tuesday', label: 'Tue' },
+  { value: 'wednesday', label: 'Wed' },
+  { value: 'thursday', label: 'Thu' },
+  { value: 'friday', label: 'Fri' },
+  { value: 'saturday', label: 'Sat' },
+  { value: 'sunday', label: 'Sun' },
+];
+
+const DAY_LABELS: Record<string, string> = Object.fromEntries(
+  DAY_CHOICES.map((d) => [d.value, d.label])
+);
+
+const DEFAULT_OPEN_DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
 export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Open days live outside react-hook-form because they need custom toggle
+  // behaviour and an async collision check before the user commits.
+  const [openDays, setOpenDays] = useState<string[]>(DEFAULT_OPEN_DAYS);
+  const [daysError, setDaysError] = useState('');
+  const [impactWarning, setImpactWarning] = useState('');
+  const [checkingImpact, setCheckingImpact] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<SettingsForm>({
     defaultValues: {
@@ -38,6 +62,11 @@ export default function Settings() {
         items.forEach((item: any) => {
           s[item.key] = item.value;
         });
+        const days = Array.isArray(s.business_days) && s.business_days.length > 0
+          ? s.business_days
+          : DEFAULT_OPEN_DAYS;
+        // Store in canonical order regardless of how the row was saved.
+        setOpenDays(DAY_CHOICES.map((d) => d.value).filter((d) => days.includes(d)));
         reset({
           clinic_name: s.clinic_name || '',
           clinic_phone: s.clinic_phone || '',
@@ -55,12 +84,64 @@ export default function Settings() {
     fetchSettings();
   }, [reset]);
 
+  // Warn — but do not block — when closing a day that already has live bookings
+  // on it. The clinic is allowed to close a day; it just needs to know.
+  const checkImpact = useCallback(async (closing: string[]) => {
+    if (closing.length === 0) {
+      setImpactWarning('');
+      return;
+    }
+    setCheckingImpact(true);
+    try {
+      const { data } = await appointmentsApi.getOperatingDaysImpact(closing);
+      const rows: Array<{ day: string; upcoming_count: number }> = data.data ?? [];
+      const withBookings = rows.filter((r) => r.upcoming_count > 0);
+      if (withBookings.length === 0) {
+        setImpactWarning('');
+      } else {
+        const summary = withBookings
+          .map((r) => `${r.upcoming_count} upcoming booking${r.upcoming_count === 1 ? '' : 's'} on ${DAY_LABELS[r.day] ?? r.day}`)
+          .join(', ');
+        setImpactWarning(
+          `${summary}. Closing ${withBookings.length === 1 ? 'this day' : 'these days'} will not remove ` +
+          `existing appointments — customers will simply stop being able to book new ones.`
+        );
+      }
+    } catch {
+      // The warning is advisory; a failure here must not block saving.
+      setImpactWarning('');
+    } finally {
+      setCheckingImpact(false);
+    }
+  }, []);
+
+  const toggleDay = (day: string) => {
+    // Preserve canonical ordering rather than toggle order.
+    const toggled = openDays.includes(day)
+      ? openDays.filter((d) => d !== day)
+      : [...openDays, day];
+    const next = DAY_CHOICES.map((d) => d.value).filter((d) => toggled.includes(d));
+
+    setOpenDays(next);
+    setDaysError('');
+
+    // Only closing days can strand existing appointments.
+    void checkImpact(openDays.filter((d) => !next.includes(d)));
+  };
+
   const onSubmit = async (values: SettingsForm) => {
+    if (openDays.length === 0) {
+      setDaysError('Select at least one day the clinic is open.');
+      return;
+    }
     setSaving(true);
     try {
-      await settingsApi.update({
-        settings: (Object.keys(values) as Array<keyof SettingsForm>).map((key) => ({ key, value: values[key] })),
-      });
+      const settings = [
+        ...(Object.keys(values) as Array<keyof SettingsForm>).map((key) => ({ key, value: values[key] })),
+        { key: 'business_days', value: openDays },
+      ];
+      await settingsApi.update({ settings });
+      setImpactWarning('');
       toast.success('Settings saved successfully');
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to save settings');
@@ -126,6 +207,52 @@ export default function Settings() {
               {errors.business_hours_end && <p className="text-xs text-red-600 mt-1">{errors.business_hours_end.message}</p>}
             </div>
           </div>
+        </div>
+
+        {/* Operating Days Section */}
+        <div className="card">
+          <div className="flex items-center gap-2 mb-1">
+            <CalendarDays size={18} className="text-primary-600" />
+            <h2 className="font-semibold text-neutral-900">Days We Are Open</h2>
+          </div>
+          <p className="text-xs text-neutral-500 mb-4">
+            Days that are switched off are hidden from customers — they cannot book or request an
+            appointment on them.
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            {DAY_CHOICES.map((day) => {
+              const active = openDays.includes(day.value);
+              return (
+                <button
+                  key={day.value}
+                  type="button"
+                  onClick={() => toggleDay(day.value)}
+                  aria-pressed={active}
+                  className={`min-w-[3.25rem] px-3 py-2 rounded-md text-sm font-medium border transition ${
+                    active
+                      ? 'bg-neutral-900 border-neutral-900 text-white'
+                      : 'bg-white border-neutral-200 text-neutral-400 hover:border-neutral-400 hover:text-neutral-700'
+                  }`}
+                >
+                  {day.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {daysError && <p className="text-xs text-red-600 mt-2">{daysError}</p>}
+
+          {checkingImpact && (
+            <p className="text-xs text-neutral-400 mt-3">Checking existing bookings...</p>
+          )}
+
+          {impactWarning && !checkingImpact && (
+            <div className="flex items-start gap-2.5 rounded-md border border-amber-200 bg-amber-50 p-3 mt-3">
+              <AlertTriangle size={15} className="text-amber-600 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-amber-900">{impactWarning}</p>
+            </div>
+          )}
         </div>
 
         {/* Save Button */}

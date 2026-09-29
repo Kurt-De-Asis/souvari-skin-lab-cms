@@ -62,13 +62,11 @@ model customers {
   postal_code   String? @db.VarChar(20)
   notes         String? @db.Text
   avatar_url    String? @db.VarChar(500)
-  preferred_staff_id Int?
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
   deleted_at    DateTime?
 
   user           users          @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  preferred_staff staff?  @relation("PreferredCustomers", fields: [preferred_staff_id], references: [id], onDelete: SetNull)
   appointments   appointments[]
   transactions   transactions[]
   treatment_records treatment_records[]
@@ -116,7 +114,6 @@ model staff {
   treatment_records         treatment_records[]
   service_reviews          service_reviews[]
   service_staff             service_staff[]
-  preferred_customers       customers[]              @relation("PreferredCustomers")
 
   @@index([position])
   @@index([status])

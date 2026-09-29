@@ -72,7 +72,6 @@ class NotificationDispatchService {
     serviceName: string;
     appointmentDate: string;
     appointmentTime: string;
-    cancellationReason?: string | null;
     adminUserIds: number[];
   }): Promise<void> {
     const {
@@ -80,7 +79,7 @@ class NotificationDispatchService {
       customerUserId, customerName, customerPhone,
       staffUserId, staffName,
       serviceName, appointmentDate, appointmentTime,
-      cancellationReason, adminUserIds,
+      adminUserIds,
     } = params;
 
     const statusMessages: Record<string, { title: string; message: string; type: NotificationType }> = {
@@ -102,11 +101,6 @@ class NotificationDispatchService {
       completed: {
         title: 'Session Completed',
         message: `Your ${serviceName} session is complete. Thank you for visiting Souvari Skin Lab!`,
-        type: 'appointment_update',
-      },
-      cancelled: {
-        title: 'Appointment Cancelled',
-        message: `Your ${serviceName} appointment on ${appointmentDate} has been cancelled.${cancellationReason ? ` Reason: ${cancellationReason}` : ''}`,
         type: 'appointment_update',
       },
       no_show: {
@@ -132,20 +126,12 @@ class NotificationDispatchService {
 
     // Notify assigned staff (in-app only)
     if (staffUserId) {
-      const staffTitle = newStatus === 'confirmed'
-        ? 'New Confirmed Appointment'
-        : newStatus === 'cancelled'
-        ? 'Appointment Cancelled'
-        : `Appointment Status: ${newStatus.replace('_', ' ')}`;
-
-      const staffMessage = newStatus === 'cancelled'
-        ? `Appointment #${appointmentId} for ${customerName} on ${appointmentDate} has been cancelled.`
-        : `Appointment #${appointmentId} for ${customerName} — ${serviceName} on ${appointmentDate} at ${appointmentTime} — status: ${newStatus.replace('_', ' ')}.`;
+      const staffMessage = `Appointment #${appointmentId} for ${customerName} — ${serviceName} on ${appointmentDate} at ${appointmentTime} — status: ${newStatus.replace('_', ' ')}.`;
 
       await this.dispatch({
         userId: staffUserId,
         type: 'appointment_update',
-        title: staffTitle,
+        title: `Appointment Status: ${newStatus.replace('_', ' ')}`,
         message: staffMessage,
         data: { appointment_id: appointmentId, new_status: newStatus },
         sendSMS: false,
@@ -160,6 +146,156 @@ class NotificationDispatchService {
         title: `Appointment ${newStatus.replace('_', ' ')}`,
         message: `Appointment #${appointmentId}: ${customerName} — ${serviceName} on ${appointmentDate} at ${appointmentTime} — status: ${newStatus.replace('_', ' ')}.`,
         data: { appointment_id: appointmentId, new_status: newStatus },
+        sendSMS: false,
+      });
+    }
+  }
+
+  /**
+   * Cancellation always gets an automatic SMS to the customer, whether it was
+   * initiated by an admin, by staff, or by the customer themselves. This is the
+   * single send site for cancellations — `dispatchAppointmentStatus` does not
+   * handle `cancelled`, so there is no risk of a duplicate message.
+   */
+  async dispatchAppointmentCancelled(params: {
+    appointmentId: number;
+    customerUserId: number;
+    customerName: string;
+    customerPhone?: string | null;
+    staffUserId: number | null;
+    staffName: string;
+    serviceName: string;
+    appointmentDate: string;
+    appointmentTime: string;
+    reason?: string | null;
+    cancelledByCustomer?: boolean;
+    adminUserIds: number[];
+  }): Promise<void> {
+    const {
+      appointmentId, customerUserId, customerName, customerPhone,
+      staffUserId, staffName, serviceName,
+      appointmentDate, appointmentTime, reason,
+      cancelledByCustomer, adminUserIds,
+    } = params;
+
+    const reasonText = reason?.trim() ? ` Reason: ${reason.trim()}` : '';
+    const rebook = cancelledByCustomer
+      ? ''
+      : ' Please contact Souvari Skin Lab to rebook.';
+
+    const message =
+      `Your ${serviceName} appointment on ${appointmentDate} at ${appointmentTime} ` +
+      `has been cancelled.${reasonText}${rebook}`;
+
+    // Notify customer (in-app + SMS) — SMS is unconditional
+    await this.dispatch({
+      userId: customerUserId,
+      type: 'appointment_update',
+      title: 'Appointment Cancelled',
+      message,
+      data: { appointment_id: appointmentId, new_status: 'cancelled' },
+      sendSMS: true,
+      smsPhone: customerPhone ?? undefined,
+    });
+
+    // Notify assigned staff (in-app only)
+    if (staffUserId) {
+      await this.dispatch({
+        userId: staffUserId,
+        type: 'appointment_update',
+        title: 'Appointment Cancelled',
+        message: `Appointment #${appointmentId} for ${customerName} on ${appointmentDate} has been cancelled.`,
+        data: { appointment_id: appointmentId, new_status: 'cancelled' },
+        sendSMS: false,
+      });
+    }
+
+    // Notify admins (in-app only)
+    for (const adminId of adminUserIds) {
+      await this.dispatch({
+        userId: adminId,
+        type: 'appointment_update',
+        title: 'Appointment Cancelled',
+        message: `Appointment #${appointmentId}: ${customerName} — ${serviceName} on ${appointmentDate} at ${appointmentTime} has been cancelled.`,
+        data: { appointment_id: appointmentId, new_status: 'cancelled' },
+        sendSMS: false,
+      });
+    }
+  }
+
+  /**
+   * Tells the customer their booking now covers a different set of services —
+   * e.g. they added a service at the counter. Customer gets in-app + SMS.
+   */
+  async dispatchAppointmentServicesChanged(params: {
+    appointmentId: number;
+    customerUserId: number;
+    customerName: string;
+    customerPhone?: string | null;
+    staffUserId: number | null;
+    staffName: string;
+    serviceNames: string[];
+    addedServiceNames: string[];
+    appointmentDate: string;
+    appointmentTime: string;
+    newEndTime: string;
+    quotedPrice: number;
+    note?: string | null;
+    adminUserIds: number[];
+  }): Promise<void> {
+    const {
+      appointmentId, customerUserId, customerName, customerPhone,
+      staffUserId, staffName, serviceNames, addedServiceNames,
+      appointmentDate, appointmentTime, newEndTime,
+      quotedPrice, note, adminUserIds,
+    } = params;
+
+    const serviceList = serviceNames.join(', ');
+    const addedText = addedServiceNames.length
+      ? ` ${addedServiceNames.join(', ')} ${addedServiceNames.length === 1 ? 'was' : 'were'} added.`
+      : '';
+    const noteText = note?.trim() ? ` Note: ${note.trim()}` : '';
+    const extended = ` Your session now ends at ${newEndTime}.`;
+
+    const message =
+      `Your appointment on ${appointmentDate} at ${appointmentTime} now covers: ${serviceList}.` +
+      `${addedText}${extended} Total: PHP ${Number(quotedPrice).toLocaleString()}.${noteText}`;
+
+    // Notify customer (in-app + SMS)
+    await this.dispatch({
+      userId: customerUserId,
+      type: 'appointment_update',
+      title: 'Appointment Services Updated',
+      message,
+      data: {
+        appointment_id: appointmentId,
+        services: serviceNames,
+        added_services: addedServiceNames,
+      },
+      sendSMS: true,
+      smsPhone: customerPhone ?? undefined,
+    });
+
+    // Notify assigned staff (in-app only)
+    if (staffUserId) {
+      await this.dispatch({
+        userId: staffUserId,
+        type: 'appointment_update',
+        title: 'Appointment Services Updated',
+        message: `Appointment #${appointmentId} for ${customerName} on ${appointmentDate} now covers: ${serviceList} (ends ${newEndTime}).`,
+        data: { appointment_id: appointmentId, services: serviceNames },
+        sendSMS: false,
+      });
+    }
+
+    // Notify admins (in-app only)
+    for (const adminId of adminUserIds) {
+      await this.dispatch({
+        userId: adminId,
+        type: 'appointment_update',
+        title: 'Appointment Services Updated',
+        message: `Appointment #${appointmentId}: ${customerName} with ${staffName} on ${appointmentDate} now covers: ${serviceList} (ends ${newEndTime}).`,
+        data: { appointment_id: appointmentId, services: serviceNames },
         sendSMS: false,
       });
     }

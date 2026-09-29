@@ -3,12 +3,20 @@ import { reviewsController } from './reviews.controller';
 import { authenticate } from '../../middleware/auth';
 import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
-import { createReviewSchema, reviewQuerySchema } from './reviews.validation';
+import { createReviewSchema, reviewQuerySchema, publicReviewQuerySchema } from './reviews.validation';
 
 const router = Router();
 
 // Public aggregate rating per service (used on the public services pages, no login required).
 router.get('/service/:serviceId/stats', reviewsController.getServiceStats);
+
+// Public testimonials for the marketing site (no login required).
+// Must stay above `router.use(authenticate)`; returns only masked, non-identifying fields.
+router.get(
+  '/public',
+  validate(publicReviewQuerySchema, 'query'),
+  reviewsController.getPublicList
+);
 
 router.use(authenticate);
 
