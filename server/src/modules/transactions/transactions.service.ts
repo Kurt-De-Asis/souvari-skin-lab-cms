@@ -168,7 +168,18 @@ export class TransactionService {
           markedCompleted = true;
           await tx.appointments.update({
             where: { id: data.appointment_id },
-            data: { status: 'completed' },
+            data: {
+              status: 'completed',
+              // Persist the POS discount back onto the appointment so the
+              // booking's discount history reflects what was actually
+              // granted at settlement.
+              ...(data.discount_pct !== undefined && data.discount_pct !== null
+                ? {
+                    discount_pct: data.discount_pct,
+                    discount_reason: data.discount_reason ?? null,
+                  }
+                : {}),
+            },
           });
 
           await tx.appointment_status_history.create({

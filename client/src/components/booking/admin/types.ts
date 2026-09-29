@@ -9,7 +9,38 @@ export interface BookingAppointment {
   staff: { id: number; first_name: string; last_name: string };
   service: { id: number; name: string };
   services?: { id: number; name: string; price?: number; duration_minutes?: number }[];
+  /** True when nothing is outstanding. Kept for existing call sites. */
   paid?: boolean;
+  /** Quote after membership/perk, less the manual staff discount. */
+  amount_due?: number;
+  paid_amount?: number;
+  /** amount_due - paid_amount. Positive means the booking is part-paid. */
+  balance?: number;
+  discount_pct?: number | null;
+}
+
+export interface BalanceService {
+  service_id: number;
+  name: string;
+  price: number;
+  already_covered: boolean;
+  line_total?: number;
+}
+
+export interface AppointmentBalance {
+  appointment_id: number;
+  status: string;
+  quoted_total: number;
+  discount_pct: number;
+  discount_reason: string | null;
+  amount_due: number;
+  paid_amount: number;
+  balance: number;
+  /** Services already billed; never charged again. */
+  covered_services: BalanceService[];
+  /** Services still to pay for, apportioned with the booking's discount. */
+  uncovered_services: BalanceService[];
+  has_balance: boolean;
 }
 
 export interface StaffSchedule {
@@ -82,5 +113,4 @@ export interface CreateGroupAppointmentPayload {
   appointment_date: string;
   start_time: string;
   notes?: string;
-  payment?: { payment_method: string; amount_tendered?: number } | null;
 }

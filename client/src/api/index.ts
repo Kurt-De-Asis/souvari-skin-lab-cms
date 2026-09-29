@@ -71,6 +71,11 @@ export const appointmentsApi = {
   getAvailability: (params: any) => api.get('/appointments/availability', { params }),
   getQuote: (serviceId: number) => api.get('/appointments/quote', { params: { service_id: String(serviceId) } }),
   getById: (id: number) => api.get(`/appointments/${id}`),
+  /**
+   * Balance owed, itemised by service. Drives the POS modal that appears when
+   * completing a booking whose services were added after payment was taken.
+   */
+  getBalance: (id: number) => api.get(`/appointments/${id}/balance`),
   /** Upcoming booking counts per weekday, for the open-days settings warning. */
   getOperatingDaysImpact: (days: string[]) =>
     api.get('/appointments/operating-days-impact', { params: { days: days.join(',') } }),

@@ -2,7 +2,6 @@ import prisma from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import pricingService from '../../services/pricing.service';
 import { notificationDispatch } from '../../services/notification-dispatch.service';
-import posService from '../pos/pos.service';
 import { customerService } from '../customers/customers.service';
 import { getPaginationParams, createPaginatedResult, PaginatedResult } from '../../utils/pagination';
 import logger from '../../utils/logger';
@@ -13,6 +12,19 @@ import {
   ListAppointmentsQuery,
   WeekdayName,
 } from './appointments.validation';
+import { summarizeAppointmentPayment } from './payment-summary';
+
+/**
+ * Columns every read path needs to work out what is still owed. `items` is
+ * included so a balance collection can tell which services have already been
+ * billed and must not be charged twice.
+ */
+const PAYMENT_ROW_SELECT = {
+  type: true,
+  payment_status: true,
+  total_amount: true,
+  items: { select: { service_id: true } },
+} as const;
 
 /** Who is performing an update. Drives the permissions the service enforces. */
 export interface AppointmentActor {
@@ -108,7 +120,7 @@ export class AppointmentService {
             },
             orderBy: { id: 'asc' },
           },
-          transactions: { select: { payment_status: true } },
+          transactions: { select: PAYMENT_ROW_SELECT },
         },
         orderBy,
         skip,
@@ -132,8 +144,26 @@ export class AppointmentService {
       price: as.unit_price !== null && as.unit_price !== undefined ? Number(as.unit_price) : Number(as.service.price),
       duration_minutes: as.duration_minutes ?? as.service.duration_minutes,
     }));
-    const paid = (transactions ?? []).some((t: any) => t.payment_status === 'paid');
-    return { ...rest, appointment_date, date: appointment_date, services: mapped, paid };
+
+    const payment = summarizeAppointmentPayment({
+      quotedPrice: a.quoted_price,
+      discountPct: a.discount_pct,
+      transactions,
+    });
+
+    return {
+      ...rest,
+      appointment_date,
+      date: appointment_date,
+      services: mapped,
+      // `paid` is kept so existing consumers keep working, but it now means
+      // "nothing outstanding" rather than "at least one paid row exists".
+      paid: payment.balance <= 0,
+      discount_pct: payment.discount_pct || null,
+      amount_due: payment.amount_due,
+      paid_amount: payment.paid_amount,
+      balance: payment.balance,
+    };
   }
 
   async getById(id: number) {
@@ -155,7 +185,7 @@ export class AppointmentService {
           },
           orderBy: { id: 'asc' },
         },
-        transactions: { select: { payment_status: true } },
+        transactions: { select: PAYMENT_ROW_SELECT },
         status_history: {
           orderBy: { created_at: 'desc' },
           take: 10,
@@ -171,6 +201,100 @@ export class AppointmentService {
     }
 
     return this.withServices(appointment);
+  }
+
+  /**
+   * Balance due on an appointment, itemised by service.
+   *
+   * Used when a booking was edited to add a service after it had already been
+   * paid for. Only the services no prior transaction has covered are returned,
+   * so completing the booking cannot re-charge a service that was already
+   * billed — and inventory is only consumed once per service, because
+   * `createTransaction` decrements stock from the item list.
+   *
+   * `uncovered` is priced from `appointment_services.unit_price` (the quoted,
+   * membership-aware price) rather than re-quoted, so it always reconciles with
+   * the appointment total the staff member already saw.
+   */
+  async getBalance(id: number) {
+    const appointment = await prisma.appointments.findFirst({
+      where: { id, deleted_at: null },
+      select: {
+        id: true,
+        customer_id: true,
+        staff_id: true,
+        appointment_date: true,
+        status: true,
+        quoted_price: true,
+        discount_pct: true,
+        discount_reason: true,
+        services: {
+          select: {
+            service_id: true,
+            unit_price: true,
+            service: { select: { id: true, name: true, price: true } },
+          },
+          orderBy: { id: 'asc' },
+        },
+        transactions: { select: PAYMENT_ROW_SELECT },
+      },
+    });
+
+    if (!appointment) {
+      throw new AppError('Appointment not found', 404);
+    }
+
+    const payment = summarizeAppointmentPayment({
+      quotedPrice: appointment.quoted_price,
+      discountPct: appointment.discount_pct,
+      transactions: appointment.transactions,
+    });
+
+    const covered = new Set(payment.covered_service_ids);
+
+    const describe = (row: any, alreadyCovered: boolean) => ({
+      service_id: row.service_id,
+      name: row.service.name,
+      price:
+        row.unit_price !== null && row.unit_price !== undefined
+          ? Number(row.unit_price)
+          : Number(row.service.price),
+      already_covered: alreadyCovered,
+    });
+
+    const uncovered = appointment.services.filter((row) => !covered.has(row.service_id)).map((row) => describe(row, false));
+    const coveredServices = appointment.services.filter((row) => covered.has(row.service_id)).map((row) => describe(row, true));
+
+    // Split the balance across the uncovered lines in proportion to their
+    // price, pushing the rounding remainder onto the last line so the lines
+    // always sum to exactly `balance`. Pricing each line off the discount
+    // percentage alone would not, because the transaction side covers whole
+    // services at once; allocating proportionally keeps the arithmetic sound
+    // for any split of paid and unpaid services.
+    const uncoveredBase = uncovered.reduce((sum, line) => sum + line.price, 0);
+    let allocatedSoFar = 0;
+    const lineItems = uncovered.map((line, index) => {
+      const isLast = index === uncovered.length - 1;
+      const lineTotal = isLast
+        ? Math.round((payment.balance - allocatedSoFar) * 100) / 100
+        : Math.round((uncoveredBase > 0 ? (line.price / uncoveredBase) * payment.balance : payment.balance) * 100) / 100;
+      allocatedSoFar += lineTotal;
+      return { ...line, line_total: lineTotal };
+    });
+
+    return {
+      appointment_id: appointment.id,
+      status: appointment.status,
+      quoted_total: appointment.quoted_price === null ? 0 : Number(appointment.quoted_price),
+      discount_pct: payment.discount_pct,
+      discount_reason: appointment.discount_reason,
+      amount_due: payment.amount_due,
+      paid_amount: payment.paid_amount,
+      balance: payment.balance,
+      covered_services: coveredServices,
+      uncovered_services: lineItems,
+      has_balance: payment.balance > 0,
+    };
   }
 
   async create(data: CreateAppointmentInput) {
@@ -303,7 +427,7 @@ export class AppointmentService {
     return appointment;
   }
 
-  async createGroup(data: CreateGroupAppointmentInput) {
+  async createGroup(data: CreateGroupAppointmentInput, callerRole?: string) {
     const services = await prisma.services.findMany({
       where: { id: { in: data.service_ids }, deleted_at: null },
     });
@@ -387,6 +511,14 @@ export class AppointmentService {
       }
     }
 
+    // No discount is recorded at booking time. Admin/staff bookings are pure
+    // scheduling acts, like the customer flow; payment and any discount happen
+    // together in the POS modal when the booking is marked complete, and the
+    // transaction path persists the discount back onto the appointment then.
+    // Staff/admin bookings are considered confirmed (the staff member entered
+    // them in person); self-service customer bookings stay `pending` awaiting
+    // clinic confirmation.
+
     // ONE appointment holding all services
     const appointment = await prisma.appointments.create({
       data: {
@@ -396,10 +528,10 @@ export class AppointmentService {
         appointment_date: new Date(data.appointment_date),
         start_time: data.start_time,
         end_time: endTime,
-        quoted_price: quotedPrice ? Math.round(quotedPrice * 100) / 100 : null,
+        quoted_price: Math.round(quotedPrice * 100) / 100 || null,
         price_type: primaryPriceType,
         membership_code: data.membership_code ?? null,
-        status: data.payment ? 'confirmed' : 'pending',
+        status: callerRole === 'customer' ? 'pending' : 'confirmed',
         notes: data.notes ?? null,
         services: {
           create: orderedServices.map((svc, i) => ({
@@ -445,41 +577,13 @@ export class AppointmentService {
       // Notification failure should not block appointment creation
     }
 
-    // Optional payment collected at booking time
-    let transaction: any = null;
-    if (data.payment) {
-      try {
-        const quote = await posService.getQuote({
-          customer_id: customerId,
-          items: orderedServices.map((s) => ({ service_id: s.id, quantity: 1 })),
-        });
-        const { transaction: tx } = await posService.createSale(
-          {
-            customer_id: customerId,
-            staff_id: staff.id,
-            payment_method: data.payment.payment_method,
-            amount_tendered: data.payment.amount_tendered,
-            notes: data.notes ?? null,
-          },
-          quote,
-          appointment.id
-        );
-        transaction = {
-          id: tx.id,
-          transaction_number: tx.transaction_number,
-          total_amount: tx.total_amount,
-        };
-      } catch (err: any) {
-        throw new AppError('Appointment saved but payment could not be recorded. Please complete at checkout.', 500);
-      }
-    }
+    const result = appointment;
 
     return {
-      appointment: this.withServices(appointment),
+      appointment: this.withServices(result ?? appointment),
       totalDuration,
       start_time: data.start_time,
       end_time: endTime,
-      transaction,
     };
   }
 
@@ -670,6 +774,22 @@ export class AppointmentService {
     if (data.cancellation_reason !== undefined) updateData.cancellation_reason = data.cancellation_reason;
     if (data.reschedule_reason !== undefined) updateData.reschedule_reason = data.reschedule_reason;
 
+    // Manual staff discount. 0 and null both mean "no discount", and are
+    // stored as NULL so the column distinguishes "not discounted" from unset.
+    // The percentage is a live value, not a baked-in peso amount, so it keeps
+    // applying when a later edit re-quotes the booking.
+    if (data.discount_pct !== undefined) {
+      const pct = data.discount_pct && data.discount_pct > 0 ? data.discount_pct : null;
+      updateData.discount_pct = pct;
+      if (data.discount_reason !== undefined) {
+        updateData.discount_reason = pct ? data.discount_reason ?? null : null;
+      } else if (!pct) {
+        updateData.discount_reason = null;
+      }
+    } else if (data.discount_reason !== undefined && data.discount_reason !== null) {
+      updateData.discount_reason = data.discount_reason;
+    }
+
     // Cancellation requires a message so the customer can be informed why.
     // Customer self-cancellation is exempt — they supply their own reason and
     // the service fills in a default for the audit trail and the SMS.
@@ -841,6 +961,7 @@ export class AppointmentService {
         include: { service: { select: { id: true, name: true, price: true, duration_minutes: true } } },
         orderBy: { id: 'asc' },
       },
+      transactions: { select: PAYMENT_ROW_SELECT },
     });
 
     if (servicePlan?.changed) {
@@ -908,7 +1029,7 @@ export class AppointmentService {
       }
     }
 
-    return appointment;
+    return this.withServices(appointment);
   }
 
   async delete(id: number) {

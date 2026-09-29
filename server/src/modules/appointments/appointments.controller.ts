@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { appointmentService } from './appointments.service';
 import type { OperatingDaysImpactQuery } from './appointments.validation';
 import prisma from '../../config/database';
+import { summarizeAppointmentPayment } from './payment-summary';
 
 /** True when the authenticated customer owns the given appointment.
  * Module-level helper (no `this`) so it can be shared by controller handlers
@@ -131,24 +132,38 @@ export class AppointmentsController {
             select: { service_id: true, service: { select: { id: true, name: true } } },
             orderBy: { id: 'asc' },
           },
-          transactions: { select: { id: true, payment_status: true } },
+          quoted_price: true,
+          discount_pct: true,
+          transactions: { select: { id: true, type: true, payment_status: true, total_amount: true } },
         },
         orderBy: [{ appointment_date: 'asc' }, { start_time: 'asc' }],
       });
 
-      const mapped = appointments.map((a) => ({
-        id: a.id,
-        date: a.appointment_date,
-        start_time: a.start_time,
-        end_time: a.end_time,
-        status: a.status,
-        notes: a.notes,
-        customer: a.customer,
-        staff: a.staff,
-        service: a.service,
-        services: a.services.map((as) => ({ id: as.service_id, name: as.service.name })),
-        paid: a.transactions.some((t) => t.payment_status === 'paid'),
-      }));
+      const mapped = appointments.map((a) => {
+        const payment = summarizeAppointmentPayment({
+          quotedPrice: a.quoted_price,
+          discountPct: a.discount_pct,
+          transactions: a.transactions,
+        });
+        return {
+          id: a.id,
+          date: a.appointment_date,
+          start_time: a.start_time,
+          end_time: a.end_time,
+          status: a.status,
+          notes: a.notes,
+          customer: a.customer,
+          staff: a.staff,
+          service: a.service,
+          services: a.services.map((as) => ({ id: as.service_id, name: as.service.name })),
+          // `paid` now means "nothing outstanding", so a booking that was
+          // edited to add an unpaid service still opens the balance modal.
+          paid: payment.balance <= 0,
+          amount_due: payment.amount_due,
+          paid_amount: payment.paid_amount,
+          balance: payment.balance,
+        };
+      });
 
       res.json({ success: true, data: { appointments: mapped } });
     } catch (error) {
@@ -171,7 +186,7 @@ export class AppointmentsController {
 
   async createGroup(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const result = await appointmentService.createGroup(req.body);
+      const result = await appointmentService.createGroup(req.body, req.user?.role);
       res.status(201).json({
         success: true,
         message: 'Appointments created successfully',
@@ -228,6 +243,24 @@ export class AppointmentsController {
         message: 'Appointment updated successfully',
         data: appointment,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getBalance(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      const role = req.user!.role;
+
+      // Customers may only see their own balance.
+      if (role === 'customer' && !(await ownsAppointment(id, req))) {
+        res.status(404).json({ success: false, message: 'Appointment not found' });
+        return;
+      }
+
+      const balance = await appointmentService.getBalance(id);
+      res.json({ success: true, data: balance });
     } catch (error) {
       next(error);
     }

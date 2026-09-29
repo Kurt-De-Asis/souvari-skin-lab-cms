@@ -65,7 +65,7 @@ export default function AppointmentDetailsDrawer({
   const showCheckIn = appointment.status === 'confirmed';
   const showNoShow = ['confirmed', 'checked_in'].includes(appointment.status);
   const showStart = appointment.status === 'checked_in';
-  const showComplete = ['confirmed', 'checked_in', 'in_progress'].includes(appointment.status);
+  const showComplete = ['pending', 'confirmed', 'checked_in', 'in_progress'].includes(appointment.status);
   const canReassign = !locked && REASSIGNABLE.includes(appointment.status);
 
   // Only specialists scheduled to work on the appointment's date are offered —

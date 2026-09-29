@@ -35,6 +35,16 @@ export const createAppointmentSchema = z.object({
   notes: z.string().nullable().optional(),
 });
 
+/**
+ * Manual staff discount, as a percentage of the post-membership/perk quote.
+ * Coerced so the booking drawer can send the chip value straight through, and
+ * bounded to 0–100 so a client can never inflate the credit beyond the total.
+ */
+const manualDiscountPct = z.coerce.number().min(0).max(100).optional();
+
+/** Why the discount was granted. Capped to match the column width. */
+const manualDiscountReason = z.string().trim().max(255).nullable().optional();
+
 export const createGroupAppointmentSchema = z
   .object({
     customer_id: z.number().int().positive('Customer ID is required').optional(),
@@ -45,10 +55,16 @@ export const createGroupAppointmentSchema = z
     start_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Start time must be in HH:MM format'),
     membership_code: z.string().min(1).optional(),
     notes: z.string().nullable().optional(),
+    // Accepted at the top level too, so a discount can be recorded on a
+    // booking saved without payment (the Save button sends no `payment`).
+    discount_pct: manualDiscountPct,
+    discount_reason: manualDiscountReason,
     payment: z
       .object({
         payment_method: z.enum(['cash', 'gcash', 'gotyme', 'rcbc', 'paid_on_us']),
         amount_tendered: z.number().nonnegative().optional(),
+        discount_pct: manualDiscountPct,
+        discount_reason: manualDiscountReason,
       })
       .optional(),
   })
@@ -60,6 +76,18 @@ export const createGroupAppointmentSchema = z
         code: 'custom',
         path: ['customer_id'],
         message: 'Provide either a customer_id or walk_in client information',
+      });
+    }
+
+    // A discount needs a reason for the audit trail. The reason can ride on
+    // the payment block or at the top level for a no-payment save.
+    const pct = val.payment?.discount_pct ?? val.discount_pct;
+    const reason = val.payment?.discount_reason ?? val.discount_reason;
+    if (pct !== undefined && pct > 0 && !reason) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['payment', 'discount_reason'],
+        message: 'Please provide a reason for the discount',
       });
     }
   });
@@ -79,6 +107,10 @@ export const updateAppointmentSchema = z.object({
   reschedule_reason: z.string().nullable().optional(),
   membership_code: z.string().min(1).optional(),
   notes: z.string().nullable().optional(),
+  // Manual staff discount on the current quote. Re-applied whenever the quote
+  // is recomputed (e.g. services added), so the balance due stays consistent.
+  discount_pct: manualDiscountPct,
+  discount_reason: manualDiscountReason,
 });
 
 export const listAppointmentsQuerySchema = z.object({

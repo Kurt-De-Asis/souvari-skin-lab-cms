@@ -44,6 +44,14 @@ router.get(
   appointmentsController.operatingDaysImpact
 );
 
+// Balance owed on a booking, itemised by service. Used when a booking was
+// edited to add an unpaid service after payment was already taken. Declared
+// before `/:id` so the literal path is not swallowed by the id param.
+router.get(
+  '/:id/balance',
+  appointmentsController.getBalance
+);
+
 router.get(
   '/:id',
   appointmentsController.getById

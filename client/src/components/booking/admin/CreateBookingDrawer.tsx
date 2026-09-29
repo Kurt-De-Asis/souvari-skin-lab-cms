@@ -5,7 +5,7 @@ import { appointmentsApi, customersApi, posApi } from '../../../api';
 import Drawer from '../../ui/Drawer';
 import CustomerDetailDrawer from '../../admin/CustomerDetailDrawer';
 import formatCategory from '../../../utils/formatCategory';
-import { formatAmountInput, formatServicePrice, parseAmountInput } from '../../../utils/format';
+import { formatServicePrice } from '../../../utils/format';
 import type {
   CreateGroupAppointmentPayload,
   CustomerOption,
@@ -29,14 +29,6 @@ interface CreateBookingDrawerProps {
   onClose: () => void;
   onCreate: (data: CreateGroupAppointmentPayload) => Promise<boolean>;
 }
-
-const PAYMENT_METHODS = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'gcash', label: 'GCash' },
-  { value: 'gotyme', label: 'GoTyme' },
-  { value: 'rcbc', label: 'RCBC' },
-  { value: 'paid_on_us', label: 'Paid On Us' },
-];
 
 function initials(name: string): string {
   const [first = '', last = ''] = name.split(' ');
@@ -95,9 +87,6 @@ export default function CreateBookingDrawer({
 
   const [quote, setQuote] = useState<QuoteResult | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [amountTendered, setAmountTendered] = useState('');
-  const [payError, setPayError] = useState('');
   const [detailCustomer, setDetailCustomer] = useState<any | null>(null);
 
   // Reset whenever the drawer opens
@@ -123,9 +112,7 @@ export default function CreateBookingDrawer({
     setSelectedSlot(null);
     setNotes('');
     setQuote(null);
-    setPaymentMethod('cash');
-    setAmountTendered('');
-    setPayError('');
+    setQuoteLoading(false);
   }, [open, date]);
 
   // Customer search (debounced) — shows recent customers as picker boxes when the query is empty
@@ -162,6 +149,8 @@ export default function CreateBookingDrawer({
     [selectedServices]
   );
 
+  // Live quote follows membership/perk pricing. No money or discount is
+  // handled here — the POS modal at Mark Complete is the only payment point.
   const finalTotal = quote?.final_total ?? totalPrice;
   const memberDiscount =
     (quote?.membership_discount ?? 0) + (quote?.monthly_perk_discount ?? 0);
@@ -334,9 +323,6 @@ export default function CreateBookingDrawer({
     });
   };
 
-  const tendered = parseAmountInput(amountTendered) || 0;
-  const change = Math.max(0, tendered - finalTotal);
-
   const clientReady =
     clientMode === 'walk-in'
       ? !!walkInFirst.trim() && !!walkInLast.trim()
@@ -352,16 +338,11 @@ export default function CreateBookingDrawer({
     }
   };
 
-  const handleSubmit = async (action: 'checkout' | 'save') => {
+  const handleSubmit = async () => {
     if (!clientReady || selectedServices.length === 0 || !selectedSlot) return;
-    if (action === 'checkout' && paymentMethod === 'cash' && tendered < finalTotal) {
-      setPayError('Amount tendered is less than total');
-      return;
-    }
-    setPayError('');
     setSubmitting(true);
     try {
-      const base = {
+      const payload: CreateGroupAppointmentPayload = {
         ...(clientMode === 'walk-in'
           ? {
               walk_in: {
@@ -379,16 +360,6 @@ export default function CreateBookingDrawer({
         start_time: selectedSlot.start,
         notes: notes.trim() || undefined,
       };
-      const payload: CreateGroupAppointmentPayload =
-        action === 'checkout'
-          ? {
-              ...base,
-              payment: {
-                payment_method: paymentMethod,
-                amount_tendered: paymentMethod === 'cash' && tendered > 0 ? tendered : undefined,
-              },
-            }
-          : base;
       await onCreate(payload);
     } catch {
       // handled by the page (toast)
@@ -799,12 +770,12 @@ export default function CreateBookingDrawer({
           </div>
         )}
 
-        {/* POS / Payment */}
+        {/* Booking summary */}
         {clientReady && selectedServices.length > 0 && (
           <div className="bg-white border border-neutral-200 rounded-md">
             <div className="flex items-center justify-between px-3 py-2 bg-neutral-900">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-white uppercase tracking-wide">POS</span>
+                <span className="text-sm font-semibold text-white uppercase tracking-wide">Summary</span>
               </div>
               {quoteLoading ? (
                 <span className="text-[11px] text-neutral-300 flex items-center gap-1">
@@ -865,66 +836,20 @@ export default function CreateBookingDrawer({
               </div>
 
               <div className="mt-3 pt-3 border-t border-neutral-100">
-                <p className="text-xs font-semibold text-neutral-900 uppercase tracking-wide mb-2">Payment Method</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {PAYMENT_METHODS.map((pm) => (
-                    <button
-                      key={pm.value}
-                      type="button"
-                      disabled={submitting}
-                      onClick={() => setPaymentMethod(pm.value)}
-                      className={`px-2.5 py-1.5 rounded-md border text-xs font-medium transition ${
-                        paymentMethod === pm.value
-                          ? 'bg-neutral-900 border-neutral-900 text-white'
-                          : 'bg-white border-neutral-200 text-neutral-600 hover:border-neutral-300'
-                      }`}
-                    >
-                      {pm.label}
-                    </button>
-                  ))}
-                </div>
-
-                {paymentMethod === 'cash' && (
-                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div>
-                      <label className="label">Amount Tendered</label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        className="input-field hide-number-spinners"
-                        placeholder="0.00"
-                        value={amountTendered}
-                        onChange={(e) => {
-                          setAmountTendered(formatAmountInput(e.target.value));
-                          setPayError('');
-                        }}
-                      />
-                    </div>
-                    <div>
-                      <label className="label">Change</label>
-                      <div className="input-field bg-neutral-50 text-neutral-600 flex items-center">
-                        ₱{change.toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {payError && <p className="text-xs text-red-600 mt-2">{payError}</p>}
+                <p className="text-xs text-neutral-500">
+                  Payment happens at the POS when this appointment is marked
+                  complete, alongside any applied discount.
+                </p>
               </div>
 
-               <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="mt-4">
                 <button
-                  onClick={() => handleSubmit('save')}
-                  disabled={!canSubmit}
-                  className="border border-neutral-300 text-neutral-700 hover:bg-neutral-100 py-2.5 text-sm font-medium transition disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {submitting ? 'Saving...' : 'Save'}
-                </button>
-                <button
-                  onClick={() => handleSubmit('checkout')}
+                  type="button"
+                  onClick={handleSubmit}
                   disabled={!canSubmit}
                   className="btn-primary w-full !py-2.5 text-sm"
                 >
-                  {submitting ? 'Processing...' : 'Checkout'}
+                  {submitting ? 'Booking...' : 'Book Appointment'}
                 </button>
               </div>
             </div>

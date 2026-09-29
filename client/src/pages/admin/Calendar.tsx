@@ -37,6 +37,7 @@ export default function Calendar() {
 
   const [checkoutAppt, setCheckoutAppt] = useState<BookingAppointment | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [checkoutMode, setCheckoutMode] = useState<'full' | 'balance'>('full');
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
 
   const dateStr = currentDate.format('YYYY-MM-DD');
@@ -144,7 +145,7 @@ export default function Calendar() {
         ...payload,
         service_ids: Array.isArray(payload.service_ids) ? payload.service_ids : [payload.service_id],
       });
-      toast.success(payload.payment ? 'Appointment created and payment recorded' : 'Appointment created');
+      toast.success('Appointment scheduled. Payment is collected at the POS when it is marked complete.');
       setCreateOpen(false);
       fetchAppointments();
       return true;
@@ -187,7 +188,16 @@ export default function Calendar() {
     setBusyApptId(appt.id);
     try {
       if (status === 'completed') {
-        if (appt.paid) {
+        // Only open the POS modal when money is genuinely outstanding.
+        //
+        // `balance` is the amount still owed. If nothing is owed, complete
+        // directly. Otherwise pick the mode: `balance` when some money was
+        // already collected (so only the uncovered services are billed), and
+        // `full` for a never-paid booking. The full path matters because
+        // /pos/quote applies membership and monthly-perk benefits, which
+        // getBalance does not.
+        const outstanding = appt.balance ?? (appt.paid ? 0 : null);
+        if (outstanding !== null && outstanding <= 0) {
           await appointmentsApi.updateStatus(appt.id, { status, reason });
           toast.success('Appointment completed');
           setDetailsAppt(null);
@@ -196,6 +206,7 @@ export default function Calendar() {
         }
         setBusyApptId(null);
         setCheckoutAppt(appt);
+        setCheckoutMode((appt.paid_amount ?? 0) > 0 ? 'balance' : 'full');
         setCheckoutOpen(true);
         return true;
       }
@@ -357,7 +368,15 @@ export default function Calendar() {
       <CheckoutModal
         open={checkoutOpen}
         onClose={() => { setCheckoutOpen(false); setCheckoutAppt(null); }}
-        onSuccess={() => { fetchAppointments(); toast.success('Appointment completed and payment recorded'); }}
+        onSuccess={() => {
+          fetchAppointments();
+          toast.success(
+            checkoutMode === 'balance'
+              ? 'Balance collected and appointment completed'
+              : 'Appointment completed and payment recorded'
+          );
+        }}
+        mode={checkoutMode}
         appointmentId={checkoutAppt?.id}
         customerId={checkoutAppt?.customer?.id ?? 0}
         staffId={checkoutAppt?.staff?.id ?? 0}

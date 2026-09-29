@@ -6,16 +6,18 @@ import {
   UserCheck,
   XCircle,
   ClipboardCheck,
+  Plus,
 } from 'lucide-react';
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
-import { appointmentsApi, treatmentRecordsApi } from '@/api';
+import { appointmentsApi, servicesApi, treatmentRecordsApi } from '@/api';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Modal from '@/components/ui/Modal';
 import CheckoutModal from '@/components/checkout/CheckoutModal';
+import CreateBookingDrawer from '@/components/booking/admin/CreateBookingDrawer';
 import CustomerDetailDrawer from '@/components/admin/CustomerDetailDrawer';
 
 interface Appointment {
@@ -29,6 +31,9 @@ interface Appointment {
   service: { id: number; name: string; duration_minutes: number } | null;
   services?: { id: number; name: string; price?: number; duration_minutes?: number }[];
   paid?: boolean;
+  amount_due?: number;
+  paid_amount?: number;
+  balance?: number;
 }
 
 const STATUS_OPTIONS = [
@@ -52,11 +57,31 @@ export default function Appointments() {
   const [treatmentNotes, setTreatmentNotes] = useState('');
   const [recommendations, setRecommendations] = useState('');
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [checkoutMode, setCheckoutMode] = useState<'full' | 'balance'>('full');
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [servicesList, setServicesList] = useState<any[]>([]);
 
   useEffect(() => {
     fetchAppointments();
   }, [dateFilter, statusFilter]);
+
+  // The new-booking drawer needs the services catalog; it is stable data, so
+  // it is fetched once rather than on every filter change.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await servicesApi.list();
+        if (!cancelled) setServicesList(data.data || data || []);
+      } catch {
+        if (!cancelled) setServicesList([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const fetchAppointments = async () => {
     setLoading(true);
@@ -88,11 +113,20 @@ export default function Appointments() {
   };
 
   const openCompleteModal = (appointment: Appointment) => {
-    if (appointment.paid) {
+    // Only open the POS modal when money is genuinely outstanding.
+    //
+    // `balance` is the amount still owed. `balance` mode is correct only when
+    // some money was already collected, so the modal bills just the uncovered
+    // services. A never-paid booking uses `full` mode instead, because
+    // /pos/quote applies membership and monthly-perk benefits that getBalance
+    // does not.
+    const outstanding = appointment.balance ?? (appointment.paid ? 0 : null);
+    if (outstanding !== null && outstanding <= 0) {
       handleUpdateStatus(appointment.id, 'completed');
       return;
     }
     setSelectedAppointment(appointment);
+    setCheckoutMode((appointment.paid_amount ?? 0) > 0 ? 'balance' : 'full');
     setTreatmentNotes('');
     setRecommendations('');
     setCheckoutOpen(true);
@@ -132,6 +166,13 @@ export default function Appointments() {
               Check In
             </button>
             <button
+              onClick={() => openCompleteModal(appt)}
+              className="btn-ghost text-xs text-primary-600 hover:text-primary-700"
+            >
+              <ClipboardCheck size={14} />
+              Complete
+            </button>
+            <button
               onClick={() => handleUpdateStatus(appt.id, 'no_show')}
               className="btn-ghost text-xs text-red-600 hover:text-red-700"
             >
@@ -167,8 +208,16 @@ export default function Appointments() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-sans font-semibold text-neutral-900">Appointments</h1>
-        <p className="text-sm text-neutral-500 mt-1">Manage your daily appointments</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-sans font-semibold text-neutral-900">Appointments</h1>
+            <p className="text-sm text-neutral-500 mt-1">Manage your daily appointments</p>
+          </div>
+          <button onClick={() => setCreateOpen(true)} className="btn-primary whitespace-nowrap">
+            <Plus size={15} className="mr-1" />
+            New Appointment
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
@@ -290,9 +339,32 @@ export default function Appointments() {
                 }]
             : []
         }
+        mode={checkoutMode}
         isStaff={true}
         treatmentNotes={treatmentNotes}
         treatmentRecommendations={recommendations}
+      />
+
+      {/* New Appointment — same drawer the admin calendar uses, so staff get
+          the identical booking, discount, and POS flow. */}
+      <CreateBookingDrawer
+        open={createOpen}
+        date={dateFilter || dayjs().format('YYYY-MM-DD')}
+        services={servicesList}
+        onClose={() => setCreateOpen(false)}
+        onCreate={async (payload) => {
+          try {
+            await appointmentsApi.createGroup(payload);
+            toast.success('Appointment created. Payment is collected at the POS when it is marked complete.');
+            setCreateOpen(false);
+            setDateFilter(payload.appointment_date);
+            fetchAppointments();
+            return true;
+          } catch (err: any) {
+            toast.error(err?.response?.data?.message || 'Failed to create appointment');
+            return false;
+          }
+        }}
       />
 
       {/* Customer Detail Drawer */}

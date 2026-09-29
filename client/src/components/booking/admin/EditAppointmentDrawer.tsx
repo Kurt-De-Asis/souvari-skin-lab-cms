@@ -17,6 +17,8 @@ export interface EditAppointmentPayload {
   end_time?: string;
   notes?: string | null;
   reschedule_reason?: string;
+  discount_pct?: number;
+  discount_reason?: string;
 }
 
 interface EditAppointmentDrawerProps {
@@ -159,6 +161,13 @@ export default function EditAppointmentDrawer({
     date !== dayjs(appointment.date).format('YYYY-MM-DD') || startTime !== appointment.start_time;
   const reasonRequired = rescheduled && !message.trim();
   const invalidTime = !startTime || !derivedEndTime || startTime >= derivedEndTime;
+  // Adding a service to a booking that has already been paid leaves a balance
+  // to collect, which the POS modal raises at completion time.
+  //
+  // There is deliberately no discount control here. The POS modal at completion
+  // is the only place a discount is applied, and any discount it grants is
+  // written back onto the booking then, so an edit form has nothing to edit.
+  const willCreateBalance = servicesChanged && (appointment.paid_amount ?? 0) > 0;
   const canSubmit =
     !locked &&
     selectedServices.length > 0 &&
@@ -333,6 +342,12 @@ export default function EditAppointmentDrawer({
             {servicesChanged && (
               <p className="text-[11px] text-primary-600 mt-1.5">
                 The session will be extended to {derivedEndTime} and the price re-quoted for the customer.
+              </p>
+            )}
+            {willCreateBalance && (
+              <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mt-1.5">
+                ₱{(appointment.paid_amount ?? 0).toLocaleString()} has already been collected. The added
+                service will show as a balance to settle when this booking is marked complete.
               </p>
             )}
           </div>
