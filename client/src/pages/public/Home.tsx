@@ -507,9 +507,13 @@ export default function Home() {
                   <figure className="h-full border border-primary-300/25 bg-charcoal p-7 flex flex-col">
                     <Quote size={22} className="text-primary-300/60" />
                     <Stars rating={r.rating} />
-                    <blockquote className="mt-4 flex-1 text-neutral-300 leading-relaxed line-clamp-5">
-                      {r.feedback}
-                    </blockquote>
+                    {r.feedback ? (
+                      <blockquote className="mt-4 flex-1 text-neutral-300 leading-relaxed line-clamp-5">
+                        {r.feedback}
+                      </blockquote>
+                    ) : (
+                      <div className="flex-1" />
+                    )}
                     <figcaption className="mt-6 border-t border-neutral-700 pt-4">
                       <p className="font-semibold text-neutral-100">{r.author}</p>
                       <p className="mt-1 text-xs uppercase tracking-wide text-neutral-500">

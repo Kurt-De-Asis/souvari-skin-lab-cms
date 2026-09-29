@@ -122,7 +122,7 @@ export class ReviewService {
   }
 
   async getPublicList(query: PublicReviewQuery) {
-    const where: any = { rating: { gte: 4 }, feedback: { not: null } };
+    const where: any = {};
     if (query.service_id) where.service_id = query.service_id;
 
     const [rows, aggregate] = await Promise.all([
@@ -145,23 +145,20 @@ export class ReviewService {
 
     // The public payload intentionally carries no raw customer fields. The author
     // label is derived here so no personally identifiable data leaves the server.
-    const reviews = rows
-      .map((r) => {
-        const feedback = (r.feedback || '').trim();
-        if (!feedback) return null;
-        const firstName = (r.customer?.first_name || '').trim();
-        const lastInitial = (r.customer?.last_name || '').trim().charAt(0);
-        return {
-          id: r.id,
-          rating: r.rating,
-          feedback,
-          created_at: r.created_at,
-          service_name: r.service?.name || null,
-          staff_first_name: r.staff?.first_name || null,
-          author: firstName ? `${firstName}${lastInitial ? ` ${lastInitial}.` : ''}` : 'Souvari client',
-        };
-      })
-      .filter((r): r is NonNullable<typeof r> => r !== null);
+    const reviews = rows.map((r) => {
+      const feedback = (r.feedback || '').trim();
+      const firstName = (r.customer?.first_name || '').trim();
+      const lastInitial = (r.customer?.last_name || '').trim().charAt(0);
+      return {
+        id: r.id,
+        rating: r.rating,
+        feedback,
+        created_at: r.created_at,
+        service_name: r.service?.name || null,
+        staff_first_name: r.staff?.first_name || null,
+        author: firstName ? `${firstName}${lastInitial ? ` ${lastInitial}.` : ''}` : 'Souvari client',
+      };
+    });
 
     return {
       reviews,
