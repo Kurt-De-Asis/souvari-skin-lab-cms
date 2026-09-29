@@ -474,8 +474,7 @@ export default function TimeSlotPicker({
                           </>
                         ) : (
                           <span className="text-red-600">
-                            This time isn't available — the store isn't taking bookings at{' '}
-                            {formatTime(`${String(toHour24(temp.h12, temp.mer)).padStart(2, '0')}:${String(temp.min).padStart(2, '0')}`)}.
+                            This staff member is already booked for this time slot.
                           </span>
                         )
                       ) : (

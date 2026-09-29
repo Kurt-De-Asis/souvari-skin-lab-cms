@@ -5,6 +5,8 @@ export interface BookingAppointment {
   end_time: string;
   status: string;
   notes?: string | null;
+  /** Reason recorded when the booking was cancelled. */
+  cancellation_reason?: string | null;
   customer: { id: number; first_name: string; last_name: string };
   staff: { id: number; first_name: string; last_name: string };
   service: { id: number; name: string };

@@ -241,6 +241,15 @@ export default function AppointmentDetailsDrawer({
           </div>
         )}
 
+        {appointment.status === 'cancelled' && appointment.cancellation_reason && (
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-red-600 mb-1">Cancellation reason</p>
+            <p className="text-sm text-neutral-700 bg-red-50 border border-red-100 rounded-md p-3">
+              {appointment.cancellation_reason}
+            </p>
+          </div>
+        )}
+
         {locked && (
           <div className="flex items-start gap-2.5 rounded-md border border-neutral-200 bg-neutral-50 p-3">
             <Lock size={15} className="text-neutral-400 mt-0.5 flex-shrink-0" />
