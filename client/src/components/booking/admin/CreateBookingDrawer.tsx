@@ -151,9 +151,13 @@ export default function CreateBookingDrawer({
 
   // Live quote follows membership/perk pricing. No money or discount is
   // handled here — the POS modal at Mark Complete is the only payment point.
+  // Post-discount figure: the quoted total is net of any membership savings.
   const finalTotal = quote?.final_total ?? totalPrice;
   const memberDiscount =
     (quote?.membership_discount ?? 0) + (quote?.monthly_perk_discount ?? 0);
+  // Pre-discount catalog value, so the subtotal row and the discount row below
+  // it reconcile to the total rather than the discount being counted twice.
+  const quoteSubtotal = quote?.subtotal ?? totalPrice;
 
   const lineTotal = (serviceId: number) => {
     const item = quote?.items?.find((i) => i.service_id === serviceId);
@@ -802,7 +806,7 @@ export default function CreateBookingDrawer({
                 })}
                 <div className="flex justify-between text-xs pt-1.5 border-t border-neutral-100">
                   <span className="text-neutral-500">Subtotal</span>
-                  <span className="text-neutral-900 font-medium">{formatServicePrice(quote?.subtotal ?? totalPrice)}</span>
+                  <span className="text-neutral-900 font-medium">{formatServicePrice(quoteSubtotal)}</span>
                 </div>
                 {memberDiscount > 0 && (
                   <div className="flex justify-between text-xs">

@@ -2,18 +2,12 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx-js-style';
 import { formatCurrency, formatPercent, formatServicePrice } from '@/utils/format';
+import { statusLabel } from '@/utils/appointmentStatus';
 
 const A4_WIDTH = 210;
 const CONTENT_W = A4_WIDTH - 28;
 const MAX_IMG_H = 60;
 const FOOTER_Y = 288;
-
-const STATUS_LABEL: Record<string, string> = {
-  completed: 'Completed',
-  cancelled: 'Cancelled',
-  no_show: 'No-show',
-  pending: 'Pending',
-};
 
 const HEADER_COLOR: [number, number, number] = [72, 58, 49];
 
@@ -52,7 +46,17 @@ export interface AnalyticsReportData {
   kpis: AnalyticsReportKpi[];
   revenue: { date: string; revenue: number }[];
   prevRevenueByDate: Record<string, number>;
-  appointments: { date: string; total: number; completed: number; cancelled: number; no_show: number; pending: number }[];
+  appointments: {
+    date: string;
+    total: number;
+    pending: number;
+    confirmed: number;
+    checked_in: number;
+    in_progress: number;
+    completed: number;
+    cancelled: number;
+    no_show: number;
+  }[];
   status: { status: string; count: number }[];
   categories: { category: string; revenue: number }[];
   services: { name: string; category: string; price: number | string | null; appointment_count: number; total_revenue: number | string | null }[];
@@ -205,9 +209,13 @@ export function exportAnalyticsPdf(r: AnalyticsReportData, images: ReportChartIm
   renderTable(
     doc,
     cursor,
-    ['Date', 'Total', 'Completed', 'Cancelled', 'No-show', 'Pending'],
-    r.appointments.map((row) => [row.date, row.total, row.completed, row.cancelled, row.no_show, row.pending]),
-    { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } }
+    ['Date', 'Total', 'Pending', 'Confirmed', 'Arrived', 'Started', 'Completed', 'Cancelled', 'No-show'],
+    r.appointments.map((row) => [
+      row.date, row.total,
+      row.pending, row.confirmed, row.checked_in, row.in_progress,
+      row.completed, row.cancelled, row.no_show,
+    ]),
+    { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' } }
   );
 
   // Bookings by status
@@ -217,7 +225,7 @@ export function exportAnalyticsPdf(r: AnalyticsReportData, images: ReportChartIm
     doc,
     cursor,
     ['Status', 'Count'],
-    r.status.map((s) => [STATUS_LABEL[s.status] || s.status, s.count]),
+    r.status.map((s) => [statusLabel(s.status), s.count]),
     { 1: { halign: 'right' } }
   );
 
@@ -432,20 +440,23 @@ export function exportAnalyticsExcel(r: AnalyticsReportData): void {
 
   // ---- Appointments ----
   {
-    const n = 6;
+    const n = 9;
     const rows: CellSpec[][] = [
       bannerCells(n, 'Appointments Analytics'),
-      headerCells(['Date', 'Total', 'Completed', 'Cancelled', 'No-show', 'Pending']),
+      headerCells(['Date', 'Total', 'Pending', 'Confirmed', 'Arrived', 'Started', 'Completed', 'Cancelled', 'No-show']),
       ...r.appointments.map((row, i): CellSpec[] => [
         { v: row.date, fill: altFill(i) },
         { v: row.total, align: 'r', numFmt: whole, fill: altFill(i) },
+        { v: row.pending, align: 'r', numFmt: whole, fill: altFill(i) },
+        { v: row.confirmed, align: 'r', numFmt: whole, fill: altFill(i) },
+        { v: row.checked_in, align: 'r', numFmt: whole, fill: altFill(i) },
+        { v: row.in_progress, align: 'r', numFmt: whole, fill: altFill(i) },
         { v: row.completed, align: 'r', numFmt: whole, fill: altFill(i) },
         { v: row.cancelled, align: 'r', numFmt: whole, fill: altFill(i) },
         { v: row.no_show, align: 'r', numFmt: whole, fill: altFill(i) },
-        { v: row.pending, align: 'r', numFmt: whole, fill: altFill(i) },
       ]),
     ];
-    makeSheet(wb, 'Appointments', rows, [18, 12, 14, 14, 14, 14], [{ s: { r: 0, c: 0 }, e: { r: 0, c: n - 1 } }], { 0: 26, 1: 18 });
+    makeSheet(wb, 'Appointments', rows, [18, 10, 11, 12, 11, 11, 12, 12, 12], [{ s: { r: 0, c: 0 }, e: { r: 0, c: n - 1 } }], { 0: 26, 1: 18 });
   }
 
   // ---- Bookings by status ----
@@ -455,7 +466,7 @@ export function exportAnalyticsExcel(r: AnalyticsReportData): void {
       bannerCells(n, 'Bookings by Status'),
       headerCells(['Status', 'Count']),
       ...r.status.map((s, i): CellSpec[] => [
-        { v: STATUS_LABEL[s.status] || s.status, fill: altFill(i) },
+        { v: statusLabel(s.status), fill: altFill(i) },
         { v: s.count, align: 'r', numFmt: whole, fill: altFill(i) },
       ]),
     ];

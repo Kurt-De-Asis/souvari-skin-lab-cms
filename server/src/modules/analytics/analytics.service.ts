@@ -74,7 +74,7 @@ class AnalyticsService {
 
     const lowStockResult = await prisma.$queryRaw<{ count: number }[]>`
       SELECT COUNT(*) as count FROM products
-      WHERE deleted_at IS NULL AND current_stock <= minimum_stock
+      WHERE deleted_at IS NULL AND current_stock > 0 AND current_stock <= minimum_stock
     `;
     const lowStockCount = Number(lowStockResult[0]?.count || 0);
 
@@ -159,7 +159,16 @@ class AnalyticsService {
     for (const a of appointments) {
       const key = new Date(a.appointment_date).toISOString().split('T')[0];
       if (!grouped[key]) {
-        grouped[key] = { total: 0, completed: 0, cancelled: 0, no_show: 0, pending: 0 };
+        grouped[key] = {
+          total: 0,
+          pending: 0,
+          confirmed: 0,
+          checked_in: 0,
+          in_progress: 0,
+          completed: 0,
+          cancelled: 0,
+          no_show: 0,
+        };
       }
       grouped[key].total += 1;
       if (grouped[key][a.status] !== undefined) {
@@ -216,7 +225,7 @@ class AnalyticsService {
       }),
       prisma.$queryRaw<{ count: number }[]>`
         SELECT COUNT(*) as count FROM products
-        WHERE deleted_at IS NULL AND current_stock <= minimum_stock
+        WHERE deleted_at IS NULL AND current_stock > 0 AND current_stock <= minimum_stock
       `,
       prisma.$queryRaw<{ count: number }[]>`
         SELECT COUNT(*) as count FROM products

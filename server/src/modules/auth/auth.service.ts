@@ -2,23 +2,26 @@ import prisma from '../../config/database';
 import { hashPassword, comparePassword } from '../../utils/password';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken, TokenPayload } from '../../utils/jwt';
 import { AppError } from '../../middleware/errorHandler';
+import { resolveIdentityFields } from '../../utils/identity';
 import { RegisterInput, LoginInput } from './auth.validation';
 
 export class AuthService {
   async register(data: RegisterInput) {
-    const existingUser = await prisma.users.findUnique({ where: { email: data.email } });
-    if (existingUser) {
-      throw new AppError('Email already registered', 409);
-    }
+    // Normalises and rejects duplicate email / phone before touching the DB, so
+    // a clash is a clear 409 rather than a raw unique-constraint failure.
+    const { email, phone } = await resolveIdentityFields({
+      email: data.email,
+      phone: data.phone,
+    });
 
     const passwordHash = await hashPassword(data.password);
 
     const user = await prisma.users.create({
       data: {
-        email: data.email,
+        email: email!,
         password_hash: passwordHash,
         role: 'customer',
-        phone: data.phone,
+        phone,
         customer: {
           create: {
             first_name: data.first_name,

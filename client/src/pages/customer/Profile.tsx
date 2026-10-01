@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { User, Save, Phone } from 'lucide-react';
+import { User, Save, Phone, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 import { customersApi } from '@/api';
@@ -20,6 +20,8 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [phoneInput, setPhoneInput] = useState('');
   const [phoneSaving, setPhoneSaving] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [emailSaving, setEmailSaving] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors, isDirty } } = useForm<ProfileForm>();
 
@@ -36,6 +38,7 @@ export default function Profile() {
           address: c.address || '',
         });
         setPhoneInput(c.user?.phone || c.phone || '');
+        setEmailInput(c.user?.email || '');
       } catch {
         toast.error('Failed to load profile');
       } finally {
@@ -72,6 +75,28 @@ export default function Profile() {
     }
   };
 
+  const onEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const next = emailInput.trim();
+    if (!next) {
+      toast.error('Email cannot be empty');
+      return;
+    }
+    setEmailSaving(true);
+    try {
+      // The server rejects an address already held by an admin or staff account,
+      // so this can only ever move the customer's own login.
+      await customersApi.updateMe({ email: next });
+      await refreshUser();
+      setEmailInput(next);
+      toast.success('Email updated successfully');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to update email');
+    } finally {
+      setEmailSaving(false);
+    }
+  };
+
   if (loading) return <LoadingSpinner fullScreen />;
 
   return (
@@ -105,6 +130,28 @@ export default function Profile() {
           >
             <Phone size={16} />
             {phoneSaving ? 'Updating...' : 'Update Phone Number'}
+          </button>
+        </form>
+
+        <form onSubmit={onEmailSubmit} className="space-y-2 mt-6">
+          <label className="label">Email Address</label>
+          <input
+            type="email"
+            value={emailInput}
+            onChange={(e) => setEmailInput(e.target.value)}
+            className="input-field"
+            placeholder="you@example.com"
+          />
+          <p className="text-xs text-neutral-400">
+            This is also your sign-in address. It must not be one already used by a staff account.
+          </p>
+          <button
+            type="submit"
+            disabled={emailSaving || emailInput.trim() === (user?.email || '')}
+            className="btn-primary mt-2"
+          >
+            <Mail size={16} />
+            {emailSaving ? 'Updating...' : 'Update Email Address'}
           </button>
         </form>
 

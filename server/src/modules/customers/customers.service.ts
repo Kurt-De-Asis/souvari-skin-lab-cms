@@ -2,6 +2,7 @@ import prisma from '../../config/database';
 import { hashPassword } from '../../utils/password';
 import { AppError } from '../../middleware/errorHandler';
 import { PaginationParams, getPaginationParams, createPaginatedResult } from '../../utils/pagination';
+import { resolveIdentityFields } from '../../utils/identity';
 import {
   CreateCustomerInput,
   UpdateCustomerInput,
@@ -78,19 +79,19 @@ export class CustomerService {
   }
 
   async create(data: CreateCustomerInput) {
-    const existingUser = await prisma.users.findUnique({ where: { email: data.email } });
-    if (existingUser) {
-      throw new AppError('Email already registered', 409);
-    }
+    const { email, phone } = await resolveIdentityFields({
+      email: data.email,
+      phone: data.phone,
+    });
 
     const passwordHash = await hashPassword(data.password);
 
     const customer = await prisma.users.create({
       data: {
-        email: data.email,
+        email: email!,
         password_hash: passwordHash,
         role: 'customer',
-        phone: data.phone,
+        phone,
         customer: {
           create: {
             first_name: data.first_name,
@@ -118,16 +119,17 @@ export class CustomerService {
   // name (required) plus optional phone/notes.
   async createWalkIn(data: WalkInCustomerInput) {
     const rawEmail = data.email?.trim();
-    let email: string;
-    if (rawEmail) {
-      const existingUser = await prisma.users.findUnique({ where: { email: rawEmail } });
-      if (existingUser) {
-        throw new AppError('Email already registered', 409);
-      }
-      email = rawEmail;
-    } else {
-      email = `walkin.${Date.now()}.${randomBytes(4).toString('hex')}@souvariskinlab.local`;
-    }
+
+    // A walk-in still gets a `users` row, so its email and phone are subject to the
+    // same uniqueness rules as a self-registered account. Without this the unique
+    // index would reject a duplicate phone as an opaque 500 at write time.
+    const identity = rawEmail
+      ? await resolveIdentityFields({ email: rawEmail, phone: data.phone })
+      : await resolveIdentityFields({ phone: data.phone });
+
+    const email =
+      identity.email ??
+      `walkin.${Date.now()}.${randomBytes(4).toString('hex')}@souvariskinlab.local`;
 
     const passwordHash = await hashPassword(randomBytes(12).toString('hex'));
 
@@ -136,7 +138,7 @@ export class CustomerService {
         email,
         password_hash: passwordHash,
         role: 'customer',
-        phone: data.phone || null,
+        phone: identity.phone ?? null,
         customer: {
           create: {
             first_name: data.first_name,
@@ -159,17 +161,12 @@ export class CustomerService {
 
     const { phone, email, password, ...customerData } = data;
 
-    // Email is the customer's login identity, so reject a duplicate up front
-    // instead of letting the unique constraint surface as a 500.
-    if (email !== undefined) {
-      const taken = await prisma.users.findFirst({
-        where: { email, id: { not: customer.user_id } },
-        select: { id: true },
-      });
-      if (taken) {
-        throw new AppError('Email already registered', 409);
-      }
-    }
+    // Email and phone are the customer's login identity, so reject a duplicate
+    // up front instead of letting the unique constraint surface as a 500.
+    const identity = await resolveIdentityFields(
+      { email, phone },
+      customer.user_id,
+    );
 
     const nullableFields = ['date_of_birth', 'address', 'city', 'state', 'postal_code', 'notes', 'avatar_url', 'gender'];
     const updateData: any = {};
@@ -187,8 +184,8 @@ export class CustomerService {
 
     if (phone !== undefined || email !== undefined || password !== undefined) {
       const userUpdate: any = {};
-      if (phone !== undefined) userUpdate.phone = phone || null;
-      if (email !== undefined) userUpdate.email = email;
+      if (identity.phone !== undefined) userUpdate.phone = identity.phone;
+      if (identity.email !== undefined) userUpdate.email = identity.email;
       if (password !== undefined) userUpdate.password_hash = await hashPassword(password);
       await prisma.users.update({ where: { id: customer.user_id }, data: userUpdate });
     }
@@ -238,6 +235,10 @@ export class CustomerService {
 
     const { phone, email, ...customerData } = data;
 
+    // Self-service identity edits go through the same uniqueness gate as the
+    // admin paths, so a customer cannot claim a staff member's email or phone.
+    const identity = await resolveIdentityFields({ email, phone }, userId);
+
     const nullableFields = ['date_of_birth', 'address', 'city', 'state', 'postal_code', 'notes', 'avatar_url', 'gender'];
     const updateData: any = {};
     for (const key of Object.keys(customerData) as (keyof typeof customerData)[]) {
@@ -254,8 +255,8 @@ export class CustomerService {
 
     if (phone !== undefined || email !== undefined) {
       const userUpdate: any = {};
-      if (phone !== undefined) userUpdate.phone = phone || null;
-      if (email !== undefined) userUpdate.email = email;
+      if (identity.phone !== undefined) userUpdate.phone = identity.phone;
+      if (identity.email !== undefined) userUpdate.email = identity.email;
       await prisma.users.update({ where: { id: userId }, data: userUpdate });
     }
 

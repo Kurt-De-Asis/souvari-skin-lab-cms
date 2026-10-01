@@ -76,7 +76,8 @@ export default function MembershipManager({ mode }: Props) {
   const [plans, setPlans] = useState<any[]>([]);
   const [selectedPlanPrice, setSelectedPlanPrice] = useState(0);
 
-  const CUSTOMER_PAYMENT_METHODS = ['gcash', 'gotyme', 'rcbc'];
+  // Store-side methods only — staff collect against whatever the customer hands
+  // over at the counter, so Cash has to be selectable here.
   const STORE_PAYMENT_METHODS = ['cash', 'gcash', 'gotyme', 'rcbc'];
   const PAYMENT_TYPES = ['FULL', 'DOWN_PAYMENT'];
 
@@ -165,6 +166,7 @@ export default function MembershipManager({ mode }: Props) {
 
   const handleStatusAction = async () => {
     if (!actionId) return;
+    setSubmitting(true);
     try {
       await membershipsApi.updateStatus(actionId.id, { status: actionId.action });
       toast.success(`Membership ${actionId.action === 'active' ? 'activated' : actionId.action === 'suspended' ? 'suspended' : actionId.action === 'failed' ? 'marked failed' : 'cancelled'}`);
@@ -172,6 +174,8 @@ export default function MembershipManager({ mode }: Props) {
       fetchMemberships();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Action failed');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -401,7 +405,7 @@ export default function MembershipManager({ mode }: Props) {
             <div>
               <label className="label">Payment Method</label>
               <select className="select-field" {...register('payment_method')}>
-                {CUSTOMER_PAYMENT_METHODS.map(m => (
+                {STORE_PAYMENT_METHODS.map(m => (
                   <option key={m} value={m}>{formatPaymentMethod(m)}</option>
                 ))}
               </select>
@@ -519,9 +523,19 @@ export default function MembershipManager({ mode }: Props) {
           Are you sure you want to {actionId?.action === 'suspended' ? 'suspend' : actionId?.action === 'cancelled' ? 'cancel' : actionId?.action === 'failed' ? 'mark as failed' : 'activate'} this membership?
         </p>
         <div className="flex justify-end gap-3">
-          <button onClick={() => setActionId(null)} className="btn-secondary">Cancel</button>
-          <button onClick={handleStatusAction} className="btn-primary">
-            {actionId?.action === 'active' ? 'Activate' : actionId?.action === 'suspended' ? 'Suspend' : actionId?.action === 'failed' ? 'Mark Failed' : 'Cancel'}
+          <button type="button" onClick={() => setActionId(null)} className="btn-secondary" disabled={submitting}>Cancel</button>
+          {/* Cancelling used to render two buttons both labelled "Cancel". The
+              destructive action answers the prompt, so it says "Yes". */}
+          <button type="button" onClick={handleStatusAction} disabled={submitting} className="btn-primary">
+            {submitting
+              ? 'Working...'
+              : actionId?.action === 'active'
+                ? 'Activate'
+                : actionId?.action === 'suspended'
+                  ? 'Suspend'
+                  : actionId?.action === 'failed'
+                    ? 'Mark Failed'
+                    : 'Yes'}
           </button>
         </div>
       </Modal>

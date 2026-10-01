@@ -9,6 +9,7 @@ import {
   UpdateSchedulesInput,
   AssignServiceInput,
 } from './staff.validation';
+import { resolveIdentityFields } from '../../utils/identity';
 
 const staffInclude = {
   user: {
@@ -100,14 +101,14 @@ export class StaffService {
       if (!data.email || !data.password) {
         throw new AppError('Provide an existing user_id or an email and password to create a staff account', 400);
       }
-      const existingEmail = await prisma.users.findUnique({ where: { email: data.email } });
-      if (existingEmail) {
-        throw new AppError('Email already registered', 409);
-      }
+      const identity = await resolveIdentityFields({
+        email: data.email,
+        phone: data.phone,
+      });
       const newUser = await prisma.users.create({
         data: {
-          email: data.email,
-          phone: data.phone ?? null,
+          email: identity.email!,
+          phone: identity.phone,
           password_hash: await hashPassword(data.password),
           role: 'staff',
           status: 'active',
@@ -184,13 +185,14 @@ export class StaffService {
       }
 
       if (data.email !== undefined && data.email !== existingUser.email) {
-        const taken = await prisma.users.findUnique({ where: { email: data.email } });
-        if (taken && taken.id !== existingUser.id) {
-          throw new AppError('Email already in use by another account', 409);
-        }
-        userUpdate.email = data.email;
+        // Let the global identity guard catch cross-role collisions
+        const identity = await resolveIdentityFields({ email: data.email }, existingUser.id);
+        userUpdate.email = identity.email!;
       }
-      if (data.phone !== undefined) userUpdate.phone = data.phone;
+      if (data.phone !== undefined) {
+        const identity = await resolveIdentityFields({ phone: data.phone }, existingUser.id);
+        userUpdate.phone = identity.phone;
+      }
       if (data.password !== undefined) userUpdate.password_hash = await hashPassword(data.password);
     }
 

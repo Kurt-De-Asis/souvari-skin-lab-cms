@@ -55,7 +55,7 @@ export default function CheckoutModal({
     final_total: number;
     benefits: string[];
     perks_applied: string[];
-    items: { service_id: number; quantity: number; unit_amount: number; line_total: number }[];
+    items: { service_id: number; quantity: number; unit_amount: number; line_total: number; discount?: number }[];
   } | null>(null);
   const [discountPct, setDiscountPct] = useState(0);
   const [discountReason, setDiscountReason] = useState('');
@@ -144,10 +144,14 @@ export default function CheckoutModal({
     );
   }, [quote]);
 
+  // Staff/comp discount applies to what the customer actually owes — the quoted
+  // total, which is already net of the membership discount. Applying it to the
+  // pre-discount subtotal would discount the membership saving a second time.
   const computedDiscount = useMemo(() => {
     if (!quote && !balanceInfo) return 0;
-    if (paidOnUs) return baseTotal;
-    if (discountPct > 0) return (baseTotal * discountPct) / 100;
+    const peso = (n: number) => Math.round(n * 100) / 100;
+    if (paidOnUs) return peso(baseTotal);
+    if (discountPct > 0) return peso((baseTotal * discountPct) / 100);
     return 0;
   }, [quote, balanceInfo, discountPct, paidOnUs, baseTotal]);
 
@@ -171,9 +175,13 @@ export default function CheckoutModal({
     setError('');
 
     try {
-      // In balance mode, bill only the services no prior transaction covered.
-      // The booking's discount share rides on each line's `discount`, leaving
-      // `unit_price` as the real service price for reporting.
+      // `unit_price` is always the pre-discount catalog amount, so the stored
+      // transaction's subtotal is the true value of the services. Every
+      // reduction — membership, monthly perk, and any staff discount — is then
+      // recorded once as the transaction-level discount. Recording a discount on
+      // the items *and* at the transaction level is what double-charged
+      // members, so the items carry no discount of their own.
+      const round = (n: number) => Math.round(n * 100) / 100;
       const items = isBalanceMode
         ? (balanceInfo?.uncovered_services ?? []).map((line) => {
             const lineTotal = line.line_total ?? line.price;
@@ -182,7 +190,6 @@ export default function CheckoutModal({
               description: line.name,
               quantity: 1,
               unit_price: line.price,
-              discount: Math.round((line.price - lineTotal) * 100) / 100,
               tax: 0,
               line_total: lineTotal,
             };
@@ -192,7 +199,6 @@ export default function CheckoutModal({
             description: services.find((s) => s.id === item.service_id)?.name ?? `Service #${item.service_id}`,
             quantity: item.quantity,
             unit_price: item.unit_amount,
-            discount: 0,
             tax: 0,
             line_total: item.line_total,
           }));
@@ -203,12 +209,20 @@ export default function CheckoutModal({
         return;
       }
 
+      // The membership and perk savings already baked into the quoted amount,
+      // so the manual discount lands on what the customer actually owes.
+      const bookedDiscount = isBalanceMode
+        ? round(items.reduce((sum, l) => sum + (l.unit_price - (l.line_total ?? l.unit_price)), 0))
+        : memberPerkDiscount;
+      const totalDiscount = round(bookedDiscount + computedDiscount);
+
       const payload = {
         customer_id: customerId,
         staff_id: staffId,
         appointment_id: appointmentId ?? null,
         type: 'sale' as const,
         items,
+        discount_amount: totalDiscount > 0 ? totalDiscount : undefined,
         discount_pct: paidOnUs ? 100 : discountPct || undefined,
         discount_reason: buildDiscountReason(discountPct, paidOnUs, discountReason),
         discount_applied_by: staffId,
@@ -305,6 +319,7 @@ export default function CheckoutModal({
                   </>
                 ) : (
                   <>
+                    {/* Pre-discount catalog value of the services. */}
                     <div className="flex justify-between text-sm">
                       <span className="text-neutral-600">Subtotal</span>
                       <span>{formatServicePrice(quote!.subtotal)}</span>

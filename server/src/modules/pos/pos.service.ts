@@ -2,13 +2,12 @@ import { Decimal } from '@prisma/client/runtime/library';
 import prisma from '../../config/database';
 import pricingService from '../../services/pricing.service';
 import { roundPeso } from '../../services/pricing-engine.core';
+import { computeQuoteLine, sumQuoteLines, type QuoteLine } from './pos-quote-math';
 
 class POSService {
   async getQuote(data: any) {
     const results = [];
-    let subtotal = 0;
-    let totalMembershipDiscount = 0;
-    let totalMonthlyPerkDiscount = 0;
+    const lines: QuoteLine[] = [];
     let allBenefits: string[] = [];
     let allPerks: string[] = [];
     let anyNeedsVerification = false;
@@ -24,31 +23,53 @@ class POSService {
         data.customer_id
       );
 
-      subtotal += pricing.applicablePrice;
-      totalMembershipDiscount += pricing.membershipDiscount;
-      totalMonthlyPerkDiscount += pricing.monthlyPerkDiscount;
+      // `calculatePrice` returns per-unit figures, so the line math multiplies
+      // them by quantity. `subtotal` is the catalogue value of the services —
+      // what they are worth before any discount — while `applicablePrice` is
+      // already reduced, so accumulating the gross and subtracting each discount
+      // exactly once keeps the rows consistent:
+      // subtotal - membership - monthlyPerk === final_total.
+      const line = computeQuoteLine({
+        basePrice: pricing.basePrice,
+        applicablePrice: pricing.applicablePrice,
+        priceType: pricing.priceType,
+        monthlyPerkDiscount: pricing.monthlyPerkDiscount,
+        quantity: item.quantity,
+      });
+
       allBenefits.push(...pricing.benefits);
       allPerks.push(...pricing.perksApplied);
       if (pricing.needsVerification) anyNeedsVerification = true;
 
+      lines.push(line);
       results.push({
         service_id: item.service_id,
         variant_id: item.variant_id,
         audience: pricing.priceType,
-        unit_amount: pricing.applicablePrice / (item.quantity || 1),
-        quantity: item.quantity || 1,
-        line_total: pricing.applicablePrice,
+        unit_amount: line.unit_amount,
+        quantity: line.quantity,
+        line_total: line.line_total,
+        discount: line.discount,
+        monthly_perk_discount: line.monthlyPerkDiscount,
         warnings: pricing.priceBreakdown[0]?.warnings ?? [],
       });
     }
 
-    const finalTotal = roundPeso(subtotal - totalMonthlyPerkDiscount);
+    // Round once, at the end, off the accumulated figures. Rounding the
+    // discounts individually but not here leaves a stray cent between the
+    // displayed rows and the charged total.
+    const {
+      subtotal: roundedSubtotal,
+      membership_discount: roundedMembershipDiscount,
+      monthly_perk_discount: roundedMonthlyPerkDiscount,
+      final_total: finalTotal,
+    } = sumQuoteLines(lines);
 
     return {
       items: results,
-      subtotal: roundPeso(subtotal),
-      membership_discount: roundPeso(totalMembershipDiscount),
-      monthly_perk_discount: roundPeso(totalMonthlyPerkDiscount),
+      subtotal: roundedSubtotal,
+      membership_discount: roundedMembershipDiscount,
+      monthly_perk_discount: roundedMonthlyPerkDiscount,
       final_total: Math.max(0, finalTotal),
       benefits: [...new Set(allBenefits)],
       perks_applied: [...new Set(allPerks)],

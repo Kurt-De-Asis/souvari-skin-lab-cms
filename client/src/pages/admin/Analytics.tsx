@@ -17,6 +17,7 @@ import ChartCard from '@/components/analytics/ChartCard';
 import DeltaBadge from '@/components/analytics/DeltaBadge';
 import StaffPerformanceTable, { StaffPerformanceRow } from '@/components/analytics/StaffPerformanceTable';
 import { formatCurrency, formatNumber, formatMinutesHours, formatPercent, percentChange } from '@/utils/format';
+import { ALL_APPOINTMENT_STATUSES, APPOINTMENT_STATUS_META } from '@/utils/appointmentStatus';
 import {
   exportAnalyticsPdf,
   exportAnalyticsExcel,
@@ -38,6 +39,9 @@ interface AppointmentData {
   cancelled: number;
   no_show: number;
   pending: number;
+  confirmed: number;
+  checked_in: number;
+  in_progress: number;
 }
 
 interface StatusData {
@@ -78,16 +82,23 @@ interface SummaryData {
   staff: StaffPerformanceRow[];
 }
 
-type PresetRange = 'today' | 'week' | 'month' | 'last_month' | 'last_30_days' | 'custom';
+type PresetRange = 'today' | 'week' | 'month' | 'last_month' | 'last_30_days';
 type CompareMode = 'previous_period' | 'none';
 type GroupBy = 'day' | 'week' | 'month';
 
-const STATUS_META: Record<string, { color: string; label: string }> = {
-  completed: { color: '#16a34a', label: 'Completed' },
-  cancelled: { color: '#ef4444', label: 'Cancelled' },
-  no_show: { color: '#dc2626', label: 'No-show' },
-  pending: { color: '#f59e0b', label: 'Pending' },
-};
+/**
+ * Colour/label per status, sourced from the shared appointment-status map so
+ * the analytics chart, the booking calendar and the status pills can never
+ * drift apart. Every status in `ALL_APPOINTMENT_STATUSES` needs an entry here
+ * or it renders as an unlabelled grey block.
+ */
+const STATUS_META: Record<string, { color: string; label: string }> =
+  Object.fromEntries(
+    ALL_APPOINTMENT_STATUSES.map((status) => [
+      status,
+      { color: APPOINTMENT_STATUS_META[status].dot, label: APPOINTMENT_STATUS_META[status].label },
+    ])
+  );
 
 const PRESET_OPTIONS: { label: string; value: PresetRange }[] = [
   { label: 'Last 30 Days', value: 'last_30_days' },
@@ -95,7 +106,6 @@ const PRESET_OPTIONS: { label: string; value: PresetRange }[] = [
   { label: 'This Week', value: 'week' },
   { label: 'This Month', value: 'month' },
   { label: 'Last Month', value: 'last_month' },
-  { label: 'Custom', value: 'custom' },
 ];
 
 const DOUGHNUT_COLORS = [
@@ -118,6 +128,9 @@ function resolveData<T>(result: PromiseSettledResult<any>, path: (data: any) => 
 export default function Analytics() {
   const [loading, setLoading] = useState(true);
   const [preset, setPreset] = useState<PresetRange>('last_30_days');
+  /** True once the From/To inputs have been edited, so the preset select can
+   *  show a non-actionable "Custom Range" instead of mislabelling the dates. */
+  const [customDates, setCustomDates] = useState(false);
   const [dateFrom, setDateFrom] = useState(dayjs().subtract(29, 'day').format('YYYY-MM-DD'));
   const [dateTo, setDateTo] = useState(dayjs().format('YYYY-MM-DD'));
   const [compare, setCompare] = useState<CompareMode>('previous_period');
@@ -136,6 +149,7 @@ export default function Analytics() {
 
   const applyPreset = useCallback((p: PresetRange) => {
     setPreset(p);
+    setCustomDates(false);
     const today = dayjs();
     switch (p) {
       case 'today':
@@ -423,10 +437,13 @@ export default function Analytics() {
           <div className="relative">
             <select
               className="select-field pr-8"
-              value={preset}
+              value={customDates ? '' : preset}
               onChange={(e) => applyPreset(e.target.value as PresetRange)}
               aria-label="Date range preset"
             >
+              {customDates && (
+                <option value="" disabled>Custom Range</option>
+              )}
               {PRESET_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
@@ -492,7 +509,7 @@ export default function Analytics() {
                 type="date"
                 className="input-field w-auto"
                 value={dateFrom}
-                onChange={(e) => { setPreset('custom'); setDateFrom(e.target.value); }}
+                onChange={(e) => { setCustomDates(true); setDateFrom(e.target.value); }}
               />
             </div>
             <div>
@@ -501,7 +518,7 @@ export default function Analytics() {
                 type="date"
                 className="input-field w-auto"
                 value={dateTo}
-                onChange={(e) => { setPreset('custom'); setDateTo(e.target.value); }}
+                onChange={(e) => { setCustomDates(true); setDateTo(e.target.value); }}
               />
             </div>
             <div>
@@ -647,9 +664,9 @@ export default function Analytics() {
             <ChartCard icon={ClipboardList} title="Bookings by Status" subtitle="Breakdown of appointment statuses">
               <div className="h-72" data-chart="status">
                 {statusData.some((s) => s.count > 0) ? (
-                  <div className="flex items-center justify-center h-full text-sm text-neutral-400">No status data for this period</div>
-                ) : (
                   <Bar data={statusBarData} options={statusBarOptions as any} />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-sm text-neutral-400">No status data for this period</div>
                 )}
               </div>
             </ChartCard>

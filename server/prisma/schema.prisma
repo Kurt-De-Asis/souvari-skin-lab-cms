@@ -16,7 +16,9 @@ model users {
   password_hash   String    @db.VarChar(255)
   role            UserRole  @default(customer)
   status          UserStatus @default(active)
-  phone           String?   @db.VarChar(20)
+  // Unique across every role so a customer cannot claim a staff member's
+  // number. Nullable, so accounts without a phone may still coexist.
+  phone           String?   @unique @db.VarChar(20)
   email_verified_at DateTime?
   last_login_at   DateTime?
   created_at      DateTime  @default(now())

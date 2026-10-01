@@ -16,6 +16,32 @@ import {
 } from './services.validation';
 
 class ServicesService {
+  /**
+   * `service_categories` and `service_groups` are two parallel tables seeded 1:1
+   * from the same catalog sections, so a category name maps to exactly one group.
+   * Admin only ever picks a category, but the public site groups services by
+   * `service_groups`, so an unresolved `group_id` makes the service appear in a
+   * phantom group of its own. Resolve it from the category name here.
+   */
+  private async resolveGroupId(categoryId: number | null | undefined, groupId?: number | null): Promise<number | null> {
+    if (groupId != null) return groupId;
+    if (categoryId == null) return null;
+
+    const category = await prisma.service_categories.findUnique({
+      where: { id: categoryId },
+      select: { id: true, name: true },
+    });
+    if (!category) {
+      throw new AppError('Category not found', 400);
+    }
+
+    const group = await prisma.service_groups.findFirst({
+      where: { name: category.name },
+      select: { id: true },
+    });
+    return group?.id ?? null;
+  }
+
   private categoryLabel(category: string): string {
     const labels: Record<string, string> = {
       facial: 'Facial',
@@ -267,6 +293,7 @@ class ServicesService {
         description: data.description,
         category: data.category,
         category_id: data.category_id,
+        group_id: await this.resolveGroupId(data.category_id, data.group_id),
         price: data.price,
         duration_minutes: data.duration_minutes,
         image_url: data.image_url,
@@ -287,9 +314,26 @@ class ServicesService {
       throw new AppError('Service not found', 404);
     }
 
+    const { group_id, ...rest } = data;
+    // An explicit `null` in the payload clears the field; an absent one keeps
+    // the stored value. Re-picking a different category has to re-resolve the
+    // group, otherwise the service stays filed under the old section. Editing a
+    // service that predates group resolution also repairs it, since the group is
+    // re-derived whenever it is still missing.
+    const categoryChanged = data.category_id !== undefined && data.category_id !== existing.category_id;
+    const nextCategoryId = data.category_id !== undefined ? data.category_id : existing.category_id;
+    const nextGroupId = group_id !== undefined
+      ? group_id
+      : categoryChanged
+        ? null
+        : existing.group_id;
+
     const service = await prisma.services.update({
       where: { id },
-      data,
+      data: {
+        ...rest,
+        group_id: await this.resolveGroupId(nextCategoryId, nextGroupId),
+      },
     });
 
     return service;

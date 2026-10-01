@@ -40,6 +40,27 @@ function serviceCategoryName(s: { category?: string; category_name?: string | nu
   return s.group?.name ?? s.category_name ?? s.category ?? '';
 }
 
+interface GroupableService {
+  category?: string;
+  category_name?: string | null;
+  group?: { slug?: string | null; name?: string | null } | null;
+}
+
+/**
+ * Services are grouped by their `service_groups` slug, but one created from the
+ * admin panel carries only a `category_id`. Keying such a service off the
+ * category enum would render a second section under the same heading, so route
+ * it through its category name to the slug the rest of that section uses.
+ */
+function makeGroupKeyResolver(services: GroupableService[]): (s: GroupableService) => string {
+  const slugByName = new Map<string, string>();
+  for (const s of services) {
+    const slug = s.group?.slug;
+    if (slug) slugByName.set(serviceCategoryName(s), slug);
+  }
+  return (s) => s.group?.slug ?? slugByName.get(serviceCategoryName(s)) ?? serviceGroupKey(s);
+}
+
 function cleanGroupDescription(d?: string | null): string {
   return (d ?? '').replace(/\s*Base retail pricing from README.*$/i, '');
 }
@@ -183,10 +204,12 @@ export default function BookingPage({ embedded = false }: { embedded?: boolean }
   const isScheduleStep = useCallback((s: number) => (isSingle ? s === SINGLE_SCHEDULE_STEP : s === MULTI_SCHEDULE_STEP), [isSingle]);
   const isDetailsStep = useCallback((s: number) => (isSingle ? s === SINGLE_DETAILS_STEP : s === MULTI_DETAILS_STEP), [isSingle]);
 
+  const resolveGroupKey = useMemo(() => makeGroupKeyResolver(allServices), [allServices]);
+
   const groups = useMemo<BookingGroup[]>(() => {
     const byKey = new Map<string, { label: string; description: string; order: number; count: number }>();
     for (const s of allServices) {
-      const key = serviceGroupKey(s);
+      const key = resolveGroupKey(s);
       const existing = byKey.get(key);
       if (existing) {
         existing.count++;
@@ -202,7 +225,7 @@ export default function BookingPage({ embedded = false }: { embedded?: boolean }
     return [...byKey.entries()]
       .map(([key, v]) => ({ key, label: v.label, description: v.description, count: v.count }))
       .sort((a, b) => (byKey.get(a.key)!.order - byKey.get(b.key)!.order));
-  }, [allServices]);
+  }, [allServices, resolveGroupKey]);
 
   const activeGroup = useMemo(() => groups.find((g) => g.key === selectedGroup) || null, [groups, selectedGroup]);
 
@@ -289,7 +312,7 @@ export default function BookingPage({ embedded = false }: { embedded?: boolean }
         if (preselectedServiceId) {
           const found = all.find((s: Service) => s.id === preselectedServiceId);
           if (found) {
-            setSelectedGroup(serviceGroupKey(found));
+            setSelectedGroup(makeGroupKeyResolver(all)(found));
             setSelectedServices([found]);
           }
         }
@@ -417,10 +440,10 @@ export default function BookingPage({ embedded = false }: { embedded?: boolean }
 
   const treatmentServices = useMemo(() => {
     if (!selectedGroup) return [];
-    const grouped = allServices.filter((s) => serviceGroupKey(s) === selectedGroup);
+    const grouped = allServices.filter((s) => resolveGroupKey(s) === selectedGroup);
     if (!consultationService) return grouped;
     return [consultationService, ...grouped.filter((s) => s.id !== consultationService.id)];
-  }, [selectedGroup, allServices, consultationService]);
+  }, [selectedGroup, allServices, consultationService, resolveGroupKey]);
 
   const availableStaff = useMemo(() => {
     const seen = new Map<number, string>();

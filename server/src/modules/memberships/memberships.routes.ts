@@ -27,8 +27,11 @@ router.get('/me', membershipsController.getMyMembership);
 
 router.get('/validate/:code', membershipsController.validateCode);
 
+// Self-service enrolment is closed: only admin/staff may put a customer on a
+// plan. Kept for admin-side flows that reuse the avail handler.
 router.post(
   '/avail',
+  authorize('admin', 'staff'),
   validate(availMembershipSchema),
   membershipsController.availPlan
 );
@@ -56,8 +59,11 @@ router.put(
   membershipsController.extend
 );
 
+// "I'll pay at the store" is a customer-initiated purchase step, so it is
+// staff-only. Balances are collected through the admin collect-payment route.
 router.post(
   '/:id/pay-in-store',
+  authorize('admin', 'staff'),
   membershipsController.requestPayInStore
 );
 

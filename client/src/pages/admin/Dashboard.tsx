@@ -331,17 +331,21 @@ export default function Dashboard() {
           { icon: <Users size={20} />, iconBg: 'bg-purple-50 text-primary-700', label: 'Customers', body: formatNumber(monthly?.total_customers ?? 0) },
           { icon: <AlertTriangle size={20} />, iconBg: 'bg-red-50 text-red-600', label: 'Low Stock Alerts', body: formatNumber(monthly?.low_stock_count ?? 0) },
         ].map((k, i) => (
-          <Reveal key={k.label} delay={Math.min(i * 60, 180)}>
-            <div className={`card shadow-sm ${k.iconWrap ?? ''}`}>
+          <Reveal key={k.label} delay={Math.min(i * 60, 180)} className="h-full">
+            <div className={`card shadow-sm h-full ${k.iconWrap ?? ''}`}>
               <div className={`p-3 rounded-md ${k.iconBg} w-fit`}>{k.icon}</div>
-              <p className="text-xs text-neutral-500 font-medium mt-3">{k.label}</p>
-              <p className="num text-3xl text-neutral-900 mt-1">{k.body}</p>
-              {k.extra !== undefined && (
-                <p className="text-xs text-neutral-500 mt-1">
-                  <span className="num text-green-600">{k.extra}</span>
-                  {k.extraSuffix}
-                </p>
-              )}
+              {/* Fixed label height: a longer label wrapping to two lines must not
+                  make one card taller than its neighbours in the row. */}
+              <p className="text-xs text-neutral-500 font-medium mt-3 h-4 truncate">{k.label}</p>
+              <p className="num text-3xl text-neutral-900 mt-1 truncate">
+                {k.body}
+                {k.extra !== undefined && (
+                  <span className="text-xs font-sans font-medium text-neutral-500 ml-2 align-middle">
+                    <span className="num text-green-600">{k.extra}</span>
+                    {k.extraSuffix}
+                  </span>
+                )}
+              </p>
             </div>
           </Reveal>
         ))}

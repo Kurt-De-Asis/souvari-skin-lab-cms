@@ -1,0 +1,11 @@
+-- Unique phone numbers across every role.
+--
+-- `users` is the single identity table for customers, staff and admins, so
+-- uniqueness here is what prevents a customer from registering with a number
+-- that already belongs to a staff login.
+--
+-- Nullable, so any number of accounts may leave it blank. Existing local-format
+-- values were normalised to E.164 and duplicates cleared beforehand by
+-- `npm run db:fix:user-phones`, since a unique index compares stored bytes and
+-- would otherwise treat `09171234567` and `+639171234567` as different.
+ALTER TABLE `users` ADD UNIQUE INDEX `users_phone_key`(`phone`);

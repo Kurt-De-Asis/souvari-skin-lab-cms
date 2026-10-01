@@ -150,14 +150,12 @@ export const membershipPlansApi = {
 
 export const membershipsApi = {
   getMe: () => api.get('/memberships/me'),
-  avail: (data: { plan_id: number; notes?: string; payment_method?: string; payment_type?: string; amount_paid?: number }) => api.post('/memberships/avail', data),
   getById: (id: number) => api.get(`/memberships/${id}`),
   list: (params?: Record<string, string>) => api.get('/memberships', { params }),
   create: (data: any) => api.post('/memberships', data),
   updateStatus: (id: number, data: any) => api.put(`/memberships/${id}/status`, data),
   extend: (id: number, data: any) => api.put(`/memberships/${id}/extend`, data),
   validateCode: (code: string) => api.get(`/memberships/validate/${code}`),
-  requestPayInStore: (id: number) => api.post(`/memberships/${id}/pay-in-store`),
   recordPayment: (id: number, data: any) => api.post(`/memberships/${id}/payments`, data),
   listPayments: (id: number) => api.get(`/memberships/${id}/payments`),
 };
