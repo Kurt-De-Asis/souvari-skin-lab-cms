@@ -1,32 +1,35 @@
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx-js-style';
 import { formatCurrency, formatPercent, formatServicePrice } from '@/utils/format';
 import { statusLabel } from '@/utils/appointmentStatus';
-
-const A4_WIDTH = 210;
-const CONTENT_W = A4_WIDTH - 28;
-const MAX_IMG_H = 60;
-const FOOTER_Y = 288;
-
-const HEADER_COLOR: [number, number, number] = [72, 58, 49];
-
-// jsPDF's built-in fonts only cover Latin-1. Unicode symbols like the peso sign
-// (U+20B1) are bit-masked and render as garbage (e.g. "±"), and the width
-// mismatch pushes numbers outside the table cells. Map them to ASCII-safe text.
-const ASCII_MAP: Array<[RegExp, string]> = [
-  [/₱/g, 'PHP '],
-  [/[\u2013\u2014]/g, '-'],
-  [/[’‘]/g, "'"],
-  [/[“”«»]/g, '"'],
-  [/…/g, '...'],
-];
-
-function pdfText(value: unknown): string {
-  let s = String(value ?? '');
-  for (const [re, rep] of ASCII_MAP) s = s.replace(re, rep);
-  return s;
-}
+import {
+  A4_WIDTH,
+  CONTENT_W,
+  MAX_IMG_H,
+  FOOTER_Y,
+  HEADER_COLOR,
+  pdfText,
+  ensureSpace,
+  sectionTitle,
+  renderTable,
+  EXCEL_TEXT,
+  BRAND_BG,
+  HEADER_BG,
+  ALT_BG,
+  SUB_BG,
+  BORDER,
+  MONEY_FMT,
+  WHOLE_FMT,
+  PCT_FMT,
+  Cursor,
+  CellSpec,
+  excelStyle,
+  bannerCells,
+  headerCells,
+  altFill,
+  makeSheet,
+  mergedSpan,
+} from '@/utils/reportFormat';
 
 export interface ReportChartImage {
   id: string;
@@ -65,10 +68,6 @@ export interface AnalyticsReportData {
   occupancy: { rate: number; working_minutes: number; booked_minutes: number; unbooked_minutes: number } | null;
 }
 
-interface Cursor {
-  y: number;
-}
-
 /** Pull the already-rendered chart.js canvases out of the DOM. */
 export function captureChartImages(ids: string[]): ReportChartImage[] {
   return ids.map((id) => {
@@ -80,22 +79,6 @@ export function captureChartImages(ids: string[]): ReportChartImage[] {
 
 function findImage(images: ReportChartImage[], id: string): ReportChartImage | undefined {
   return images.find((img) => img.id === id);
-}
-
-function ensureSpace(doc: jsPDF, cursor: Cursor, needed: number): void {
-  if (doc.internal.pageSize.getHeight() - cursor.y < needed + (FOOTER_Y - 260)) {
-    doc.addPage();
-    cursor.y = 20;
-  }
-}
-
-function sectionTitle(doc: jsPDF, cursor: Cursor, text: string): void {
-  ensureSpace(doc, cursor, 16);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  doc.setTextColor(40, 34, 29);
-  doc.text(pdfText(text), 14, cursor.y + 6);
-  cursor.y += 11;
 }
 
 function addChart(doc: jsPDF, cursor: Cursor, image: ReportChartImage | undefined, caption?: string): void {
@@ -133,29 +116,6 @@ function addChart(doc: jsPDF, cursor: Cursor, image: ReportChartImage | undefine
     doc.text(pdfText(caption), 14 + (CONTENT_W - tw) / 2, cursor.y);
     cursor.y += 6;
   }
-}
-
-function renderTable(
-  doc: jsPDF,
-  cursor: Cursor,
-  head: string[],
-  body: (string | number)[][],
-  columnStyles: Record<number, { halign: 'left' | 'right' | 'center' }> = {}
-): void {
-  ensureSpace(doc, cursor, 24);
-  autoTable(doc, {
-    startY: cursor.y,
-    head: [head.map(pdfText)],
-    body: body.map((row) => row.map(pdfText)),
-    theme: 'grid',
-    styles: { fontSize: 9, cellPadding: 2.5, textColor: [50, 45, 40], overflow: 'linebreak' },
-    headStyles: { fillColor: HEADER_COLOR, textColor: 255, fontStyle: 'bold' },
-    alternateRowStyles: { fillColor: [250, 247, 245] },
-    columnStyles,
-    margin: { left: 14, right: 14 },
-  });
-  const lastY = (doc as any).lastAutoTable?.finalY;
-  cursor.y = typeof lastY === 'number' ? lastY + 8 : cursor.y + 8;
 }
 
 export function exportAnalyticsPdf(r: AnalyticsReportData, images: ReportChartImage[]): void {
@@ -306,104 +266,12 @@ export function exportAnalyticsPdf(r: AnalyticsReportData, images: ReportChartIm
   doc.save(`Souvari-Analytics_${r.dateFrom}_to_${r.dateTo}.pdf`);
 }
 
-const EXCEL_TEXT = '3D3128';
-const BRAND_BG = '543B2E';
-const HEADER_BG = 'EADFD4';
-const ALT_BG = 'F8F4EF';
-const SUB_BG = 'F0E9E1';
-const BORDER = 'E3D8CC';
-
-interface CellSpec {
-  v: string | number;
-  align?: 'l' | 'r' | 'c';
-  bold?: boolean;
-  italic?: boolean;
-  size?: number;
-  color?: string;
-  fill?: string;
-  numFmt?: string;
-  border?: boolean;
-}
-
-function excelStyle(c: CellSpec): any {
-  const thin = { style: 'thin', color: { rgb: BORDER } };
-  const s: any = {
-    font: {
-      name: 'Calibri',
-      sz: c.size ?? 10,
-      color: { rgb: c.color ?? EXCEL_TEXT },
-      bold: !!c.bold,
-      italic: !!c.italic,
-    },
-    alignment: {
-      horizontal: c.align === 'r' ? 'right' : c.align === 'c' ? 'center' : 'left',
-      vertical: 'center',
-    },
-  };
-  if (c.fill) s.fill = { fgColor: { rgb: c.fill }, patternType: 'solid' };
-  if (c.numFmt) s.numFmt = c.numFmt;
-  if (c.border !== false) s.border = { top: thin, bottom: thin, left: thin, right: thin };
-  return s;
-}
-
-function bannerCells(n: number, text: string, size = 13): CellSpec[] {
-  return Array.from({ length: n }, (_, i) =>
-    i === 0
-      ? { v: text, align: 'c', bold: true, size, color: 'FFFFFF', fill: BRAND_BG, border: false }
-      : { v: '', fill: BRAND_BG, border: false }
-  );
-}
-
-function headerCells(headers: string[]): CellSpec[] {
-  return headers.map((h) => ({ v: h, align: 'c', bold: true, color: BRAND_BG, fill: HEADER_BG }));
-}
-
-function altFill(i: number): string | undefined {
-  return i % 2 === 1 ? ALT_BG : undefined;
-}
-
-function makeSheet(
-  wb: XLSX.WorkBook,
-  name: string,
-  rows: CellSpec[][],
-  widths: number[],
-  merges: XLSX.Range[] = [],
-  rowHeights: Record<number, number> = {}
-): void {
-  const matrix = rows.map((r) => r.map((c) => c.v));
-  const ws = XLSX.utils.aoa_to_sheet(matrix);
-  ws['!cols'] = widths.map((w) => ({ wch: w }));
-  if (merges.length) ws['!merges'] = merges;
-  const maxRow = Math.max(...Object.keys(rowHeights).map(Number), rows.length - 1);
-  const rowArr: XLSX.RowInfo[] = [];
-  for (let i = 0; i <= maxRow; i++) rowArr.push({ hpt: rowHeights[i] });
-  ws['!rows'] = rowArr;
-
-  rows.forEach((row, r) => {
-    row.forEach((cell, col) => {
-      const addr = XLSX.utils.encode_cell({ r, c: col });
-      const target = ws[addr] as XLSX.CellObject | undefined;
-      if (target) (target as any).s = excelStyle(cell);
-    });
-  });
-
-  XLSX.utils.book_append_sheet(wb, ws, name);
-}
-
-function mergedSpan(n: number, text: string, fill: string): CellSpec[] {
-  return Array.from({ length: n }, (_, i) =>
-    i === 0
-      ? { v: text, align: 'l', size: 10, color: BRAND_BG, fill, bold: false }
-      : { v: '', fill, border: false }
-  );
-}
-
 export function exportAnalyticsExcel(r: AnalyticsReportData): void {
   const wb = XLSX.utils.book_new();
   const generated = new Date().toLocaleString();
-  const money = '"₱"#,##0.00';
-  const whole = '#,##0';
-  const pct = '0.0"%"';
+  const money = MONEY_FMT;
+  const whole = WHOLE_FMT;
+  const pct = PCT_FMT;
 
   // ---- Summary ----
   {

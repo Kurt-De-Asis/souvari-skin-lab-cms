@@ -22,6 +22,9 @@ interface Product {
   sku: string;
   product_category_id: number | null;
   category: Category | null;
+  description: string | null;
+  purpose: string | null;
+  benefits: string | null;
   unit: string;
   current_stock: number | string;
   minimum_stock: number | string;
@@ -33,6 +36,9 @@ interface Product {
 interface ProductForm {
   product_category_id: number | string;
   name: string;
+  description: string;
+  purpose: string;
+  benefits: string;
   unit: string;
   unit_price: number;
   unit_cost: number;
@@ -59,7 +65,7 @@ export default function Products() {
   const [submitting, setSubmitting] = useState(false);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<ProductForm>({
-    defaultValues: { product_category_id: '', name: '', unit: 'piece', unit_price: 0, unit_cost: 0, current_stock: 0, minimum_stock: 0, status: 'active' },
+    defaultValues: { product_category_id: '', name: '', description: '', purpose: '', benefits: '', unit: 'piece', unit_price: 0, unit_cost: 0, current_stock: 0, minimum_stock: 0, status: 'active' },
   });
 
   const [cartOpen, setCartOpen] = useState(false);
@@ -197,7 +203,7 @@ export default function Products() {
 
   const openAddModal = () => {
     setEditingProduct(null);
-    reset({ product_category_id: '', name: '', unit: 'piece', unit_price: 0, unit_cost: 0, current_stock: 0, minimum_stock: 0, status: 'active' });
+    reset({ product_category_id: '', name: '', description: '', purpose: '', benefits: '', unit: 'piece', unit_price: 0, unit_cost: 0, current_stock: 0, minimum_stock: 0, status: 'active' });
     setModalOpen(true);
   };
 
@@ -206,6 +212,9 @@ export default function Products() {
     reset({
       product_category_id: p.product_category_id ?? '',
       name: p.name,
+      description: p.description ?? '',
+      purpose: p.purpose ?? '',
+      benefits: p.benefits ?? '',
       unit: p.unit,
       unit_price: Number(p.unit_price) || 0,
       unit_cost: Number(p.unit_cost) || 0,
@@ -548,6 +557,18 @@ export default function Products() {
             <label className="label">Name</label>
             <input className="input-field" placeholder="Product name" {...register('name', { required: 'Required' })} />
             {errors.name && <p className="text-xs text-red-600 mt-1">{errors.name.message}</p>}
+          </div>
+          <div>
+            <label className="label">Description</label>
+            <textarea rows={2} className="input-field" placeholder="What the product is" {...register('description')} />
+          </div>
+          <div>
+            <label className="label">Purpose</label>
+            <textarea rows={2} className="input-field" placeholder="What the product is intended for" {...register('purpose')} />
+          </div>
+          <div>
+            <label className="label">Benefits</label>
+            <textarea rows={2} className="input-field" placeholder="Documented benefits of the product" {...register('benefits')} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

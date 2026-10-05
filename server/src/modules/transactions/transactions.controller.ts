@@ -35,6 +35,24 @@ export class TransactionsController {
         success: true,
         data: result.data,
         pagination: result.pagination,
+        summary: result.summary,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Report data for the PDF/Excel export. Admin only, because it spans every
+   * customer rather than being scoped to the caller.
+   */
+  async getTransactionReport(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const query = { ...req.query } as any;
+      const report = await transactionService.getTransactionReport(query);
+      res.json({
+        success: true,
+        data: report,
       });
     } catch (error) {
       next(error);

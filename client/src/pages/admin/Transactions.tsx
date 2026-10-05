@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, Fragment } from 'react';
-import { Search, ChevronDown, ChevronUp, DollarSign, Ban, RotateCcw } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, DollarSign, Ban, RotateCcw, FileText, Sheet } from 'lucide-react';
 import toast from 'react-hot-toast';
 import dayjs from 'dayjs';
 import { transactionsApi } from '@/api';
@@ -8,6 +8,12 @@ import EmptyState from '@/components/shared/EmptyState';
 import Pagination from '@/components/ui/Pagination';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Modal from '@/components/ui/Modal';
+import {
+  exportTransactionsPdf,
+  exportTransactionsExcel,
+  type TransactionsReportData,
+  type ReportSummary,
+} from '@/utils/transactionsReport';
 
 interface TransactionItem {
   id: number;
@@ -53,9 +59,11 @@ export default function Transactions() {
 
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  // Summary
-  const [summaryRevenue, setSummaryRevenue] = useState(0);
-  const [summaryCount, setSummaryCount] = useState(0);
+  // Summary, computed by the server across every filtered row rather than just
+  // the current page.
+  const [summary, setSummary] = useState<ReportSummary | null>(null);
+
+  const [exporting, setExporting] = useState<'pdf' | 'excel' | null>(null);
 
   // Void/Refund modals
   const [voidModal, setVoidModal] = useState<Transaction | null>(null);
@@ -71,30 +79,52 @@ export default function Transactions() {
 
   useEffect(() => { setPage(1); }, [debouncedSearch, dateFrom, dateTo, statusFilter, typeFilter]);
 
+  // Single source of truth for the active filters. The list and the export both
+  // use this, so an exported file can never describe a different result set than
+  // the screen.
+  const buildFilterParams = useCallback((): Record<string, string> => {
+    const params: Record<string, string> = {};
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+    if (statusFilter) params.payment_status = statusFilter;
+    if (typeFilter) params.type = typeFilter;
+    if (debouncedSearch) params.customer = debouncedSearch;
+    return params;
+  }, [dateFrom, dateTo, statusFilter, typeFilter, debouncedSearch]);
+
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = { page: String(page), limit: '15' };
-      if (dateFrom) params.date_from = dateFrom;
-      if (dateTo) params.date_to = dateTo;
-      if (statusFilter) params.payment_status = statusFilter;
-      if (typeFilter) params.type = typeFilter;
-      if (debouncedSearch) params.customer = debouncedSearch;
-      const { data } = await transactionsApi.list(params);
+      const { data } = await transactionsApi.list({ page: String(page), limit: '15', ...buildFilterParams() });
       const txns = data.data || [];
       setTransactions(txns);
       setTotalPages(data.pagination?.totalPages || 1);
       setTotal(data.pagination?.total || 0);
-      setSummaryRevenue(txns.reduce((sum: number, t: any) => sum + (t.payment_status === 'refunded' || t.payment_status === 'voided' ? 0 : Number(t.total_amount || t.total || 0)), 0));
-      setSummaryCount(data.pagination?.total || txns.length);
+      setSummary(data.summary ?? null);
     } catch {
       toast.error('Failed to load transactions');
     } finally {
       setLoading(false);
     }
-  }, [page, dateFrom, dateTo, statusFilter, typeFilter, debouncedSearch]);
+  }, [page, buildFilterParams]);
 
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
+
+  const handleExport = async (format: 'pdf' | 'excel') => {
+    setExporting(format);
+    try {
+      const res = await transactionsApi.report(buildFilterParams());
+      const report = res.data?.data as TransactionsReportData;
+      if (!report) throw new Error('The report returned no data.');
+      if (format === 'pdf') exportTransactionsPdf(report);
+      else exportTransactionsExcel(report);
+      toast.success(`Transactions ${format.toUpperCase()} downloaded`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to generate report');
+    } finally {
+      setExporting(null);
+    }
+  };
 
   const handleVoid = async () => {
     if (!voidModal) return;
@@ -144,8 +174,10 @@ export default function Transactions() {
             <DollarSign size={20} />
           </div>
           <div>
-            <p className="text-xs text-neutral-500 font-medium">Total Revenue</p>
-            <p className="text-2xl font-sans font-semibold text-neutral-900 mt-0.5">{formatCurrency(summaryRevenue)}</p>
+            <p className="text-xs text-neutral-500 font-medium">Net Revenue</p>
+            <p className="text-2xl font-sans font-semibold text-neutral-900 mt-0.5">
+              {formatCurrency(summary?.net_revenue ?? 0)}
+            </p>
           </div>
         </div>
         <div className="card flex items-start gap-4">
@@ -154,7 +186,9 @@ export default function Transactions() {
           </div>
           <div>
             <p className="text-xs text-neutral-500 font-medium">Total Transactions</p>
-            <p className="text-2xl font-sans font-semibold text-neutral-900 mt-0.5">{summaryCount}</p>
+            <p className="text-2xl font-sans font-semibold text-neutral-900 mt-0.5">
+              {summary?.count ?? 0}
+            </p>
           </div>
         </div>
       </div>
@@ -184,10 +218,12 @@ export default function Transactions() {
           <div>
             <label className="label">Type</label>
             <select className="select-field w-full sm:w-auto" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+              {/* These must match the server's transaction_type enum. The previous
+                  service/product/mixed values were rejected with a 400. */}
               <option value="">All Types</option>
-              <option value="service">Service</option>
-              <option value="product">Product</option>
-              <option value="mixed">Mixed</option>
+              <option value="sale">Sale</option>
+              <option value="refund">Refund</option>
+              <option value="adjustment">Adjustment</option>
             </select>
           </div>
           <div>
@@ -202,6 +238,30 @@ export default function Transactions() {
                 onChange={(e) => setCustomerSearch(e.target.value)}
               />
             </div>
+          </div>
+
+          {/* Export honours the filters above, not just the visible page. */}
+          <div className="ml-auto flex items-end gap-2">
+            <button
+              onClick={() => handleExport('pdf')}
+              disabled={exporting !== null || transactions.length === 0}
+              className="btn-secondary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              type="button"
+              title="Download all filtered transactions as PDF"
+            >
+              <FileText size={16} />
+              {exporting === 'pdf' ? 'Preparing...' : 'Export PDF'}
+            </button>
+            <button
+              onClick={() => handleExport('excel')}
+              disabled={exporting !== null || transactions.length === 0}
+              className="btn-secondary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              type="button"
+              title="Download all filtered transactions as Excel"
+            >
+              <Sheet size={16} />
+              {exporting === 'excel' ? 'Preparing...' : 'Export Excel'}
+            </button>
           </div>
         </div>
       </div>

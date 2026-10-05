@@ -19,6 +19,7 @@ const QUICK_REPLIES = [
   'What are your best-selling services?',
   'What do you recommend?',
   'How much is a facial?',
+  'What products do you have?',
   'What are your clinic hours?',
 ];
 

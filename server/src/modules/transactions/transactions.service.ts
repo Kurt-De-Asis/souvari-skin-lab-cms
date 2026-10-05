@@ -1,12 +1,22 @@
 import prisma from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
-import { getPaginationParams, createPaginatedResult, PaginatedResult } from '../../utils/pagination';
+import { getPaginationParams, createPaginatedResult } from '../../utils/pagination';
 import {
   CreateTransactionInput,
   ListTransactionsQuery,
+  ReportTransactionsQuery,
   VoidTransactionInput,
   RefundTransactionInput,
 } from './transactions.validation';
+import {
+  summarizeTransactions,
+  summarizeGroupedRows,
+  groupTotals,
+  groupByDay,
+  resolvePeriod,
+  clinicDayStartUtc,
+  clinicDayEndUtc,
+} from './transactions-report-math';
 import { Decimal } from '@prisma/client/runtime/library';
 import { notificationDispatch } from '../../services/notification-dispatch.service';
 
@@ -320,8 +330,13 @@ export class TransactionService {
     return transaction;
   }
 
-  async getTransactions(query: ListTransactionsQuery): Promise<PaginatedResult<any>> {
-    const { page, limit, skip } = getPaginationParams(query);
+  /**
+   * Build the Prisma filter shared by the paginated list and the report.
+   *
+   * Both must agree on exactly which rows are in scope, so the rules live in one
+   * place instead of being duplicated per endpoint.
+   */
+  private async buildTransactionsWhere(query: ListTransactionsQuery): Promise<any> {
     const {
       search,
       customer,
@@ -333,8 +348,6 @@ export class TransactionService {
       appointment_id,
       date_from,
       date_to,
-      sort_by,
-      sort_order,
     } = query;
 
     const where: any = { deleted_at: null };
@@ -361,6 +374,7 @@ export class TransactionService {
       if (customerIds.length > 0) {
         where.customer_id = { in: customerIds };
       } else {
+        // No match must select nothing rather than every customer.
         where.customer_id = -1;
       }
     }
@@ -374,13 +388,26 @@ export class TransactionService {
 
     if (date_from || date_to) {
       where.created_at = {};
-      if (date_from) where.created_at.gte = new Date(date_from);
+      // Clinic-calendar bounds, not host-local or raw UTC midnight, so the rows a
+      // range returns are exactly the rows by_day groups under those days.
+      if (date_from) {
+        const from = clinicDayStartUtc(date_from);
+        if (from) where.created_at.gte = from;
+      }
       if (date_to) {
-        const endDate = new Date(date_to);
-        endDate.setHours(23, 59, 59, 999);
-        where.created_at.lte = endDate;
+        const to = clinicDayEndUtc(date_to);
+        if (to) where.created_at.lte = to;
       }
     }
+
+    return where;
+  }
+
+  async getTransactions(query: ListTransactionsQuery) {
+    const pagination = getPaginationParams(query);
+    const { sort_by, sort_order } = query;
+
+    const where = await this.buildTransactionsWhere(query);
 
     const orderBy: any = {};
     if (sort_by) {
@@ -389,7 +416,7 @@ export class TransactionService {
       orderBy.created_at = 'desc';
     }
 
-    const [transactions, total] = await Promise.all([
+    const [transactions, total, totalsByGroup] = await Promise.all([
       prisma.transactions.findMany({
         where,
         include: {
@@ -407,13 +434,103 @@ export class TransactionService {
           },
         },
         orderBy,
-        skip,
-        take: limit,
+        skip: pagination.skip,
+        take: pagination.limit,
       }),
       prisma.transactions.count({ where }),
+      // Totals cover every matching row, not just this page, so the headline
+      // figures on screen are the real ones and match the exported report.
+      prisma.transactions.groupBy({
+        by: ['type', 'payment_status'],
+        where,
+        _sum: { total_amount: true, discount_amount: true, tax_amount: true },
+        _count: { _all: true },
+      }),
     ]);
 
-    return createPaginatedResult(transactions, total, { page, limit, skip });
+    const groups = (totalsByGroup as any[]).map((g) => ({
+      type: g.type,
+      payment_status: g.payment_status,
+      total_amount: g._sum?.total_amount ?? 0,
+      discount_amount: g._sum?.discount_amount ?? 0,
+      tax_amount: g._sum?.tax_amount ?? 0,
+      _count: g._count?._all ?? 0,
+    }));
+
+    const page = createPaginatedResult(transactions, total, { page: pagination.page, limit: pagination.limit, skip: pagination.skip });
+    return { ...page, summary: summarizeGroupedRows(groups) };
+  }
+
+  /**
+   * Full filtered data set plus aggregates for the PDF/Excel export.
+   *
+   * Deliberately not paginated: a report that only covers the rows currently on
+   * screen would be misleading as a financial record, and the totals have to be
+   * computed over every matching row rather than one page of them.
+   */
+  async getTransactionReport(query: ReportTransactionsQuery) {
+    const where = await this.buildTransactionsWhere(query);
+
+    const { sort_by, sort_order } = query;
+    const orderBy: any = {};
+    if (sort_by) {
+      orderBy[sort_by] = sort_order || 'desc';
+    } else {
+      orderBy.created_at = 'desc';
+    }
+
+    const transactions = await prisma.transactions.findMany({
+      where,
+      select: {
+        id: true,
+        transaction_number: true,
+        type: true,
+        payment_status: true,
+        payment_method: true,
+        created_at: true,
+        subtotal: true,
+        discount_amount: true,
+        tax_amount: true,
+        total_amount: true,
+        notes: true,
+        customer: { select: { id: true, first_name: true, last_name: true } },
+        staff: { select: { id: true, first_name: true, last_name: true } },
+        // Only the count is rendered, so the line detail is left out to keep the
+        // response small on large date ranges.
+        items: { select: { id: true } },
+      },
+      orderBy,
+    });
+
+    const rows = transactions.map((t) => ({
+      id: t.id,
+      transaction_number: t.transaction_number,
+      type: t.type,
+      payment_status: t.payment_status,
+      payment_method: t.payment_method,
+      created_at: t.created_at,
+      subtotal: t.subtotal,
+      discount_amount: t.discount_amount,
+      tax_amount: t.tax_amount,
+      total_amount: t.total_amount,
+      notes: t.notes,
+      customer: t.customer,
+      staff: t.staff,
+      item_count: t.items.length,
+    }));
+
+    const summary = summarizeTransactions(rows);
+    const period = resolvePeriod(rows, { date_from: query.date_from, date_to: query.date_to });
+
+    return {
+      period,
+      summary,
+      rows,
+      by_status: groupTotals(rows, 'payment_status', (v) => v),
+      by_method: groupTotals(rows, 'payment_method', (v) => v),
+      by_type: groupTotals(rows, 'type', (v) => v),
+      by_day: groupByDay(rows),
+    };
   }
 
   async getTransactionById(id: number) {

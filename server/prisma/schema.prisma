@@ -376,6 +376,10 @@ model products {
   name               String     @db.VarChar(255)
   sku                String     @unique @db.VarChar(100)
   description        String?    @db.Text
+  purpose            String?    @db.Text
+  benefits           String?    @db.Text
+  /// Provenance for researched content, per field. Never used at runtime.
+  research_sources   Json?
   unit               ProductUnit @default(piece)
   unit_cost          Decimal    @default(0) @db.Decimal(12, 2)
   unit_price         Decimal    @default(0) @db.Decimal(12, 2)

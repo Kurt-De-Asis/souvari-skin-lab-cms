@@ -1,13 +1,36 @@
 import prisma from '../../config/database';
 import { env } from '../../config/env';
 import { SendMessageInput } from './ai.validation';
+import {
+  detectIntents,
+  loadRetailProducts,
+  matchProducts,
+  isCatalogBrowseQuery,
+  isReferentialProductFollowUp,
+  isThingLookupShape,
+  looksLikeProductLookup,
+  mentionsProduct,
+  normalizeQuery,
+  productsForService,
+  renderAmbiguousReply,
+  renderCatalogReply,
+  renderNoMatchReply,
+  renderProductAnswer,
+  renderRelatedProductsReply,
+  type ProductIntent,
+  type ProductRecord,
+} from './product-knowledge';
 import crypto from 'crypto';
 
 class AiService {
   private systemPrompt = '';
+  private systemPromptBuiltAt = 0;
 
   /** In-memory per-session context so follow-ups like "how much for that?" work without an LLM. */
-  private sessionContext = new Map<number, { lastServices: string[]; lastConcern: string | null }>();
+  private sessionContext = new Map<
+    number,
+    { lastServices: string[]; lastConcern: string | null; lastProducts: ProductRecord[] }
+  >();
 
   /** Strong standalone signals — a single match means the message is clinic-related. */
   private static readonly STRONG_CLINIC_KEYWORDS = [
@@ -218,7 +241,7 @@ class AiService {
   ];
 
   /** Is this message about the clinic / its services? */
-  private isClinicRelated(message: string, services: Array<{ name: string; category: string }>): boolean {
+  private async isClinicRelated(message: string, services: Array<{ name: string; category: string }>): Promise<boolean> {
     const lower = message.toLowerCase();
 
     // 1) Strong clinic word alone is enough.
@@ -246,6 +269,14 @@ class AiService {
     const addressesClinic = /\byou\b|\byour\b|\byours\b|\bfor me\b|\bfor us\b/.test(lower);
     if (addressesClinic) return true;
     if (weakHits.length >= 2) return true;
+
+    // 3) A name from the product catalog counts as clinic-related, so typing a
+    // product name on its own is answered rather than refused as off-topic.
+    const productQuery = normalizeQuery(message);
+    if (mentionsProduct(productQuery)) {
+      const products = await loadRetailProducts();
+      if (matchProducts(products, productQuery).kind !== 'none') return true;
+    }
 
     return false;
   }
@@ -547,8 +578,16 @@ class AiService {
     return lower.includes('emergency') || lower.includes('urgent') || lower.includes('911') || lower.includes('severe pain') || lower.includes('allergic reaction');
   }
 
+  /**
+   * How long a built prompt is reused before it is rebuilt from the database.
+   * Without this the prompt was cached for the lifetime of the process, so a
+   * service added after startup never reached the assistant until a restart.
+   */
+  private static readonly PROMPT_TTL_MS = 10 * 60 * 1000;
+
   async buildSystemPrompt(): Promise<string> {
-    if (this.systemPrompt) {
+    const fresh = Date.now() - this.systemPromptBuiltAt < AiService.PROMPT_TTL_MS;
+    if (this.systemPrompt && fresh) {
       return this.systemPrompt;
     }
 
@@ -627,6 +666,7 @@ RESPONSE GUIDELINES:
 - Example — User: "I have acne" -> You: "For acne and breakouts, our top picks are: 1) Acne Clear — deep-cleansing with extraction; 2) Carbon Laser — targets breakouts and oil; 3) Dermapen — helps with acne marks. Want more details on any of these?"
 
 You should be friendly, professional, and helpful while staying within these boundaries.`;
+    this.systemPromptBuiltAt = Date.now();
     return this.systemPrompt;
   }
 
@@ -670,13 +710,28 @@ You should be friendly, professional, and helpful while staying within these bou
         botResponse = this.thanksResponse();
       } else if (this.isEmergency(lower)) {
         botResponse = this.emergencyResponse();
+      } else if (this.isGreeting(lower)) {
+        // Greetings are checked before any product lookup, otherwise a short
+        // greeting reads as an unknown product name.
+        botResponse = this.greetingResponse();
       } else {
         const services = await this.getActiveServices();
-        const related = this.isGreeting(lower) || this.isClinicRelated(lower, services);
-        if (!related) {
+
+        // Context-anchored follow-ups are resolved BEFORE a fresh lookup, so
+        // "tell me about this product" continues the previous product instead of
+        // being reported as a product we do not have.
+        const followUpIntents = this.followUpProductIntents(lower);
+        const followUpReply = followUpIntents
+          ? await this.productAnswer(session.id, input.message, followUpIntents, services)
+          : null;
+
+        // Products are resolved from the database before the LLM, so a product
+        // question never reaches the model and can never be embellished.
+        const productReply = followUpReply ?? (await this.productAnswer(session.id, input.message, undefined, services));
+        if (productReply) {
+          botResponse = productReply;
+        } else if (!(await this.isClinicRelated(lower, services))) {
           botResponse = this.OFF_TOPIC_REPLY;
-        } else if (this.isGreeting(lower)) {
-          botResponse = this.greetingResponse();
         } else {
           botResponse = await this.llmWithFallback(input.message, session.id);
         }
@@ -869,16 +924,155 @@ You should be friendly, professional, and helpful while staying within these bou
     }
   }
 
-  private rememberContext(sessionId: number | undefined, lastServices: string[], lastConcern: string | null): void {
+  private rememberContext(
+    sessionId: number | undefined,
+    lastServices: string[],
+    lastConcern: string | null,
+    lastProducts: ProductRecord[] = [],
+  ): void {
     if (!sessionId) return;
-    this.sessionContext.set(sessionId, { lastServices, lastConcern });
+    this.sessionContext.set(sessionId, { lastServices, lastConcern, lastProducts });
     if (this.sessionContext.size > 300) {
       const oldest = this.sessionContext.keys().next().value;
       if (oldest !== undefined) this.sessionContext.delete(oldest);
     }
   }
 
+  /** Remember a product the customer just asked about, for later pronoun follow-ups. */
+  private rememberProducts(sessionId: number | undefined, products: ProductRecord[]): void {
+    if (!sessionId || products.length === 0) return;
+    const existing = this.sessionContext.get(sessionId);
+    this.rememberContext(sessionId, existing?.lastServices ?? [], existing?.lastConcern ?? null, products);
+  }
+
   /** Resolve vague follow-ups ("how much for that?", "tell me more about it") using session context. */
+  /**
+   * Answer a product question straight from the catalog.
+   *
+   * This runs before the language model on purpose. Product answers must be
+   * reproducible and must never contain anything the database does not hold, and
+   * a model asked to describe products from memory will happily invent benefits
+   * or ingredients. Returning `null` means the message was not about a product,
+   * and the caller carries on as before.
+   *
+   * @param followUpIntents intents to answer when the customer refers back to a
+   *   product already discussed in this session ("how much?" after naming one).
+   */
+  private async productAnswer(
+    sessionId: number | undefined,
+    message: string,
+    followUpIntents?: ProductIntent[],
+    services: Array<{ name: string; category: string }> = [],
+  ): Promise<string | null> {
+    const query = normalizeQuery(message);
+    const lowerMessage = message.toLowerCase();
+
+    // A pronoun follow-up ("how much?", "how do I use it?") refers to whatever
+    // product was discussed last, so there is nothing new to match.
+    if (followUpIntents && followUpIntents.length > 0) {
+      const ctx = sessionId ? this.sessionContext.get(sessionId) : undefined;
+      const recent = ctx?.lastProducts ?? [];
+      if (recent.length === 0) return null;
+      return recent.map((p) => renderProductAnswer(p, followUpIntents)).join('\n\n');
+    }
+
+    // Either the user said "product"-ish words, or the sentence is shaped like a
+    // lookup of a specific item. Both must be attempted so a miss can be reported
+    // honestly instead of being handed to the model.
+    const productShaped = mentionsProduct(query) || looksLikeProductLookup(query);
+
+    // A question can also be product-shaped yet be excluded by an operational
+    // word that only appears inside a real product name ("Acne Treatment
+    // Cream"). Attempt those too, but only trust an exact, verbatim name match
+    // so genuine operational questions are not swallowed.
+    if (!productShaped && !isThingLookupShape(query)) return null;
+
+    const products = await loadRetailProducts();
+    const match = matchProducts(products, query);
+
+    if (!productShaped) {
+      const namesExactProduct =
+        match.kind === 'single' && query.lower.includes(match.product.name.toLowerCase());
+      if (!namesExactProduct) return null;
+    }
+
+    if (match.kind === 'none') {
+      // A message can ask the other way round: name a service and ask which
+      // product goes with it. Answer from the stored service/product links.
+      const relatedReply = await this.relatedProductsForService(message, services);
+      if (relatedReply) return relatedReply;
+
+      // If the user named a service we do offer, this is a service question and
+      // must continue down the normal path.
+      if (services.length > 0 && this.findServiceByMessage(lowerMessage, services)) return null;
+
+      // The message asked about something the clinic sells but nothing matched.
+      // Answering "we do not carry that" is required here: falling through would
+      // let the model invent details about a product that does not exist.
+      // A request to see the catalog as a whole is answered with the catalog, not
+      // with "we do not have that".
+      if (isCatalogBrowseQuery(query)) return renderCatalogReply(products);
+
+      return renderNoMatchReply();
+    }
+
+    if (match.kind === 'ambiguous') {
+      this.rememberProducts(sessionId, match.products);
+      return renderAmbiguousReply(match.products);
+    }
+
+    this.rememberProducts(sessionId, [match.product]);
+
+    const answer = renderProductAnswer(match.product, detectIntents(query));
+
+    // A message can be about a product and a service at once ("what product goes
+    // with X?", "how much is the treatment and the recommended product?"). When a
+    // service is also named, answer about that too rather than dropping it.
+    return answer;
+  }
+
+  /**
+   * "What product goes with <service>?" — answered from the service/product
+   * links stored in the database. Returns null when the message is not asking
+   * about a product in relation to a named service.
+   */
+  private async relatedProductsForService(
+    message: string,
+    services: Array<{ name: string; category: string }>,
+  ): Promise<string | null> {
+    const lower = message.toLowerCase();
+    if (!/\bproduct(s)?\b|\bwhat.*(use|with)\b|\bwhich.*(use|with)\b/.test(lower)) return null;
+    if (services.length === 0) return null;
+
+    const hit = this.findServiceByMessage(lower, services);
+    if (!hit) return null;
+
+    const products = await loadRetailProducts();
+    const related = productsForService(products, hit.service.name);
+    if (related.length === 0) return null;
+
+    this.rememberProducts(undefined, related);
+    return renderRelatedProductsReply(hit.service.name, related);
+  }
+
+  /** Intent set for a bare follow-up, or null when the message is not one. */
+  private followUpProductIntents(lowerMessage: string): ProductIntent[] | null {
+    const intentText = lowerMessage
+      .replace(/\b(it|that|this|they|them|those|the product|product)\b/g, ' ')
+      .trim();
+    if (!intentText || !/\?|\b(how|what|price|cost|use|used|stock|available|benefit|ingredient|purpose|tell|more)\b/.test(intentText)) {
+      return null;
+    }
+
+    // Only a message that refers back to the previous product is a follow-up.
+    // A question naming something new must be matched against the catalog,
+    // otherwise it gets answered about whatever was mentioned previously.
+    if (!isReferentialProductFollowUp(normalizeQuery(lowerMessage))) return null;
+
+    const intents = detectIntents(lowerMessage).filter((i) => i !== 'overview');
+    return intents.length > 0 ? intents : ['overview'];
+  }
+
   private followUpResponse(sessionId: number | undefined, lowerMessage: string, services: any[]): string | null {
     if (!sessionId) return null;
     const ctx = this.sessionContext.get(sessionId);
@@ -948,12 +1142,23 @@ You should be friendly, professional, and helpful while staying within these bou
       return this.emergencyResponse();
     }
 
+    // Same database-driven product answer as the LLM path, so behaviour does not
+    // depend on whether a model is configured.
+    const productReply = await this.productAnswer(sessionId, message, undefined, services);
+    if (productReply) return productReply;
+
+    const productFollowUpIntents = this.followUpProductIntents(lowerMessage);
+    if (productFollowUpIntents) {
+      const productFollowUp = await this.productAnswer(sessionId, message, productFollowUpIntents, services);
+      if (productFollowUp) return productFollowUp;
+    }
+
     // Follow-up referencing a recent recommendation (e.g. "how much for that?")
     const followUp = this.followUpResponse(sessionId, lowerMessage, services);
     if (followUp) return followUp;
 
     // Strict topic gate: refuse anything not related to the clinic
-    if (!this.isClinicRelated(lowerMessage, services)) {
+    if (!(await this.isClinicRelated(lowerMessage, services))) {
       return this.OFF_TOPIC_REPLY;
     }
 

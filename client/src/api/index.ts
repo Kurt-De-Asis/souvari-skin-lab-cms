@@ -87,6 +87,9 @@ export const appointmentsApi = {
 
 export const transactionsApi = {
   list: (params?: Record<string, string>) => api.get('/transactions', { params }),
+  // Unpaginated data for the PDF/Excel export; must be declared before any
+  // '/:id' style path server-side.
+  report: (params?: Record<string, string>) => api.get('/transactions/report', { params }),
   getById: (id: number) => api.get(`/transactions/${id}`),
   create: (data: any) => api.post('/transactions', data),
   void: (id: number, data?: any) => api.post(`/transactions/${id}/void`, data),

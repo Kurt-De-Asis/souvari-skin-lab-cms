@@ -48,6 +48,17 @@ export const listTransactionsQuerySchema = z.object({
   sort_order: z.enum(['asc', 'desc']).optional(),
 });
 
+/**
+ * Same filters as the list endpoint, minus pagination: the export covers every
+ * matching row, so page/limit would silently truncate the report.
+ */
+export const reportTransactionsQuerySchema = listTransactionsQuerySchema
+  .omit({ page: true, limit: true })
+  .extend({
+    sort_by: z.enum(['created_at', 'total_amount', 'transaction_number']).optional(),
+    sort_order: z.enum(['asc', 'desc']).optional(),
+  });
+
 export const transactionIdParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
@@ -64,5 +75,6 @@ export const refundTransactionSchema = z.object({
 
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
 export type ListTransactionsQuery = z.infer<typeof listTransactionsQuerySchema>;
+export type ReportTransactionsQuery = z.infer<typeof reportTransactionsQuerySchema>;
 export type VoidTransactionInput = z.infer<typeof voidTransactionSchema>;
 export type RefundTransactionInput = z.infer<typeof refundTransactionSchema>;

@@ -6,6 +6,7 @@ import { validate } from '../../middleware/validate';
 import {
   createTransactionSchema,
   listTransactionsQuerySchema,
+  reportTransactionsQuerySchema,
   transactionIdParamSchema,
   voidTransactionSchema,
   refundTransactionSchema,
@@ -19,6 +20,14 @@ router.get(
   '/',
   validate(listTransactionsQuerySchema, 'query'),
   transactionsController.getTransactions
+);
+
+// Must stay above '/:id', otherwise Express matches "report" as an id.
+router.get(
+  '/report',
+  authorize('admin'),
+  validate(reportTransactionsQuerySchema, 'query'),
+  transactionsController.getTransactionReport
 );
 
 router.get(
