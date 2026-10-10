@@ -2,6 +2,16 @@ import prisma from '../config/database';
 import { getSMSProvider } from './sms.service';
 import logger from '../utils/logger';
 import { NotificationType } from '@prisma/client';
+import { env } from '../config/env';
+import {
+  APPOINTMENT_BOOKED_MESSAGE,
+  APPOINTMENT_CHECKED_IN_MESSAGE,
+  APPOINTMENT_PLACED_MESSAGE,
+  buildAppointmentCancelledMessage,
+  buildAppointmentCompletedMessage,
+  isCompletionAllowedFrom,
+  shouldNotifyStatusChange,
+} from './appointment-notification-messages';
 
 const SMS_GREETING = 'Hello, this is Souvari Skin Lab.';
 
@@ -82,15 +92,23 @@ class NotificationDispatchService {
       adminUserIds,
     } = params;
 
+    // Only a genuine status change warrants a customer notification. Re-saving
+    // a booking or re-submitting the same status must not re-send a message.
+    if (!shouldNotifyStatusChange(oldStatus, newStatus)) return;
+
+    // A cancelled appointment is terminal for notification purposes: even if a
+    // later write asserts it was completed, no completion message is sent.
+    if (newStatus === 'completed' && !isCompletionAllowedFrom(oldStatus)) return;
+
     const statusMessages: Record<string, { title: string; message: string; type: NotificationType }> = {
       confirmed: {
-        title: 'Appointment Confirmed',
-        message: `Your ${serviceName} appointment on ${appointmentDate} at ${appointmentTime} has been confirmed.`,
+        title: 'Appointment Booked',
+        message: APPOINTMENT_BOOKED_MESSAGE,
         type: 'appointment_update',
       },
       checked_in: {
         title: 'Checked In',
-        message: `You've been checked in for your ${serviceName} session.`,
+        message: APPOINTMENT_CHECKED_IN_MESSAGE,
         type: 'appointment_update',
       },
       in_progress: {
@@ -100,7 +118,7 @@ class NotificationDispatchService {
       },
       completed: {
         title: 'Session Completed',
-        message: `Your ${serviceName} session is complete. Thank you for visiting Souvari Skin Lab!`,
+        message: buildAppointmentCompletedMessage(env.REVIEW_URL),
         type: 'appointment_update',
       },
       no_show: {
@@ -178,22 +196,15 @@ class NotificationDispatchService {
       cancelledByCustomer, adminUserIds,
     } = params;
 
-    const reasonText = reason?.trim() ? ` Reason: ${reason.trim()}` : '';
-    const rebook = cancelledByCustomer
-      ? ''
-      : ' Please contact Souvari Skin Lab to rebook.';
-
-    const message =
-      `Your ${serviceName} appointment on ${appointmentDate} at ${appointmentTime} ` +
-      `has been cancelled.${reasonText}${rebook}`;
+    const customerMessage = buildAppointmentCancelledMessage(reason);
 
     // Notify customer (in-app + SMS) — SMS is unconditional
     await this.dispatch({
       userId: customerUserId,
       type: 'appointment_update',
       title: 'Appointment Cancelled',
-      message,
-      data: { appointment_id: appointmentId, new_status: 'cancelled' },
+      message: customerMessage,
+      data: { appointment_id: appointmentId, new_status: 'cancelled', cancelled_by_customer: !!cancelledByCustomer },
       sendSMS: true,
       smsPhone: customerPhone ?? undefined,
     });
@@ -371,22 +382,29 @@ class NotificationDispatchService {
     appointmentDate: string;
     appointmentTime: string;
     quotedPrice: number | null;
+    status: string;
     adminUserIds: number[];
   }): Promise<void> {
     const {
       appointmentId, customerUserId, customerName, customerPhone,
       staffUserId, staffName, serviceName,
-      appointmentDate, appointmentTime, quotedPrice, adminUserIds,
+      appointmentDate, appointmentTime, quotedPrice, status, adminUserIds,
     } = params;
 
+    // A staff/admin booking is entered already confirmed by the clinic, so the
+    // customer receives the "booked" message. A self-service customer request
+    // is still pending and must only hear that it was *placed*.
+    const confirmedAtCreation = status === 'confirmed';
+    const customerTitle = confirmedAtCreation ? 'Appointment Booked' : 'Appointment Placed';
+    const customerMessage = confirmedAtCreation ? APPOINTMENT_BOOKED_MESSAGE : APPOINTMENT_PLACED_MESSAGE;
+
     // Notify customer (in-app + SMS)
-    const priceStr = quotedPrice ? ` for ₱${Number(quotedPrice).toLocaleString()}` : '';
     await this.dispatch({
       userId: customerUserId,
       type: 'appointment_reminder',
-      title: 'Appointment Booked',
-      message: `Your ${serviceName} appointment has been booked for ${appointmentDate} at ${appointmentTime}${priceStr}. Reference: #${appointmentId}`,
-      data: { appointment_id: appointmentId },
+      title: customerTitle,
+      message: customerMessage,
+      data: { appointment_id: appointmentId, status },
       sendSMS: true,
       smsPhone: customerPhone ?? undefined,
     });

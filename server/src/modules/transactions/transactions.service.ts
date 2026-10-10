@@ -46,6 +46,7 @@ export class TransactionService {
   async createTransaction(data: CreateTransactionInput, userId: number) {
     const transactionNumber = await this.generateTransactionNumber();
     let markedCompleted = false;
+    let completedFromStatus: string | null = null;
 
     const transaction = await prisma.$transaction(async (tx) => {
       for (const item of data.items) {
@@ -180,8 +181,9 @@ export class TransactionService {
           where: { id: data.appointment_id },
         });
 
-        if (appointment && appointment.status !== 'completed') {
+        if (appointment && appointment.status !== 'completed' && appointment.status !== 'cancelled') {
           markedCompleted = true;
+          completedFromStatus = appointment.status;
           await tx.appointments.update({
             where: { id: data.appointment_id },
             data: {
@@ -309,7 +311,7 @@ export class TransactionService {
           });
           await notificationDispatch.dispatchAppointmentStatus({
             appointmentId: appt.id,
-            oldStatus: 'in_progress',
+            oldStatus: completedFromStatus ?? 'in_progress',
             newStatus: 'completed',
             customerUserId: customerUser?.id ?? 0,
             customerName: `${appt.customer.first_name} ${appt.customer.last_name}`,

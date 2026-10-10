@@ -418,6 +418,7 @@ export class AppointmentService {
         appointmentDate: data.appointment_date,
         appointmentTime: data.start_time,
         quotedPrice: quotedPrice,
+        status: 'pending',
         adminUserIds,
       });
     } catch (err: any) {
@@ -571,6 +572,7 @@ export class AppointmentService {
         appointmentDate: data.appointment_date,
         appointmentTime: data.start_time,
         quotedPrice: Math.round(quotedPrice * 100) / 100 || null,
+        status: callerRole === 'customer' ? 'pending' : 'confirmed',
         adminUserIds,
       });
     } catch (err: any) {
@@ -692,6 +694,16 @@ export class AppointmentService {
     if (existing.status === 'completed') {
       throw new AppError(
         'Completed appointments can no longer be edited or have their status changed.',
+        422
+      );
+    }
+
+    // Cancelled is terminal for completion: an appointment that never went
+    // ahead must not be marked completed (and must not receive a completion
+    // message). Other re-openings (e.g. back to confirmed) remain allowed.
+    if (data.status === 'completed' && existing.status === 'cancelled') {
+      throw new AppError(
+        'A cancelled appointment cannot be marked completed.',
         422
       );
     }
@@ -845,61 +857,64 @@ export class AppointmentService {
         },
       });
 
-      // Dispatch notifications for status change
-      try {
-        const customerRecord = await prisma.customers.findUnique({
-          where: { id: existing.customer_id },
-          select: { user_id: true },
-        });
-        const customerUser = customerRecord
-          ? await prisma.users.findUnique({ where: { id: customerRecord.user_id }, select: { id: true, phone: true } })
-          : null;
-        const staffRecord = await prisma.staff.findUnique({
-          where: { id: existing.staff_id },
-          select: { user_id: true },
-        });
-        const adminUserIds = await notificationDispatch.getAdminUserIds();
-        const apptDate = new Date(existing.appointment_date).toLocaleDateString('en-PH', {
-          year: 'numeric', month: 'long', day: 'numeric',
-        });
-        const serviceLabel = servicePlan?.serviceNames.join(', ') ?? updated.service.name;
+      // Dispatch notifications only for a genuine status change. Re-saving an
+      // appointment without changing its status must not re-send a notification.
+      if (existing.status !== data.status) {
+        try {
+          const customerRecord = await prisma.customers.findUnique({
+            where: { id: existing.customer_id },
+            select: { user_id: true },
+          });
+          const customerUser = customerRecord
+            ? await prisma.users.findUnique({ where: { id: customerRecord.user_id }, select: { id: true, phone: true } })
+            : null;
+          const staffRecord = await prisma.staff.findUnique({
+            where: { id: existing.staff_id },
+            select: { user_id: true },
+          });
+          const adminUserIds = await notificationDispatch.getAdminUserIds();
+          const apptDate = new Date(existing.appointment_date).toLocaleDateString('en-PH', {
+            year: 'numeric', month: 'long', day: 'numeric',
+          });
+          const serviceLabel = servicePlan?.serviceNames.join(', ') ?? updated.service.name;
 
-        // Cancelling always goes through the dedicated dispatcher so the
-        // customer gets an automatic SMS regardless of which entry point
-        // initiated the cancellation (admin, staff, or the customer).
-        if (data.status === 'cancelled') {
-          await notificationDispatch.dispatchAppointmentCancelled({
-            appointmentId: id,
-            customerUserId: customerUser?.id ?? customerRecord?.user_id ?? 0,
-            customerName: `${updated.customer.first_name} ${updated.customer.last_name}`,
-            customerPhone: customerUser?.phone ?? null,
-            staffUserId: staffRecord?.user_id ?? null,
-            staffName: `${updated.staff.first_name} ${updated.staff.last_name}`,
-            serviceName: serviceLabel,
-            appointmentDate: apptDate,
-            appointmentTime: existing.start_time,
-            reason: updateData.cancellation_reason ?? data.cancellation_reason ?? null,
-            cancelledByCustomer: isCustomerSelfService,
-            adminUserIds,
-          });
-        } else {
-          await notificationDispatch.dispatchAppointmentStatus({
-            appointmentId: id,
-            oldStatus: existing.status,
-            newStatus: data.status,
-            customerUserId: customerUser?.id ?? customerRecord?.user_id ?? 0,
-            customerName: `${updated.customer.first_name} ${updated.customer.last_name}`,
-            customerPhone: customerUser?.phone ?? null,
-            staffUserId: staffRecord?.user_id ?? null,
-            staffName: `${updated.staff.first_name} ${updated.staff.last_name}`,
-            serviceName: serviceLabel,
-            appointmentDate: apptDate,
-            appointmentTime: existing.start_time,
-            adminUserIds,
-          });
+          // Cancelling always goes through the dedicated dispatcher so the
+          // customer gets an automatic SMS regardless of which entry point
+          // initiated the cancellation (admin, staff, or the customer).
+          if (data.status === 'cancelled') {
+            await notificationDispatch.dispatchAppointmentCancelled({
+              appointmentId: id,
+              customerUserId: customerUser?.id ?? customerRecord?.user_id ?? 0,
+              customerName: `${updated.customer.first_name} ${updated.customer.last_name}`,
+              customerPhone: customerUser?.phone ?? null,
+              staffUserId: staffRecord?.user_id ?? null,
+              staffName: `${updated.staff.first_name} ${updated.staff.last_name}`,
+              serviceName: serviceLabel,
+              appointmentDate: apptDate,
+              appointmentTime: existing.start_time,
+              reason: updateData.cancellation_reason ?? data.cancellation_reason ?? null,
+              cancelledByCustomer: isCustomerSelfService,
+              adminUserIds,
+            });
+          } else {
+            await notificationDispatch.dispatchAppointmentStatus({
+              appointmentId: id,
+              oldStatus: existing.status,
+              newStatus: data.status,
+              customerUserId: customerUser?.id ?? customerRecord?.user_id ?? 0,
+              customerName: `${updated.customer.first_name} ${updated.customer.last_name}`,
+              customerPhone: customerUser?.phone ?? null,
+              staffUserId: staffRecord?.user_id ?? null,
+              staffName: `${updated.staff.first_name} ${updated.staff.last_name}`,
+              serviceName: serviceLabel,
+              appointmentDate: apptDate,
+              appointmentTime: existing.start_time,
+              adminUserIds,
+            });
+          }
+        } catch (err: any) {
+          // Notification failure should not block status update
         }
-      } catch (err: any) {
-        // Notification failure should not block status update
       }
 
       // Tell the customer their booking now covers a different service set.
@@ -1054,6 +1069,50 @@ export class AppointmentService {
       where: { id },
       data: { deleted_at: new Date(), status: 'cancelled' },
     });
+
+    // Deleting a booking cancels it, so the customer is notified — unless it
+    // was already cancelled, in which case a notification was already sent.
+    if (existing.status !== 'cancelled') {
+      try {
+        const [customerRecord, staffRecord, service, adminUserIds] = await Promise.all([
+          prisma.customers.findUnique({
+            where: { id: existing.customer_id },
+            select: { user_id: true, first_name: true, last_name: true },
+          }),
+          prisma.staff.findUnique({
+            where: { id: existing.staff_id },
+            select: { user_id: true, first_name: true, last_name: true },
+          }),
+          prisma.services.findUnique({
+            where: { id: existing.service_id },
+            select: { name: true },
+          }),
+          notificationDispatch.getAdminUserIds(),
+        ]);
+        const customerUser = customerRecord
+          ? await prisma.users.findUnique({ where: { id: customerRecord.user_id }, select: { id: true, phone: true } })
+          : null;
+
+        await notificationDispatch.dispatchAppointmentCancelled({
+          appointmentId: id,
+          customerUserId: customerUser?.id ?? customerRecord?.user_id ?? 0,
+          customerName: `${customerRecord?.first_name ?? ''} ${customerRecord?.last_name ?? ''}`.trim(),
+          customerPhone: customerUser?.phone ?? null,
+          staffUserId: staffRecord?.user_id ?? null,
+          staffName: `${staffRecord?.first_name ?? ''} ${staffRecord?.last_name ?? ''}`.trim(),
+          serviceName: service?.name ?? 'appointment',
+          appointmentDate: new Date(existing.appointment_date).toLocaleDateString('en-PH', {
+            year: 'numeric', month: 'long', day: 'numeric',
+          }),
+          appointmentTime: existing.start_time,
+          reason: existing.cancellation_reason ?? null,
+          cancelledByCustomer: false,
+          adminUserIds,
+        });
+      } catch (err: any) {
+        // Notification failure should not block deletion
+      }
+    }
   }
 
   async getAvailability(staffId: number | undefined, serviceId: number, date: string, durationOverride?: number) {

@@ -3,6 +3,7 @@ import prisma from '../../config/database';
 import pricingService from '../../services/pricing.service';
 import { roundPeso } from '../../services/pricing-engine.core';
 import { computeQuoteLine, sumQuoteLines, type QuoteLine } from './pos-quote-math';
+import { notificationDispatch } from '../../services/notification-dispatch.service';
 
 class POSService {
   async getQuote(data: any) {
@@ -142,8 +143,11 @@ class POSService {
 
     // If appointment_id provided, complete the appointment and create treatment record
     if (data.appointment_id) {
-      const appointment = await prisma.appointments.findUnique({ where: { id: data.appointment_id } });
-      if (appointment && appointment.status !== 'completed') {
+      const appointment = await prisma.appointments.findUnique({
+        where: { id: data.appointment_id },
+      });
+      if (appointment && appointment.status !== 'completed' && appointment.status !== 'cancelled') {
+        const oldStatus = appointment.status;
         await prisma.appointments.update({
           where: { id: data.appointment_id },
           data: { status: 'completed' },
@@ -151,7 +155,7 @@ class POSService {
         await prisma.appointment_status_history.create({
           data: {
             appointment_id: data.appointment_id,
-            old_status: appointment.status,
+            old_status: oldStatus,
             new_status: 'completed',
             changed_by: data.discount_applied_by ?? data.staff_id ?? 0,
             reason: 'Service completed via POS checkout',
@@ -172,6 +176,51 @@ class POSService {
               end_time: appointment.end_time ?? null,
             },
           });
+        }
+
+        try {
+          const apptFull = await prisma.appointments.findUnique({
+            where: { id: data.appointment_id },
+            include: {
+              customer: { select: { user_id: true, first_name: true, last_name: true } },
+              staff: { select: { user_id: true, first_name: true, last_name: true } },
+              service: { select: { name: true } },
+            },
+          });
+          if (apptFull) {
+            const customerUser = await prisma.users.findUnique({
+              where: { id: apptFull.customer.user_id },
+              select: { id: true, phone: true },
+            });
+            const staffUser = apptFull.staff
+              ? await prisma.users.findUnique({
+                  where: { id: apptFull.staff.user_id },
+                  select: { id: true, phone: true },
+                })
+              : null;
+            const adminUserIds = await notificationDispatch.getAdminUserIds();
+            const apptDate = new Date(apptFull.appointment_date).toLocaleDateString('en-PH', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            });
+            await notificationDispatch.dispatchAppointmentStatus({
+              appointmentId: apptFull.id,
+              oldStatus,
+              newStatus: 'completed',
+              customerUserId: customerUser?.id ?? 0,
+              customerName: `${apptFull.customer.first_name} ${apptFull.customer.last_name}`,
+              customerPhone: customerUser?.phone ?? null,
+              staffUserId: staffUser?.id ?? null,
+              staffName: apptFull.staff ? `${apptFull.staff.first_name} ${apptFull.staff.last_name}` : '',
+              serviceName: apptFull.service.name,
+              appointmentDate: apptDate,
+              appointmentTime: apptFull.start_time ?? '',
+              adminUserIds,
+            });
+          }
+        } catch (err) {
+          // Notification failure should not block POS checkout
         }
       }
     }

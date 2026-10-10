@@ -27,6 +27,7 @@ const envSchema = z.object({
   MAIL_USER: z.string().default(''),
   MAIL_PASS: z.string().default(''),
   MAIL_FROM_NAME: z.string().default('Souvari Skin Lab'),
+  REVIEW_URL: z.string().optional().default(''),
 });
 
 const parsed = envSchema.safeParse(process.env);
