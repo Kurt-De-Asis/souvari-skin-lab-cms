@@ -178,7 +178,38 @@ const NON_PRODUCT_TOPICS = [
   'therapist', 'staff', 'doctor', 'nurse', 'age', 'pregnant',
   'pregnancy', 'breastfeeding', 'allergic', 'allergy', 'diabetes', 'surgery',
   'downtime', 'side effect', 'side effects',
+  // Service/category words and one-word clinic topics. None of these are ever a
+  // retail product ("waxing", "manicure", "facial", "laser", ...), so they must
+  // not be reported as "no product found" — they belong to the service side of
+  // the assistant.
+  'facial', 'facials', 'laser', 'peel', 'peels', 'botox', 'filler', 'fillers',
+  'injection', 'injectables', 'nail', 'nails', 'manicure', 'pedicure', 'biab',
+  'hifu', 'wax', 'waxing', 'hydrafacial', 'glow', 'whitening', 'microdermabrasion',
+  'microneedling', 'dermapen', 'menu', 'body contour', 'lipo', 'lipolysis',
+  'slimming', 'threading', 'thread', 'hand spa', 'foot spa',
+  'gel polish', 'gel nails', 'lash', 'lashes', 'eyelash', 'brow', 'eyebrow',
+  'microblading', 'lamination', 'pmu', 'permanent makeup', 'rf', 'meso',
+  'rejuran', 'pdrn', 'exosome', 'glutathione', 'gluta', 'vitamin c', 'nad',
+  'infusion', 'drip', 'scalp', 'hair loss', 'hairfall', 'tattoo removal',
+  'skin tag', 'skincare', 'skin care', 'scrub', 'gua sha', 'massage',
+  'offer', 'offers', 'offering', 'offerings',
+  // Eye-area concerns. Include spelling variants (eye bags / eyebags / the
+  // common "eyeabags" typo) so a concern question is never reported as a missing
+  // product.
+  'eye bag', 'eye bags', 'eyebag', 'eyebags', 'eyeabag', 'eyeabags',
+  'under eye', 'under-eye', 'undereye', 'dark circle', 'dark circles',
+  'puffy eye', 'puffy eyes', 'eye area', 'eye puffiness', 'tired eye', 'tired eyes',
 ];
+
+/**
+ * True when the message mentions a clinic topic that is handled by the rest of
+ * the assistant rather than by the product catalog. Matching is a substring
+ * check against the raw lowercased text (the tokenizer strips exactly these
+ * kinds of words), so "what are your hours?" and a bare "waxing" both count.
+ */
+export function isNonProductTopic(lower: string): boolean {
+  return NON_PRODUCT_TOPICS.some((topic) => lower.includes(topic));
+}
 
 /**
  * Detect a question that is shaped like a lookup of a *thing* the clinic sells,

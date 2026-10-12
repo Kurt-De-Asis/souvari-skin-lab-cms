@@ -3,6 +3,7 @@ import {
   normalizeQuery,
   mentionsProduct,
   isCatalogBrowseQuery,
+  isNonProductTopic,
   isReferentialProductFollowUp,
   looksLikeProductLookup,
   matchProducts,
@@ -402,6 +403,47 @@ describe('looksLikeProductLookup', () => {
   it('ignores unrelated chatter', () => {
     expect(looksLikeProductLookup(normalizeQuery('who are you'))).toBe(false);
     expect(looksLikeProductLookup(normalizeQuery('   '))).toBe(false);
+  });
+});
+
+describe('isNonProductTopic', () => {
+  it('recognizes generic service and category words', () => {
+    expect(isNonProductTopic('services')).toBe(true);
+    expect(isNonProductTopic('what are your hours?')).toBe(true);
+    expect(isNonProductTopic('do you have packages')).toBe(true);
+    expect(isNonProductTopic('how much is a facial')).toBe(true);
+    expect(isNonProductTopic('do you offer laser')).toBe(true);
+  });
+
+  it('recognizes one-word service and treatment topics', () => {
+    const topics = [
+      'waxing', 'manicure', 'pedicure', 'biab', 'gel nails', 'threading',
+      'lash lift', 'microblading', 'pmu', 'hifu', 'rf', 'rejuran', 'pdrn',
+      'exosome', 'glutathione', 'vitamin c', 'nad', 'meso', 'gua sha',
+      'body scrub', 'scalp', 'botox', 'filler', 'chemical peel',
+    ];
+    for (const topic of topics) {
+      expect(isNonProductTopic(topic)).toBe(true);
+    }
+  });
+
+  it('does not treat retail product names as non-product topics', () => {
+    expect(isNonProductTopic('radiance serum')).toBe(false);
+    expect(isNonProductTopic('zephyr breeze gel')).toBe(false);
+    expect(isNonProductTopic('midnight balm')).toBe(false);
+  });
+
+  it('does not fire on unrelated chatter', () => {
+    expect(isNonProductTopic('pizza')).toBe(false);
+    expect(isNonProductTopic('   ')).toBe(false);
+  });
+
+  it('recognizes eye-area concerns, including the common "eyeabags" typo', () => {
+    expect(isNonProductTopic('i have eyeabags')).toBe(true);
+    expect(isNonProductTopic('eye bags')).toBe(true);
+    expect(isNonProductTopic('under eye bags')).toBe(true);
+    expect(isNonProductTopic('dark circles')).toBe(true);
+    expect(isNonProductTopic('puffy eyes')).toBe(true);
   });
 });
 

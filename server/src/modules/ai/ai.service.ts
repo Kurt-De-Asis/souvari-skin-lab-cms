@@ -6,6 +6,7 @@ import {
   loadRetailProducts,
   matchProducts,
   isCatalogBrowseQuery,
+  isNonProductTopic,
   isReferentialProductFollowUp,
   isThingLookupShape,
   looksLikeProductLookup,
@@ -42,6 +43,9 @@ class AiService {
     'wrinkle', 'wrinkles', 'fine line', 'fine lines', 'sagging', 'pore', 'pores', 'oily',
     'spot', 'spots', 'scar', 'scars', 'lifting', 'firming', 'aging', 'whitening', 'glow',
     'hyperpigmentation', 'melasma', 'dark spot', 'dark spots', 'blemish', 'breakout',
+    'eye bag', 'eye bags', 'eyebag', 'eyebags', 'eyeabag', 'eyeabags', 'under eye',
+    'under-eye', 'undereye', 'dark circle', 'dark circles', 'puffy eye', 'puffy eyes',
+    'eye area', 'eye puffiness', 'tired eye', 'tired eyes',
   ];
 
   /** Ambiguous words — only clinic-related when supported by another signal (you/your, or 2+ words). */
@@ -53,6 +57,24 @@ class AiService {
     'best-seller', 'best-selling', 'bestseller', 'top service', 'most requested',
     'most booked', 'address', 'location', 'located', 'phone', 'contact', 'where', 'reach',
     'which service', 'what to get',
+  ];
+
+  /**
+   * Clinic-operational words that each have a dedicated answer in the rule-based
+   * engine (hours, pricing, contact, booking, services, best sellers, ...). A
+   * single hit is enough to be clinic-related, so one-word asks like "hours?",
+   * "price?", "contact?", "services?" get answered instead of refused as
+   * off-topic. Truly random words ("pizza", "ufo") still fail this gate.
+   */
+  private static readonly OPERATIONAL_KEYWORDS = [
+    'hour', 'hours', 'open', 'close', 'closed', 'time', 'times', 'schedule',
+    'price', 'prices', 'pricing', 'pricelist', 'cost', 'fee', 'fees', 'rate', 'rates',
+    'how much', 'contact', 'phone', 'number', 'address', 'location', 'located', 'where',
+    'reach', 'book', 'booking', 'booked', 'reserve', 'reservation',
+    'service', 'services', 'offer', 'offers', 'menu', 'package', 'packages',
+    'recommend', 'recommendation', 'recommendations', 'suggest', 'suggestion',
+    'popular', 'best seller', 'best selling', 'bestseller', 'top service',
+    'most requested', 'most booked', 'promo', 'voucher',
   ];
 
   /** Concise, on-topic answers for one-word / very short questions (e.g. "acne", "nails", "botox"). */
@@ -93,7 +115,7 @@ class AiService {
       needles: ['hydrafacial'],
     },
     {
-      tokens: ['hifu'],
+      tokens: ['hifu', 'ultratight', 'ultra tight'],
       blurb: 'HIFU uses focused ultrasound to lift and tighten the face and neck without surgery or downtime.',
       needles: ['hifu'],
     },
@@ -146,6 +168,136 @@ class AiService {
       tokens: ['membership', 'member', 'vip'],
       blurb: 'We offer VIP memberships with exclusive discounts and perks.',
       needles: [],
+    },
+    {
+      tokens: ['waxing', 'wax', 'hot wax', 'bikini wax', 'brazilian wax'],
+      blurb: 'Hot-wax and wet-wax hair removal leaves skin smooth for weeks — for the face, underarms, and body.',
+      needles: ['wax', 'waxing', 'brazilian'],
+    },
+    {
+      tokens: ['threading', 'thread lift', 'threadlift', 'nose thread', 'thread'],
+      blurb: 'Precision threading shapes clean eyebrow, lip, chin, and full-face lines — plus non-surgical thread lifts for firming.',
+      needles: ['thread', 'threading'],
+    },
+    {
+      tokens: ['microneedling', 'micro needling'],
+      blurb: 'Microneedling with Dermapen stimulates collagen to smooth scars, refine pores, and improve texture.',
+      needles: ['dermapen', 'microneedling'],
+    },
+    {
+      tokens: ['manicure', 'mani'],
+      blurb: 'Our manicures keep hands polished and nails healthy — from classic care to UV gel finishes.',
+      needles: ['manicure'],
+    },
+    {
+      tokens: ['pedicure', 'pedi'],
+      blurb: 'Our pedicures refresh and soften feet with cuticle care, shaping, and polish options.',
+      needles: ['pedicure'],
+    },
+    {
+      tokens: ['biab'],
+      blurb: 'Soft BIAB builds a breathable, natural-looking structure that strengthens and shapes your nails.',
+      needles: ['biab'],
+    },
+    {
+      tokens: ['gel nails', 'gel polish', 'gel manicure', 'uv gel', 'soft gel', 'gel extensions'],
+      blurb: 'UV gel looks give a glossy, chip-resistant finish that lasts — in manicure, pedicure, and extension styles.',
+      needles: ['gel'],
+    },
+    {
+      tokens: ['nail extension', 'nail extensions', 'extension removal', 'extension repair', 'dual form', 'soft gel extension'],
+      blurb: 'Nail extensions add length and shape with soft gel or dual-form techniques, with repairs and removals.',
+      needles: ['extension', 'dual form'],
+    },
+    {
+      tokens: ['hand spa'],
+      blurb: 'Our hand spa rituals exfoliate, moisturize, and restore dry, tired hands.',
+      needles: ['hand spa', 'spa'],
+    },
+    {
+      tokens: ['foot spa'],
+      blurb: 'Our foot spa treatments soften hard skin and revive tired feet — from essential to deluxe care.',
+      needles: ['foot spa', 'spa'],
+    },
+    {
+      tokens: ['lash', 'lashes', 'eyelash', 'lash lift', 'lash tint', 'lash extension', 'eyelash extension'],
+      blurb: 'Eyelash extensions and keratin lash lifts add instant length and curl with no mascara needed.',
+      needles: ['lash', 'eyelash'],
+    },
+    {
+      tokens: ['brow', 'brows', 'eyebrow', 'microblading', 'lamination', 'eyebrow threading', 'eyebrow design', 'tint', 'ombre brow', 'ombré brow', 'ombre brows', 'ombré brows'],
+      blurb: 'Brow shapes that frame your face — microblading, lamination, tinting, threading, and ombré powder styles.',
+      needles: ['brow', 'microblading', 'tint', 'threading'],
+    },
+    {
+      tokens: ['permanent makeup', 'permanent make-up', 'pmu', 'lip pigmentation', 'lips pigmentation', 'lip blush', 'eyeliner', 'eyeliner pigmentation', 'tattoo removal', 'tattoo'],
+      blurb: 'Permanent makeup gives long-lasting brow, lash-line, and lip color — with professional touch-ups and tattoo removal.',
+      needles: ['eyeliner', 'brow', 'lip pigment', 'lips', 'pmu', 'touch-up', 'tattoo'],
+    },
+    {
+      tokens: ['rf', 'radio frequency', 'radiofrequency'],
+      blurb: 'Radio-frequency (RF) treatments tighten and firm the skin and body, with a non-invasive lift.',
+      needles: ['hifu', 'tighten', 'contour'],
+    },
+    {
+      tokens: ['rejuran'],
+      blurb: 'Rejuran skin boosters deliver rejuvenating polynucleotides to repair, hydrate, and revive tired skin.',
+      needles: ['rejuran', 'booster'],
+    },
+    {
+      tokens: ['pdrn'],
+      blurb: 'PDRN treatments support deep skin healing and regeneration for a smoother, more resilient complexion.',
+      needles: ['pdrn', 'rejuran', 'exosome'],
+    },
+    {
+      tokens: ['exosome', 'scalp', 'hair loss', 'hairfall', 'hair fall', 'hair thinning', 'regrow', 'regrowth'],
+      blurb: 'Exosome and scalp therapies help regenerate hair, calm the scalp, and support healthy regrowth.',
+      needles: ['exosome', 'pdrn', 'scalp'],
+    },
+    {
+      tokens: ['glutathione', 'gluta'],
+      blurb: 'Glutathione treatments brighten and even out skin tone for a healthy, luminous glow.',
+      needles: ['glutathione', 'whitening', 'glow'],
+    },
+    {
+      tokens: ['vitamin c', 'vit c'],
+      blurb: 'Vitamin C brightens dull skin, fades dark spots, and boosts collagen — as serums, drips, and mask add-ons.',
+      needles: ['vitamin c', 'glutathione'],
+    },
+    {
+      tokens: ['iv drip', 'nad', 'nad+', 'infusion', 'longevity', 'iv therapy', 'drip'],
+      blurb: 'IV drips and NAD+ infusions are popular for an instant energy, hydration, and radiance boost.',
+      needles: ['nad', 'infusion', 'lumiere', 'vitamin c', 'glutathione'],
+    },
+    {
+      tokens: ['meso', 'lipolysis', 'mesolipo'],
+      blurb: 'Mesotherapy and lipolysis treatments target stubborn pockets of fat for a smoother, sleeker silhouette.',
+      needles: ['lipolysis', 'meso', 'lipo', 'slim'],
+    },
+    {
+      tokens: ['gua sha', 'guasha'],
+      blurb: 'Gua sha facial massage relieves tension, boosts circulation, and restores a natural glow.',
+      needles: ['facial', 'gua sha'],
+    },
+    {
+      tokens: ['body scrub', 'scrub'],
+      blurb: 'Full-body scrubs exfoliate and smooth rough, dry skin for an instant softness and glow.',
+      needles: ['scrub', 'hand spa', 'foot spa'],
+    },
+    {
+      tokens: ['wart', 'warts', 'skin tag', 'skin tags'],
+      blurb: 'Wart and skin-tag removal clears bumps safely, with aftercare creams to ease healing.',
+      needles: ['wart', 'skin tag'],
+    },
+    {
+      tokens: ['diamond', 'diamond glow', 'diamond peel'],
+      blurb: 'Our diamond-finish treatments — like Diamond Glow and Diamond Peel — brighten, exfoliate, and polish the skin.',
+      needles: ['diamond'],
+    },
+    {
+      tokens: ['eye bag', 'eye bags', 'eyebag', 'eyeabag', 'eyeabags', 'under eye', 'undereye', 'dark circle', 'dark circles', 'puffy eye', 'puffy eyes', 'tired eye', 'tired eyes'],
+      blurb: 'Under-eye bags and dark circles can come from fluid retention, pigmentation, or loss of volume around the eye. We treat the eye area with tightening HIFU, Rejuran eye boosters, and under-eye brightening programs.',
+      needles: ['eye area', 'rejuran eye', 'undereye', 'under eye', 'hifu'],
     },
   ];
 
@@ -223,6 +375,12 @@ class AiService {
       phrases: ['skin rejuvenation', 'youthful skin', 'skin renewal'],
       targets: ['skin rejuvenation laser', 'chemical peel', 'diamond peel', 'dermapen', 'rejuran'],
     },
+    {
+      label: 'eye bags and dark circles',
+      tokens: ['eyebag', 'eyeabag', 'eyeabags', 'puffy', 'puffiness'],
+      phrases: ['eye bag', 'eye bags', 'under eye', 'under-eye', 'undereye', 'dark circle', 'dark circles', 'puffy eyes', 'tired eyes', 'eye area'],
+      targets: ['eye area', 'hifu', 'rejuran eye', 'undereye', 'under eye'],
+    },
   ];
 
   private static readonly CATEGORY_STOP_TOKENS = new Set([
@@ -252,6 +410,12 @@ class AiService {
     // 1b) A bare topic word (e.g. "acne", "nails", "botox") is on-topic on its own.
     for (const topic of AiService.SHORT_TOPICS) {
       if (topic.tokens.some((tok) => lower.includes(tok))) return true;
+    }
+
+    // 1c) Clinic-operational words with a dedicated answer ("hours?", "price?",
+    // "services?") are on-topic on their own.
+    for (const kw of AiService.OPERATIONAL_KEYWORDS) {
+      if (lower.includes(kw)) return true;
     }
 
     // 2) Any active service name/category counts as a strong signal.
@@ -674,30 +838,63 @@ You should be friendly, professional, and helpful while staying within these bou
     let sessionToken = input.session_token;
     let session;
 
-    if (sessionToken) {
-      session = await prisma.chat_sessions.findUnique({
-        where: { session_token: sessionToken },
-      });
-    }
+    try {
+      if (sessionToken) {
+        session = await prisma.chat_sessions.findUnique({
+          where: { session_token: sessionToken },
+        });
+      }
 
-    if (!session) {
-      sessionToken = crypto.randomBytes(32).toString('hex');
-      session = await prisma.chat_sessions.create({
+      if (!session) {
+        sessionToken = crypto.randomBytes(32).toString('hex');
+        session = await prisma.chat_sessions.create({
+          data: {
+            user_id: userId || null,
+            session_token: sessionToken,
+          },
+        });
+      }
+
+      await prisma.chat_messages.create({
         data: {
-          user_id: userId || null,
-          session_token: sessionToken,
+          session_id: session.id,
+          sender_type: 'user',
+          content: input.message,
         },
       });
+
+      const botResponse = await this.buildBotResponse(input, session.id);
+
+      await prisma.chat_messages.create({
+        data: {
+          session_id: session.id,
+          sender_type: 'bot',
+          content: botResponse,
+        },
+      });
+
+      return {
+        session_token: sessionToken,
+        response: botResponse,
+      };
+    } catch (error) {
+      console.error('AI processing failed:', error);
+      // Never surface a 500 to the chat widget: answer gracefully instead.
+      return {
+        session_token: input.session_token ?? sessionToken,
+        response:
+          "I'm sorry, something went wrong while processing your message. Please try again in a moment, or contact the clinic directly for immediate assistance.",
+      };
     }
+  }
 
-    await prisma.chat_messages.create({
-      data: {
-        session_id: session.id,
-        sender_type: 'user',
-        content: input.message,
-      },
-    });
-
+  /**
+   * Runs the deterministic pipeline (greetings/thanks/emergency, product lookup,
+   * relevance gate, LLM + fallback) and returns just the reply text. The caller
+   * persists the user + bot messages; splitting it this way lets a routing
+   * failure be answered gracefully instead of as a 500.
+   */
+  private async buildBotResponse(input: SendMessageInput, sessionId: number): Promise<string> {
     let botResponse: string;
 
     if (env.AI_API_KEY) {
@@ -722,36 +919,30 @@ You should be friendly, professional, and helpful while staying within these bou
         // being reported as a product we do not have.
         const followUpIntents = this.followUpProductIntents(lower);
         const followUpReply = followUpIntents
-          ? await this.productAnswer(session.id, input.message, followUpIntents, services)
+          ? await this.productAnswer(sessionId, input.message, followUpIntents, services)
           : null;
 
         // Products are resolved from the database before the LLM, so a product
         // question never reaches the model and can never be embellished.
-        const productReply = followUpReply ?? (await this.productAnswer(session.id, input.message, undefined, services));
+        const productReply = followUpReply ?? (await this.productAnswer(sessionId, input.message, undefined, services));
         if (productReply) {
           botResponse = productReply;
         } else if (!(await this.isClinicRelated(lower, services))) {
           botResponse = this.OFF_TOPIC_REPLY;
+        } else if (this.isGenericServiceBrowse(lower, services)) {
+          // Bare "services" / "what do you offer" is answered with the category
+          // overview + a clarifying question, deterministically, instead of
+          // handing it to the model.
+          botResponse = this.clarifyResponse('services');
         } else {
-          botResponse = await this.llmWithFallback(input.message, session.id);
+          botResponse = await this.llmWithFallback(input.message, sessionId);
         }
       }
     } else {
-      botResponse = await this.ruleBasedResponse(input.message, session.id);
+      botResponse = await this.ruleBasedResponse(input.message, sessionId);
     }
 
-    await prisma.chat_messages.create({
-      data: {
-        session_id: session.id,
-        sender_type: 'bot',
-        content: botResponse,
-      },
-    });
-
-    return {
-      session_token: sessionToken,
-      response: botResponse,
-    };
+    return botResponse;
   }
 
   /** Calls the configured model but falls back to the deterministic engine on ANY error. */
@@ -769,7 +960,7 @@ You should be friendly, professional, and helpful while staying within these bou
     const openai = new OpenAI({
       apiKey: env.AI_API_KEY,
       baseURL: env.AI_BASE_URL || undefined,
-      timeout: 30000,
+      timeout: 20000,
     });
 
     const recentMessages = await prisma.chat_messages.findMany({
@@ -785,17 +976,29 @@ You should be friendly, professional, and helpful while staying within these bou
 
     const systemPrompt = await this.buildSystemPrompt();
 
-    const completion = await openai.chat.completions.create({
-      model: env.AI_MODEL,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...history,
-      ],
-      max_tokens: 300,
-      temperature: 0.7,
-    });
+    // Retry once on transient failures (timeouts, rate limits, 5xx). If both
+    // attempts fail the error is rethrown and llmWithFallback takes over.
+    let content: string | null = null;
+    for (let attempt = 0; attempt < 2 && content === null; attempt += 1) {
+      if (attempt > 0) {
+        console.warn('OpenAI call failed, retrying...');
+      }
+      try {
+        const completion = await openai.chat.completions.create({
+          model: env.AI_MODEL,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...history,
+          ],
+          max_tokens: 300,
+          temperature: 0.7,
+        });
+        content = completion.choices[0]?.message?.content ?? null;
+      } catch (error) {
+        if (attempt === 1) throw error;
+      }
+    }
 
-    const content = completion.choices[0]?.message?.content;
     if (!content) {
       return "I'm sorry, I couldn't generate a response. Please contact the clinic directly.";
     }
@@ -905,6 +1108,25 @@ You should be friendly, professional, and helpful while staying within these bou
     return AiService.SKIN_CONCERNS.some((group) => this.concernHits(lowerMessage, msgTokens, group).length > 0);
   }
 
+  /**
+   * Bare service-browse messages ("services", "what do you offer", "service
+   * menu") get the deterministic category overview + clarifying question rather
+   * than being handed to the model — but only when the user has not already
+   * named a concern, category, or specific service (those deserve a real answer).
+   */
+  private isGenericServiceBrowse(lowerMessage: string, services: Array<{ name: string; category: string }>): boolean {
+    const browse =
+      /\bservices?\b/.test(lowerMessage) ||
+      /\boffering?s?\b/.test(lowerMessage) ||
+      lowerMessage.includes('service menu') ||
+      lowerMessage.includes('the menu') ||
+      lowerMessage.trim() === 'menu' ||
+      lowerMessage.includes('what do you have') ||
+      lowerMessage.includes('what have you got') ||
+      lowerMessage.includes('what can you offer');
+    return browse && !this.hasSpecificNeed(lowerMessage, services);
+  }
+
   /** One-round clarification probe used before recommending / listing when the request is too vague. */
   private clarifyResponse(kind: 'recommend' | 'services' | 'pricing'): string {
     const categories =
@@ -1006,12 +1228,28 @@ You should be friendly, professional, and helpful while staying within these bou
       // must continue down the normal path.
       if (services.length > 0 && this.findServiceByMessage(lowerMessage, services)) return null;
 
+      // A named service category is a service question too ("how much is a
+      // facial?"), answered by the pricing/services sections below.
+      if (this.mentionedCategory(lowerMessage, services)) return null;
+
+      // Clinic topics with their own answer ("what are your hours?", "waxing",
+      // "do you have packages?") must never be reported as missing products.
+      if (isNonProductTopic(lowerMessage)) return null;
+
       // The message asked about something the clinic sells but nothing matched.
       // Answering "we do not carry that" is required here: falling through would
       // let the model invent details about a product that does not exist.
       // A request to see the catalog as a whole is answered with the catalog, not
       // with "we do not have that".
       if (isCatalogBrowseQuery(query)) return renderCatalogReply(products);
+
+      // A bare, short word that is neither a clinic topic nor a service is
+      // off-topic chatter ("pizza", "ufo"), not a product miss. Return null so
+      // the relevance gate can refuse it instead of claiming a product is
+      // missing. Longer product-shaped questions still get the honest miss.
+      if (query.isBareName && query.tokens.length <= 2 && !(await this.isClinicRelated(lowerMessage, services))) {
+        return null;
+      }
 
       return renderNoMatchReply();
     }
