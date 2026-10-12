@@ -445,6 +445,21 @@ describe('isNonProductTopic', () => {
     expect(isNonProductTopic('dark circles')).toBe(true);
     expect(isNonProductTopic('puffy eyes')).toBe(true);
   });
+
+  it('recognizes concern and treatment vocabulary across every catalog category', () => {
+    const topics = [
+      'blackheads', 'whiteheads', 'black heads', 'extraction', 'dermaclear',
+      'redness', 'rosacea', 'sensitive skin', 'eczema', 'stretch marks', 'keloid',
+      'double chin', 'jawline', 'tightening', 'body fat', 'belly fat', 'love handles',
+      'bra fat', 'cellulite', 'weight loss', 'underarm', 'armpit', 'hyperhidrosis',
+      'body odor', 'sweating', 'chapped lips', 'dry lips', 'lip balm', 'shaving',
+      'hairy legs', 'body hair', 'facial hair', 'acrylic', 'keratin', 'nail fungus',
+      'milia',
+    ];
+    for (const topic of topics) {
+      expect(isNonProductTopic(topic)).toBe(true);
+    }
+  });
 });
 
 describe('isReferentialProductFollowUp', () => {

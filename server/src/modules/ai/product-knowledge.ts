@@ -199,6 +199,29 @@ const NON_PRODUCT_TOPICS = [
   'eye bag', 'eye bags', 'eyebag', 'eyebags', 'eyeabag', 'eyeabags',
   'under eye', 'under-eye', 'undereye', 'dark circle', 'dark circles',
   'puffy eye', 'puffy eyes', 'eye area', 'eye puffiness', 'tired eye', 'tired eyes',
+  // Concern and treatment vocabulary across every catalog category. None of these
+  // is ever a retail product, so a question about one must be handled by the
+  // service side of the assistant rather than reported as a missing product.
+  'blackhead', 'blackheads', 'black head', 'black heads', 'whitehead', 'whiteheads',
+  'white head', 'white heads', 'comedone', 'comedones', 'extraction', 'extractions',
+  'dermaclear', 'derma clear', 'microdermabrasion', 'pdt',
+  'redness', 'rosacea', 'vascular', 'sensitive', 'sensitivity', 'irritated', 'irritation',
+  'eczema', 'dermatitis', 'rash', 'allergic', 'allergy',
+  'stretch mark', 'stretch marks', 'striae', 'keloid', 'keloids', 'scar revision',
+  'jowl', 'jowls', 'jawline', 'jaw line', 'double chin', 'loose skin', 'laxity', 'saggy',
+  'tighten', 'tightening', 'nasolabial', 'marionette', 'smile lines', 'forehead lines',
+  "crow's feet", 'crows feet', 'collagen',
+  'cellulite', 'body fat', 'fat body', 'belly fat', 'love handle', 'love handles',
+  'bra fat', 'flabby', 'flab', 'stubborn fat', 'weight loss', 'lose weight', 'overweight',
+  'obese', 'chubby', 'body contour', 'body contouring', 'body shaping',
+  'underarm', 'underarms', 'armpit', 'armpits', 'under arm', 'body odor', 'body odour',
+  'hyperhidrosis', 'excessive sweat', 'sweat', 'sweating', 'sweaty',
+  'chapped', 'cracked lip', 'cracked lips', 'dry lip', 'dry lips', 'lip balm', 'lip care',
+  'lip scrub', 'lip gloss', 'lip tint', 'dark lip', 'dark lips',
+  'shave', 'shaving', 'hair removal', 'unwanted hair', 'body hair', 'facial hair',
+  'hair growth', 'hirsutism', 'mustache', 'moustache', 'beard', 'sideburns', 'hairline',
+  'hairy', 'acrylic', 'cuticle', 'ingrown', 'nail fungus', 'nail art', 'nail polish',
+  'keratin', 'wart', 'warts', 'skin tag', 'skin tags', 'mole', 'moles', 'milia',
 ];
 
 /**

@@ -46,6 +46,53 @@ class AiService {
     'eye bag', 'eye bags', 'eyebag', 'eyebags', 'eyeabag', 'eyeabags', 'under eye',
     'under-eye', 'undereye', 'dark circle', 'dark circles', 'puffy eye', 'puffy eyes',
     'eye area', 'eye puffiness', 'tired eye', 'tired eyes',
+    // Acne / texture concerns and treatments.
+    'blackhead', 'blackheads', 'black head', 'black heads', 'whitehead', 'whiteheads',
+    'white head', 'white heads', 'comedone', 'comedones', 'extraction', 'extractions',
+    'dermaclear', 'derma clear', 'microdermabrasion', 'pdt',
+    // Redness, sensitivity and irritation.
+    'redness', 'rosacea', 'vascular', 'sensitive', 'sensitivity', 'irritated', 'irritation',
+    'eczema', 'dermatitis', 'allergic', 'allergy',
+    // Scars, marks and firming.
+    'stretch mark', 'stretch marks', 'striae', 'keloid', 'keloids', 'scar revision',
+    'jowl', 'jowls', 'jawline', 'jaw line', 'double chin', 'loose skin', 'laxity', 'saggy',
+    'tighten', 'tightening', 'nasolabial', 'marionette', 'smile lines', 'forehead lines',
+    "crow's feet", 'crows feet', 'collagen',
+    // Body contouring and weight.
+    'cellulite', 'body fat', 'fat body', 'belly fat', 'love handle', 'love handles',
+    'bra fat', 'flabby', 'flab', 'stubborn fat', 'weight loss', 'lose weight', 'overweight',
+    'obese', 'chubby', 'body contour', 'body contouring', 'body shaping',
+    // Underarms, sweating and odour.
+    'underarm', 'underarms', 'armpit', 'armpits', 'under arm', 'body odor', 'body odour',
+    'hyperhidrosis', 'excessive sweat',
+    // Lips.
+    'chapped', 'cracked lip', 'cracked lips', 'lip balm', 'lip care', 'lip scrub',
+    'lip gloss', 'lip tint', 'dark lip', 'dark lips',
+    // Hair and hair removal.
+    'shave', 'shaving', 'hair removal', 'unwanted hair', 'body hair', 'facial hair',
+    'hair growth', 'hirsutism', 'mustache', 'moustache', 'beard', 'sideburns', 'hairline',
+    'hairy',
+    // Nails, lashes and spa.
+    'acrylic', 'cuticle', 'ingrown', 'nail fungus', 'nail art', 'nail polish', 'keratin',
+    // Bumps and growths.
+    'milia',
+  ];
+
+  /**
+   * Word-boundary signals for short or collision-prone terms where a plain
+   * substring check would produce false positives ("spa" in "spaghetti",
+   * "gel" in "angel", "lip" in "clip", "fat" in "father", "hair" in "chair").
+   */
+  private static readonly STRONG_CLINIC_PATTERNS: RegExp[] = [
+    /\blips?\b/,
+    /\bgel\b/,
+    /\bspa\b/,
+    /\bfats?\b|\bfatty\b/,
+    /\bhair\b/,
+    /\bsweat(y|ing)?\b/,
+    /\bmoles?\b/,
+    /\brash(es)?\b/,
+    /\bwarts?\b/,
   ];
 
   /** Ambiguous words — only clinic-related when supported by another signal (you/your, or 2+ words). */
@@ -299,15 +346,75 @@ class AiService {
       blurb: 'Under-eye bags and dark circles can come from fluid retention, pigmentation, or loss of volume around the eye. We treat the eye area with tightening HIFU, Rejuran eye boosters, and under-eye brightening programs.',
       needles: ['eye area', 'rejuran eye', 'undereye', 'under eye', 'hifu'],
     },
+    {
+      tokens: ['blackhead', 'blackheads', 'black head', 'black heads', 'whitehead', 'whiteheads', 'white head', 'white heads', 'comedone', 'comedones'],
+      blurb: 'Blackheads and whiteheads are clogged pores — deep-cleansing facials, carbon laser, and extraction treatments clear them and refine texture.',
+      needles: ['dermaclear', 'carbon laser', 'hydrafacial', 'extraction'],
+    },
+    {
+      tokens: ['pores', 'large pores', 'big pores', 'open pores'],
+      blurb: 'Enlarged pores usually come from excess oil and build-up — carbon laser, HydraFacial, and diamond treatments refine and tighten them.',
+      needles: ['carbon laser', 'hydrafacial', 'diamond', 'dermaclear'],
+    },
+    {
+      tokens: ['fat', 'fatty', 'body fat', 'fat body', 'belly', 'belly fat', 'tummy', 'love handle', 'love handles', 'bra fat', 'flabby', 'flab', 'stubborn fat', 'weight loss', 'lose weight', 'overweight', 'obese', 'chubby'],
+      blurb: 'Body contouring and slimming treatments target stubborn fat pockets and tone the body, with fat-dissolving injectables and RF/HIFU tightening.',
+      needles: ['lipolysis', 'contour', 'lipo'],
+    },
+    {
+      tokens: ['double chin', 'chin fat', 'jawline', 'jaw line', 'jowl', 'jowls', 'marionette', 'nasolabial'],
+      blurb: 'Double chin and jawline concerns are treated with HIFU, RF, and fat-dissolving lipolysis for a sharper, more defined lower face.',
+      needles: ['double chin', 'jawline', 'chin lift', 'lipolysis'],
+    },
+    {
+      tokens: ['lip', 'lips', 'chapped lip', 'chapped lips', 'cracked lip', 'cracked lips', 'dry lip', 'dry lips', 'lip balm', 'lip care', 'lip gloss', 'lip tint', 'lip scrub'],
+      blurb: 'From hydration and barrier-repair lip treatments to tint and pigmentation, we keep lips soft, smooth, and naturally colored.',
+      needles: ['dmae', 'revitalization'],
+    },
+    {
+      tokens: ['redness', 'rosacea', 'sensitive', 'sensitivity', 'irritated', 'irritation', 'rash', 'rashes', 'eczema', 'dermatitis'],
+      blurb: 'Redness, sensitivity, and irritation are calmed with gentle brightening facials and skin-repairing treatments.',
+      needles: ['glow', 'diamond', 'hydrafacial', 'carbon laser'],
+    },
+    {
+      tokens: ['stretch mark', 'stretch marks', 'striae', 'keloid', 'keloids', 'scar revision', 'raised scar'],
+      blurb: 'Scars, stretch marks, and keloids are treated with collagen-stimulating microneedling and advanced scar-revision procedures.',
+      needles: ['scar'],
+    },
+    {
+      tokens: ['underarm', 'underarms', 'armpit', 'armpits', 'under arm', 'body odor', 'body odour', 'hyperhidrosis', 'sweat', 'sweaty', 'sweating', 'excessive sweating'],
+      blurb: 'Underarm concerns like darkening and excessive sweating are treated with whitening laser and Botox hyperhidrosis therapy.',
+      needles: ['whitening', 'hyperhidrosis'],
+    },
+    {
+      tokens: ['shave', 'shaving', 'hairy', 'hairy legs', 'leg hair', 'body hair', 'facial hair', 'hair growth', 'hirsutism', 'mustache', 'moustache', 'beard', 'sideburns'],
+      blurb: 'Unwanted body and facial hair is reduced with DIODE laser hair removal — smooth results on the legs, underarms, face, and more.',
+      needles: ['legs', 'arms', 'upper lip', 'brazilian', 'underarms'],
+    },
+    {
+      tokens: ['gel', 'gel polish', 'gel nails', 'gel manicure', 'uv gel', 'soft gel'],
+      blurb: 'UV gel gives a glossy, chip-resistant finish for manicures, pedicures, and extensions that lasts for weeks.',
+      needles: ['gel', 'manicure', 'pedicure', 'extension'],
+    },
+    {
+      tokens: ['spa', 'hand spa', 'foot spa'],
+      blurb: 'Our hand and foot spa rituals exfoliate, massage, and moisturize — from essential to deluxe care.',
+      needles: ['hand spa', 'foot spa'],
+    },
+    {
+      tokens: ['keratin', 'lash lift', 'lash tint'],
+      blurb: 'Keratin lash lifts and tints add curl, color, and length to your natural lashes.',
+      needles: ['lash', 'eyelash'],
+    },
   ];
 
   /** Skin-concern knowledge map used for scored recommendations. */
   private static readonly SKIN_CONCERNS = [
     {
       label: 'acne and blemishes',
-      tokens: ['acne', 'blemish', 'blemishes', 'pimple', 'pimples', 'breakout', 'breakouts', 'sebum', 'cystic', 'zit', 'zits', 'blackhead', 'blackheads'],
-      phrases: ['acne scar', 'acne scars'],
-      targets: ['acne treatment', 'acne clear', 'dermapen', 'carbon laser', 'pico laser'],
+      tokens: ['acne', 'blemish', 'blemishes', 'pimple', 'pimples', 'breakout', 'breakouts', 'sebum', 'cystic', 'zit', 'zits', 'blackhead', 'blackheads', 'whitehead', 'whiteheads', 'comedone', 'comedones', 'congested', 'congestion', 'clogged'],
+      phrases: ['acne scar', 'acne scars', 'clogged pores'],
+      targets: ['acne treatment', 'acne clear', 'dermapen', 'carbon laser', 'pico laser', 'dermaclear', 'extraction'],
     },
     {
       label: 'dark spots and pigmentation',
@@ -346,10 +453,10 @@ class AiService {
       targets: ['whitening', 'glutathione push', 'whitening drip', 'vitamin c'],
     },
     {
-      label: 'hair removal',
-      tokens: ['hairy', 'hairless', 'unwanted'],
-      phrases: ['hair removal', 'remove hair', 'body hair', 'underarm hair', 'armpit hair'],
-      targets: ['laser hair removal', 'underarms', 'upper arms', 'lower arms'],
+      label: 'unwanted body or facial hair',
+      tokens: ['hairy', 'hairless', 'unwanted', 'shave', 'shaving', 'beard', 'mustache', 'moustache', 'sideburns'],
+      phrases: ['hair removal', 'remove hair', 'body hair', 'facial hair', 'underarm hair', 'armpit hair', 'unwanted hair', 'hairy legs', 'leg hair', 'hair growth'],
+      targets: ['full legs', 'half legs', 'full arms', 'half arms', 'underarms', 'brazilian', 'bikini line', 'full face', 'upper lip', 'chin'],
     },
     {
       label: 'weak or brittle nails',
@@ -359,15 +466,33 @@ class AiService {
     },
     {
       label: 'body fat and contouring',
-      tokens: ['fat', 'belly', 'tummy', 'contour', 'contours', 'lipo', 'slim', 'slimming', 'cellulite'],
-      phrases: ['body contour', 'body contouring', 'belly fat', 'double chin', 'stubborn fat', 'body shaping'],
-      targets: ['body contouring', 'belly line', 'lipo', 'mesolipo', 'fat freeze', 'fat burner', 'chin lipolysis', 'rf body'],
+      tokens: ['fat', 'fatty', 'belly', 'tummy', 'contour', 'contours', 'lipo', 'slim', 'slimming', 'cellulite', 'flabby', 'flab', 'stubborn'],
+      phrases: ['body contour', 'body contouring', 'body fat', 'fat body', 'belly fat', 'love handles', 'bra fat', 'stubborn fat', 'body shaping', 'weight loss', 'lose weight', 'double chin'],
+      targets: ['lipolysis', 'contour', 'lipo', 'mesolipo', 'hifu', 'rf', 'double chin'],
     },
     {
-      label: 'veins and redness',
-      tokens: ['vein', 'veins', 'redness', 'vascular'],
-      phrases: ['spider veins', 'varicose vein', 'red veins'],
-      targets: [],
+      label: 'redness, sensitivity and irritation',
+      tokens: ['vein', 'veins', 'redness', 'vascular', 'sensitive', 'sensitivity', 'irritated', 'irritation', 'rosacea', 'flushing', 'eczema', 'dermatitis', 'rash', 'rashes', 'allergic', 'allergy'],
+      phrases: ['spider veins', 'varicose vein', 'red veins', 'sensitive skin', 'skin irritation', 'broken capillaries'],
+      targets: ['glow', 'diamond', 'hydrafacial', 'carbon laser', 'whitening'],
+    },
+    {
+      label: 'dry, chapped and cracked lips',
+      tokens: ['chapped', 'cracked', 'lip', 'lips', 'peeling'],
+      phrases: ['dry lip', 'dry lips', 'chapped lips', 'cracked lips', 'lip care', 'lip treatment', 'peeling lips'],
+      targets: ['dmae', 'revitalization', 'hydration', 'rejuran'],
+    },
+    {
+      label: 'scars, stretch marks and keloids',
+      tokens: ['scar', 'scars', 'stretch', 'keloid', 'keloids', 'striae'],
+      phrases: ['stretch mark', 'stretch marks', 'acne scar', 'acne scars', 'raised scar', 'scar revision', 'keloid scar', 'surgical scar'],
+      targets: ['scar', 'dermapen', 'microneedling', 'rejuran', 'pdrn'],
+    },
+    {
+      label: 'sweating and body odor',
+      tokens: ['sweat', 'sweaty', 'sweating', 'hyperhidrosis', 'odor', 'odour', 'underarm', 'underarms', 'armpit', 'armpits'],
+      phrases: ['excessive sweating', 'body odor', 'body odour', 'sweaty underarms', 'dark underarms'],
+      targets: ['hyperhidrosis', 'whitening', 'botox'],
     },
     {
       label: 'skin rejuvenation',
@@ -407,9 +532,17 @@ class AiService {
       if (lower.includes(kw)) return true;
     }
 
-    // 1b) A bare topic word (e.g. "acne", "nails", "botox") is on-topic on its own.
+    // 1a) Short or collision-prone terms are matched on word boundaries so
+    // "spa" in "spaghetti" or "lip" in "clip" is not mistaken for a clinic word.
+    for (const pattern of AiService.STRONG_CLINIC_PATTERNS) {
+      if (pattern.test(lower)) return true;
+    }
+
+    // 1b) A bare topic word (e.g. "acne", "nails", "botox") is on-topic on its
+    // own. Matched on word boundaries so a short topic word like "spa" or "gel"
+    // does not fire inside "spaghetti" or "angel".
     for (const topic of AiService.SHORT_TOPICS) {
-      if (topic.tokens.some((tok) => lower.includes(tok))) return true;
+      if (topic.tokens.some((tok) => this.mentionsTopicToken(lower, tok))) return true;
     }
 
     // 1c) Clinic-operational words with a dedicated answer ("hours?", "price?",
@@ -443,6 +576,12 @@ class AiService {
     }
 
     return false;
+  }
+
+  /** Word-boundary test for topic tokens, so short words do not match inside others. */
+  private mentionsTopicToken(lower: string, token: string): boolean {
+    const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`\\b${escaped}\\b`).test(lower);
   }
 
   private static readonly STOPWORDS = new Set([
@@ -1243,11 +1382,12 @@ You should be friendly, professional, and helpful while staying within these bou
       // with "we do not have that".
       if (isCatalogBrowseQuery(query)) return renderCatalogReply(products);
 
-      // A bare, short word that is neither a clinic topic nor a service is
-      // off-topic chatter ("pizza", "ufo"), not a product miss. Return null so
-      // the relevance gate can refuse it instead of claiming a product is
-      // missing. Longer product-shaped questions still get the honest miss.
-      if (query.isBareName && query.tokens.length <= 2 && !(await this.isClinicRelated(lowerMessage, services))) {
+      // A bare, short word is a keyword ("pores", "fat", "dry lips"), never a
+      // product lookup, even when it is clinic-related. Return null so the
+      // clinic engine answers it (or the relevance gate refuses off-topic
+      // chatter like "pizza"). Only longer, product-shaped questions get the
+      // honest "we do not carry that" miss.
+      if (query.isBareName && query.tokens.length <= 2) {
         return null;
       }
 
