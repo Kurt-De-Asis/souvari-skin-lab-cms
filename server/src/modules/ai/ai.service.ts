@@ -21,6 +21,25 @@ import {
   type ProductIntent,
   type ProductRecord,
 } from './product-knowledge';
+import {
+  detectEmergency,
+  detectMedicalAdvice,
+  EMERGENCY_REPLY,
+  MEDICAL_REFERRAL_REPLY,
+} from './clinic-safety';
+import {
+  AI_UNAVAILABLE_REPLY,
+  RETRIEVAL_ERROR_REPLY,
+  TECHNICAL_ERROR_REPLY,
+  UNRECOGNIZED_REPLY,
+} from './fallback-responses';
+import {
+  AFTERCARE_AFTER_REPLY,
+  AFTERCARE_PREP_REPLY,
+  detectAftercareIntent,
+  lookupAftercare,
+  type AftercarePhase,
+} from './aftercare-knowledge';
 import crypto from 'crypto';
 
 class AiService {
@@ -406,6 +425,16 @@ class AiService {
       blurb: 'Keratin lash lifts and tints add curl, color, and length to your natural lashes.',
       needles: ['lash', 'eyelash'],
     },
+    {
+      tokens: ['face', 'facial area'],
+      blurb: 'The face is our specialty — from cleansing and hydrating facials to laser, peels, and skin boosters that improve tone, texture, pores, and glow.',
+      needles: ['facial', 'carbon laser', 'hydrafacial', 'dermapen'],
+    },
+    {
+      tokens: ['body', 'body treatment', 'body treatments'],
+      blurb: 'Our body treatments cover contouring and slimming, hair removal, scrubs, and skin tightening for the arms, legs, back, and more.',
+      needles: ['body', 'contour', 'lipo', 'scrub', 'legs', 'arms'],
+    },
   ];
 
   /** Skin-concern knowledge map used for scored recommendations. */
@@ -508,6 +537,23 @@ class AiService {
     },
   ];
 
+  /**
+   * Concern tokens too generic to make a message clinic-related on their own
+   * (they appear in everyday, non-clinic sentences). Excluded from the relevance
+   * gate only; the recommendation engine still uses them when other signals are
+   * present.
+   */
+  private static readonly GENERIC_CONCERN_TOKENS = new Set([
+    'tone', 'spot', 'spots', 'soft', 'thin', 'weak', 'fresh', 'younger', 'damaged', 'revive',
+  ]);
+
+  /**
+   * Bare anatomical area words that the clinic engine answers. A single word like
+   * "face" is a topic, not a product name, even when a product name contains it
+   * (e.g. "Collagen Face Mask"); multi-word queries like "face mask" still match.
+   */
+  private static readonly BARE_AREA_QUERIES = new Set(['face', 'body']);
+
   private static readonly CATEGORY_STOP_TOKENS = new Set([
     'facial', 'facials', 'laser', 'injection', 'body', 'package', 'other',
     'consultation', 'peel', 'peels', 'hair', 'removal', 'skin', 'rejuvenation',
@@ -545,6 +591,22 @@ class AiService {
       if (topic.tokens.some((tok) => this.mentionsTopicToken(lower, tok))) return true;
     }
 
+    // 1b-ii) Any skin/hair/body concern the recommendation engine understands is
+    // on-topic on its own, so a bare concern word like "dryness", "dehydrated",
+    // or "dull" is answered instead of refused. This keeps the gate consistent
+    // with the recommender: if we can recommend for it, we can talk about it.
+    const msgTokens = this.tokenize(lower);
+    for (const group of AiService.SKIN_CONCERNS) {
+      for (const phrase of group.phrases) {
+        if (lower.includes(phrase)) return true;
+      }
+      for (const token of group.tokens) {
+        if (AiService.GENERIC_CONCERN_TOKENS.has(token)) continue;
+        const hit = msgTokens.some((mt) => this.concernTokenMatch(mt, token));
+        if (hit) return true;
+      }
+    }
+
     // 1c) Clinic-operational words with a dedicated answer ("hours?", "price?",
     // "services?") are on-topic on their own.
     for (const kw of AiService.OPERATIONAL_KEYWORDS) {
@@ -571,8 +633,13 @@ class AiService {
     // product name on its own is answered rather than refused as off-topic.
     const productQuery = normalizeQuery(message);
     if (mentionsProduct(productQuery)) {
-      const products = await loadRetailProducts();
-      if (matchProducts(products, productQuery).kind !== 'none') return true;
+      try {
+        const products = await loadRetailProducts();
+        if (matchProducts(products, productQuery).kind !== 'none') return true;
+      } catch {
+        // A product-catalog read failure must not make the gate throw; fall
+        // through and let the other signals decide.
+      }
     }
 
     return false;
@@ -735,9 +802,46 @@ class AiService {
     const hits: string[] = [];
     for (const p of group.phrases) if (lowerMessage.includes(p)) hits.push(p);
     for (const t of group.tokens) {
-      if (msgTokens.some((mt) => mt === t || (t.length >= 5 && this.fuzzyMatch(mt, t)))) hits.push(t);
+      if (msgTokens.some((mt) => this.concernTokenMatch(mt, t))) hits.push(t);
     }
     return hits;
+  }
+
+  /**
+   * Match a message token against a concern token, tolerating the noun forms
+   * customers naturally use. "dullness" vs "dull" and "flakiness" vs "flaky"
+   * share no exact token, and the existing fuzzy match needs length >= 5, so a
+   * light suffix normalization runs first. Kept deliberately narrow (only the
+   * "-ness" and "-iness" suffixes) so unrelated long words do not collide.
+   */
+  private concernTokenMatch(msgToken: string, concernToken: string): boolean {
+    if (msgToken === concernToken) return true;
+
+    const forms = (word: string): string[] => {
+      if (word.endsWith('iness') && word.length > 6) return [word, `${word.slice(0, -5)}y`];
+      if (word.endsWith('ness') && word.length > 5) return [word, word.slice(0, -4)];
+      return [word];
+    };
+
+    const msgForms = forms(msgToken);
+    const concernForms = forms(concernToken);
+    if (msgForms.some((form) => concernForms.includes(form))) return true;
+
+    // Typo tolerance as a last resort. Require the first two characters to agree
+    // and scale the allowed distance with word length, so distinct words that
+    // merely share a prefix/suffix ("flakiness" vs "fairness", "flaky" vs
+    // "flabby") do not cross-match.
+    if (
+      concernToken.length >= 5 &&
+      msgToken.length >= 5 &&
+      msgToken.slice(0, 2) === concernToken.slice(0, 2)
+    ) {
+      const longer = Math.max(msgToken.length, concernToken.length);
+      const maxDistance = longer <= 6 ? 1 : longer <= 8 ? 2 : 3;
+      return this.levenshtein(msgToken, concernToken) <= maxDistance;
+    }
+
+    return false;
   }
 
   private serviceText(s: any): string {
@@ -844,6 +948,50 @@ class AiService {
     return ranked.map((r) => ({ service: r.service, reasons: r.reasons.slice(0, 2) }));
   }
 
+  /**
+   * Human-readable clinic hours composed from the operational settings the rest
+   * of the system already uses (business_hours_start/end and business_days), so
+   * the assistant reflects the same schedule as booking. Falls back to a plain
+   * clinic_hours string, then to a safe default, when those keys are absent.
+   */
+  private formatClinicHours(settingsMap: Map<string, string>): string {
+    const read = (key: string) => settingsMap.get(key)?.replace(/"/g, '');
+    const start = read('business_hours_start');
+    const end = read('business_hours_end');
+    const clinicHours = read('clinic_hours');
+
+    if (!start || !end) {
+      return clinicHours || 'Monday-Saturday: 10:00 AM - 8:00 PM, Sunday: Closed';
+    }
+
+    const to12Hour = (value: string): string => {
+      const [hours, minutes] = value.split(':').map(Number);
+      if (Number.isNaN(hours) || Number.isNaN(minutes)) return value;
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const hour = hours % 12 === 0 ? 12 : hours % 12;
+      return `${hour}:${String(minutes).padStart(2, '0')} ${period}`;
+    };
+
+    let days = 'Monday-Saturday';
+    const rawDays = settingsMap.get('business_days');
+    if (rawDays) {
+      try {
+        const parsed: unknown = JSON.parse(rawDays);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed.length < 7) {
+          days =
+            parsed.length === 6
+              ? 'Monday-Saturday'
+              : parsed.map((d) => `${String(d).charAt(0).toUpperCase()}${String(d).slice(1)}`).join(', ');
+        }
+      } catch {
+        // Keep the default label when the stored value is not valid JSON.
+      }
+    }
+
+    const closedNote = days === 'Monday-Saturday' ? ', Sunday: Closed' : '';
+    return `${days}: ${to12Hour(start)} - ${to12Hour(end)}${closedNote}`;
+  }
+
   private readonly OFF_TOPIC_REPLY =
     "I'm here to answer questions about Souvari Skin Lab — our services, pricing, " +
     'clinic hours, and location. That question is outside what I can help with. ' +
@@ -866,7 +1014,62 @@ class AiService {
   }
 
   private emergencyResponse(): string {
-    return "If you are experiencing a medical emergency, please call 911 or your local emergency number immediately.\n\nFor non-urgent concerns, please contact the clinic directly to speak with our professionals.";
+    return EMERGENCY_REPLY;
+  }
+
+  private medicalAdviceResponse(): string {
+    return MEDICAL_REFERRAL_REPLY;
+  }
+
+  /**
+   * Preparation / aftercare questions. Answers only from the confirmed
+   * knowledge base; when nothing is recorded it says so honestly instead of
+   * inventing treatment-specific instructions.
+   */
+  private aftercareResponse(
+    phase: AftercarePhase,
+    lower: string,
+    services: Array<{ name: string; category: string }> = [],
+  ): string {
+    const matched = this.findServiceByMessage(lower, services);
+    const entry = lookupAftercare(matched?.service?.name) ?? lookupAftercare(matched?.service?.category);
+    const confirmed = phase === 'prep' ? entry?.prep : entry?.aftercare;
+
+    if (confirmed) {
+      return `${confirmed}\n\nPlease consult with our clinic professionals for personalized advice.`;
+    }
+    return phase === 'prep' ? AFTERCARE_PREP_REPLY : AFTERCARE_AFTER_REPLY;
+  }
+
+  /** Grounded overview of the clinic, composed only from stored settings. */
+  private async clinicInfoResponse(): Promise<string> {
+    const settings = await prisma.system_settings.findMany({
+      where: {
+        setting_key: {
+          in: [
+            'clinic_name',
+            'clinic_phone',
+            'clinic_address',
+            'business_hours_start',
+            'business_hours_end',
+            'business_days',
+            'clinic_hours',
+          ],
+        },
+      },
+    });
+    const map = new Map(settings.map((s) => [s.setting_key, s.setting_value]));
+    const name = map.get('clinic_name')?.replace(/"/g, '') || 'Souvari Skin Lab';
+    const phone = map.get('clinic_phone')?.replace(/"/g, '') || 'Please contact the clinic for phone number';
+    const address = map.get('clinic_address')?.replace(/"/g, '') || 'Please contact the clinic for address';
+    const hours = this.formatClinicHours(map);
+
+    return (
+      `${name} is a beauty and aesthetics clinic.\n\n` +
+      `Location: ${address}\nPhone: ${phone}\nHours: ${hours}\n\n` +
+      `I can help with our services and pricing, treatment recommendations, and how to book. What would you like to know?\n\n` +
+      `Please consult with our clinic professionals for personalized advice.`
+    );
   }
 
   private isGreeting(lower: string): boolean {
@@ -877,8 +1080,43 @@ class AiService {
     return /\b(thank you|thanks|thank)\b/.test(lower);
   }
 
+  /** Explicit request for the assistant's capabilities ("help", "what can you do?"). */
+  private isHelpRequest(lower: string): boolean {
+    const cleaned = lower.replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    return [
+      'help',
+      'help me',
+      'i need help',
+      'can you help me',
+      'what can you do',
+      'what do you do',
+      'what can i ask',
+      'how can you help',
+      'what can you help with',
+    ].includes(cleaned);
+  }
+
+  /**
+   * Questions about the clinic itself ("tell me about your clinic", "who are
+   * you?"). Without this they look like product lookups ("tell me about ...")
+   * and were answered with a misleading "no product found".
+   */
+  private isClinicInfoRequest(lower: string): boolean {
+    return (
+      /\b(tell me about|about|information about|info about|details about|what is|what'?s)\b[^?]*\b(your|the|this)?\s*clinic\b/.test(lower) ||
+      /\babout (you|yourselves|this place|this business)\b/.test(lower) ||
+      /\bwho are you\b|\bwhat are you\b/.test(lower) ||
+      /\b(clinic|company|business)\s+(info|information|details|overview|profile)\b/.test(lower)
+    );
+  }
+
   private isEmergency(lower: string): boolean {
-    return lower.includes('emergency') || lower.includes('urgent') || lower.includes('911') || lower.includes('severe pain') || lower.includes('allergic reaction');
+    return detectEmergency(lower);
+  }
+
+  /** Medical-advice / suitability question that must be referred to staff. */
+  private isMedicalAdvice(lower: string): boolean {
+    return detectMedicalAdvice(lower);
   }
 
   /**
@@ -901,7 +1139,17 @@ class AiService {
       }),
       prisma.system_settings.findMany({
         where: {
-          setting_key: { in: ['clinic_name', 'clinic_hours', 'clinic_phone', 'clinic_address'] },
+          setting_key: {
+            in: [
+              'clinic_name',
+              'clinic_hours',
+              'clinic_phone',
+              'clinic_address',
+              'business_hours_start',
+              'business_hours_end',
+              'business_days',
+            ],
+          },
         },
       }),
       this.getPopularServices(5),
@@ -910,7 +1158,7 @@ class AiService {
     const settingsMap = new Map(settings.map((s) => [s.setting_key, s.setting_value]));
 
     const clinicName = settingsMap.get('clinic_name')?.replace(/"/g, '') || 'Souvari Skin Lab';
-    const clinicHours = settingsMap.get('clinic_hours')?.replace(/"/g, '') || 'Monday-Saturday: 9:00 AM - 6:00 PM, Sunday: Closed';
+    const clinicHours = this.formatClinicHours(settingsMap);
     const clinicPhone = settingsMap.get('clinic_phone')?.replace(/"/g, '') || 'Please contact the clinic for phone number';
     const clinicAddress = settingsMap.get('clinic_address')?.replace(/"/g, '') || 'Please contact the clinic for address';
 
@@ -945,12 +1193,16 @@ ${popularList || 'Booking data not yet available.'}
 IMPORTANT SAFETY INSTRUCTIONS:
 - NEVER provide medical diagnoses or health assessments
 - NEVER recommend medications, drugs, or treatments for medical conditions
+- NEVER claim, promise, or guarantee a result or cure
 - NEVER provide emergency medical guidance - always direct to emergency services (call 911 or local emergency number)
+- If the customer mentions a medical condition (for example pregnancy, breastfeeding, eczema, psoriasis, diabetes), a medication (for example Accutane/isotretinoin or blood thinners), a known allergy, or asks whether a treatment is safe or suitable, give only GENERAL service information and tell them to consult our clinic professionals — they can start with the FREE "Free Skin Consultation". Do not assess their condition.
+- If the customer describes a possible emergency (difficulty breathing, swelling of the face/lips/tongue/throat, chest pain, fainting, severe bleeding), tell them to call 911 or their local emergency number immediately.
 - ONLY recommend services that exist in the system listed above
 - Always include a disclaimer: "Please consult with our clinic professionals for personalized advice."
 - If you are uncertain about anything, say: "I don't have enough information. Please contact the clinic directly."
 - Do not make up services, prices, or information not provided above
 - Focus on service information, pricing, clinic hours, best-selling services, and general beauty/aesthetics questions
+- Always reply in English only. Never answer in Tagalog or any other language.
 
 STRICT TOPIC RULE:
 - You may ONLY answer questions directly related to this clinic, its services, pricing, hours, location, contact details, and general beauty/aesthetics care provided by this clinic.
@@ -1017,12 +1269,18 @@ You should be friendly, professional, and helpful while staying within these bou
         response: botResponse,
       };
     } catch (error) {
-      console.error('AI processing failed:', error);
+      // Log enough for developers to debug without exposing the customer's
+      // message or any secret. The customer only ever sees a safe message.
+      const err = error instanceof Error ? error : new Error(String(error));
+      console.error('[chat] message processing failed', {
+        category: /prisma|database|connect|ECONNREFUSED/i.test(err.message) ? 'database' : 'routing',
+        name: err.name,
+        message: err.message,
+      });
       // Never surface a 500 to the chat widget: answer gracefully instead.
       return {
         session_token: input.session_token ?? sessionToken,
-        response:
-          "I'm sorry, something went wrong while processing your message. Please try again in a moment, or contact the clinic directly for immediate assistance.",
+        response: TECHNICAL_ERROR_REPLY,
       };
     }
   }
@@ -1039,42 +1297,63 @@ You should be friendly, professional, and helpful while staying within these bou
     if (env.AI_API_KEY) {
       const lower = input.message.toLowerCase();
 
-      // Deterministic safety-first pipeline: greetings/thanks/emergency and the
-      // relevance gate run BEFORE any LLM call, so off-topic queries never reach
-      // the model and no tokens are wasted.
-      if (this.isThanks(lower)) {
-        botResponse = this.thanksResponse();
-      } else if (this.isEmergency(lower)) {
+      // Deterministic safety-first pipeline: emergencies, medical-advice
+      // referrals, greetings/thanks, and the relevance gate all run BEFORE any
+      // LLM call, so safety and off-topic queries never reach the model and no
+      // tokens are wasted. Emergency is checked first so a message that also
+      // looks like a greeting ("hi, I can't breathe") is never swallowed.
+      if (this.isEmergency(lower)) {
         botResponse = this.emergencyResponse();
+      } else if (this.isMedicalAdvice(lower)) {
+        botResponse = this.medicalAdviceResponse();
+      } else if (this.isClinicInfoRequest(lower)) {
+        botResponse = await this.clinicInfoResponse();
+      } else if (this.isThanks(lower)) {
+        botResponse = this.thanksResponse();
       } else if (this.isGreeting(lower)) {
         // Greetings are checked before any product lookup, otherwise a short
         // greeting reads as an unknown product name.
         botResponse = this.greetingResponse();
+      } else if (this.isHelpRequest(lower)) {
+        botResponse = this.HELP_REPLY;
       } else {
-        const services = await this.getActiveServices();
+        const services = await this.safeGetActiveServices();
+        if (!services) {
+          // The catalog could not be read; say so honestly instead of letting a
+          // database error surface as a generic failure or an invented answer.
+          return RETRIEVAL_ERROR_REPLY;
+        }
 
-        // Context-anchored follow-ups are resolved BEFORE a fresh lookup, so
-        // "tell me about this product" continues the previous product instead of
-        // being reported as a product we do not have.
-        const followUpIntents = this.followUpProductIntents(lower);
-        const followUpReply = followUpIntents
-          ? await this.productAnswer(sessionId, input.message, followUpIntents, services)
-          : null;
-
-        // Products are resolved from the database before the LLM, so a product
-        // question never reaches the model and can never be embellished.
-        const productReply = followUpReply ?? (await this.productAnswer(sessionId, input.message, undefined, services));
-        if (productReply) {
-          botResponse = productReply;
-        } else if (!(await this.isClinicRelated(lower, services))) {
-          botResponse = this.OFF_TOPIC_REPLY;
-        } else if (this.isGenericServiceBrowse(lower, services)) {
-          // Bare "services" / "what do you offer" is answered with the category
-          // overview + a clarifying question, deterministically, instead of
-          // handing it to the model.
-          botResponse = this.clarifyResponse('services');
+        // Preparation / aftercare questions are answered deterministically from
+        // the confirmed knowledge base (or an honest fallback), so the model can
+        // never invent treatment-specific medical instructions.
+        const aftercarePhase = detectAftercareIntent(lower);
+        if (aftercarePhase) {
+          botResponse = this.aftercareResponse(aftercarePhase, lower, services);
         } else {
-          botResponse = await this.llmWithFallback(input.message, sessionId);
+          // Context-anchored follow-ups are resolved BEFORE a fresh lookup, so
+          // "tell me about this product" continues the previous product instead of
+          // being reported as a product we do not have.
+          const followUpIntents = this.followUpProductIntents(lower);
+          const followUpReply = followUpIntents
+            ? await this.productAnswer(sessionId, input.message, followUpIntents, services)
+            : null;
+
+          // Products are resolved from the database before the LLM, so a product
+          // question never reaches the model and can never be embellished.
+          const productReply = followUpReply ?? (await this.productAnswer(sessionId, input.message, undefined, services));
+          if (productReply) {
+            botResponse = productReply;
+          } else if (!(await this.isClinicRelated(lower, services))) {
+            botResponse = this.OFF_TOPIC_REPLY;
+          } else if (this.isGenericServiceBrowse(lower, services)) {
+            // Bare "services" / "what do you offer" is answered with the category
+            // overview + a clarifying question, deterministically, instead of
+            // handing it to the model.
+            botResponse = this.clarifyResponse('services');
+          } else {
+            botResponse = await this.llmWithFallback(input.message, sessionId);
+          }
         }
       }
     } else {
@@ -1089,8 +1368,17 @@ You should be friendly, professional, and helpful while staying within these bou
     try {
       return await this.callOpenAI(message, sessionId);
     } catch (error) {
-      console.error('LLM call failed, falling back to rule-based engine:', error);
-      return this.ruleBasedResponse(message, sessionId);
+      const err = error instanceof Error ? error : new Error(String(error));
+      console.error('[chat] LLM call failed, using rule-based engine', {
+        name: err.name,
+        message: err.message,
+      });
+      try {
+        return await this.ruleBasedResponse(message, sessionId);
+      } catch {
+        // Both the model and the deterministic engine are unavailable.
+        return AI_UNAVAILABLE_REPLY;
+      }
     }
   }
 
@@ -1139,7 +1427,9 @@ You should be friendly, professional, and helpful while staying within these bou
     }
 
     if (!content) {
-      return "I'm sorry, I couldn't generate a response. Please contact the clinic directly.";
+      // Throw so llmWithFallback runs the deterministic engine rather than
+      // showing the customer an internal "couldn't generate a response" note.
+      throw new Error('AI provider returned an empty completion');
     }
     return this.stripMarkdown(content).trim();
   }
@@ -1198,6 +1488,42 @@ You should be friendly, professional, and helpful while staying within these bou
       select: { id: true, name: true, description: true, price: true, duration_minutes: true, category: true },
       orderBy: { name: 'asc' },
     });
+  }
+
+  /**
+   * Get the catalog, or `null` when it cannot be read. Callers turn `null` into
+   * an honest "temporarily unavailable" reply instead of a generic failure or an
+   * invented answer.
+   */
+  private async safeGetActiveServices(): Promise<Array<{
+    id: number;
+    name: string;
+    description: string | null;
+    price: unknown;
+    duration_minutes: number;
+    category: string;
+  }> | null> {
+    try {
+      return await this.getActiveServices();
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      console.error('[chat] failed to load service catalog', { name: err.name, message: err.message });
+      return null;
+    }
+  }
+
+  /**
+   * Load the retail catalog, or `null` when it cannot be read. A product
+   * retrieval failure must not turn a normal chat message into a hard error.
+   */
+  private async safeLoadRetailProducts(): Promise<ProductRecord[] | null> {
+    try {
+      return await loadRetailProducts();
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      console.error('[chat] failed to load product catalog', { name: err.name, message: err.message });
+      return null;
+    }
   }
 
   private formatServiceLine(s: any): string {
@@ -1348,7 +1674,23 @@ You should be friendly, professional, and helpful while staying within these bou
     // so genuine operational questions are not swallowed.
     if (!productShaped && !isThingLookupShape(query)) return null;
 
-    const products = await loadRetailProducts();
+    // A single bare area word ("face", "body") is a clinic topic, not a product
+    // name, even when a product name happens to contain it (e.g. "Collagen Face
+    // Mask"). Multi-word queries like "face mask" still match the product.
+    if (
+      query.isBareName &&
+      query.tokens.length === 1 &&
+      AiService.BARE_AREA_QUERIES.has(query.tokens[0])
+    ) {
+      return null;
+    }
+
+    const products = await this.safeLoadRetailProducts();
+    if (!products) {
+      // Product catalog unreadable: report it is not a product answer so the
+      // clinic engine can still answer from the (already loaded) service list.
+      return null;
+    }
     const match = matchProducts(products, query);
 
     if (!productShaped) {
@@ -1425,7 +1767,8 @@ You should be friendly, professional, and helpful while staying within these bou
     const hit = this.findServiceByMessage(lower, services);
     if (!hit) return null;
 
-    const products = await loadRetailProducts();
+    const products = await this.safeLoadRetailProducts();
+    if (!products) return null;
     const related = productsForService(products, hit.service.name);
     if (related.length === 0) return null;
 
@@ -1503,10 +1846,39 @@ You should be friendly, professional, and helpful while staying within these bou
   }
 
   private async ruleBasedResponse(message: string, sessionId?: number): Promise<string> {
-    const services = await this.getActiveServices();
+    const services = await this.safeGetActiveServices();
+    if (!services) {
+      return RETRIEVAL_ERROR_REPLY;
+    }
     const lowerMessage = message.toLowerCase();
 
-    // Greetings / pleasantries first (always on-topic-safe)
+    // Safety first: emergencies and medical-advice questions are always handled
+    // before anything else, so a message like "hi, I can't breathe" is never
+    // answered as a greeting.
+    if (this.isEmergency(lowerMessage)) {
+      return this.emergencyResponse();
+    }
+
+    if (this.isMedicalAdvice(lowerMessage)) {
+      return this.medicalAdviceResponse();
+    }
+
+    // Preparation / aftercare: answered from the confirmed knowledge base or an
+    // honest "not on file" reply, never fabricated. Checked before greetings so
+    // "hi, what should I do after my facial?" is answered, not greeted.
+    const aftercarePhase = detectAftercareIntent(lowerMessage);
+    if (aftercarePhase) {
+      return this.aftercareResponse(aftercarePhase, lowerMessage, services);
+    }
+
+    // Meta questions about the clinic itself (answered from stored settings, not
+    // as a product lookup). Before greetings so "hi, tell me about your clinic"
+    // is answered rather than greeted.
+    if (this.isClinicInfoRequest(lowerMessage)) {
+      return await this.clinicInfoResponse();
+    }
+
+    // Greetings / pleasantries next (always on-topic-safe)
     if (this.isGreeting(lowerMessage)) {
       return this.greetingResponse();
     }
@@ -1515,9 +1887,8 @@ You should be friendly, professional, and helpful while staying within these bou
       return this.thanksResponse();
     }
 
-    // Safety: emergencies are always handled
-    if (this.isEmergency(lowerMessage)) {
-      return this.emergencyResponse();
+    if (this.isHelpRequest(lowerMessage)) {
+      return this.HELP_REPLY;
     }
 
     // Same database-driven product answer as the LLM path, so behaviour does not
@@ -1606,10 +1977,16 @@ You should be friendly, professional, and helpful while staying within these bou
 
     // --- Clinic hours ---
     if (lowerMessage.includes('hour') || lowerMessage.includes('open') || lowerMessage.includes('close') || lowerMessage.includes('time')) {
-      const settings = await prisma.system_settings.findUnique({
-        where: { setting_key: 'clinic_hours' },
+      const hourSettings = await prisma.system_settings.findMany({
+        where: {
+          setting_key: {
+            in: ['business_hours_start', 'business_hours_end', 'business_days', 'clinic_hours'],
+          },
+        },
       });
-      const hours = settings?.setting_value?.replace(/"/g, '') || 'Monday-Saturday: 9:00 AM - 6:00 PM, Sunday: Closed';
+      const hours = this.formatClinicHours(
+        new Map(hourSettings.map((s) => [s.setting_key, s.setting_value])),
+      );
       return `Our clinic hours are:\n${hours}\n\nPlease consult with our clinic professionals for personalized advice.`;
     }
 
@@ -1697,7 +2074,7 @@ You should be friendly, professional, and helpful while staying within these bou
       if (category) {
         const filtered = services.filter((s) => s.category === category);
         if (filtered.length === 0) {
-          return `We currently don't offer that service. Please contact the clinic directly to learn more.\n\nPlease consult with our clinic professionals for personalized advice.`;
+          return `I couldn't find that in our current list of services. We may still be able to help — please contact the clinic and our staff will confirm for you.\n\nPlease consult with our clinic professionals for personalized advice.`;
         }
         return `Here are our ${category} services:\n${this.formatServicesByCategory(filtered)}\n\nPlease consult with our clinic professionals for personalized advice.`;
       }
@@ -1714,7 +2091,7 @@ You should be friendly, professional, and helpful while staying within these bou
       return this.clarifyResponse('services');
     }
 
-    return this.HELP_REPLY;
+    return UNRECOGNIZED_REPLY;
   }
 }
 

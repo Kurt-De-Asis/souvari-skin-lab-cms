@@ -199,6 +199,11 @@ See [docs/api.md](docs/api.md) for complete API documentation.
 http://localhost:3000/api
 ```
 
+### AI Chatbot
+
+See [docs/ai-chatbot.md](docs/ai-chatbot.md) for the assistant's routing order,
+safety rules, fallback messages, and the aftercare knowledge base.
+
 ### Key Endpoints
 
 | Method | Endpoint | Description |
