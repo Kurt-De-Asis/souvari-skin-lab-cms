@@ -621,6 +621,11 @@ class AiService {
       if (category.length >= 3 && lower.includes(category)) return true;
     }
 
+    // 2b) A request to see the product catalog ("products", "your products",
+    // "product list") is on-topic on its own and must not be refused just
+    // because it carries no strong keyword.
+    if (isCatalogBrowseQuery(normalizeQuery(message))) return true;
+
     // 3) Weak words need support: mention of "you/your" (asking the clinic) or 2+ weak words.
     const weakHits = AiService.WEAK_CLINIC_KEYWORDS.filter((kw) => lower.includes(kw));
     if (weakHits.length === 0) return false;

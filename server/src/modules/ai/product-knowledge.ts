@@ -303,6 +303,16 @@ export function isCatalogBrowseQuery(normalized: NormalizedQuery): boolean {
   const lower = normalized.lower;
   if (!/\b(products?|items?)\b/.test(lower)) return false;
 
+  // A bare or lightly-qualified catalog request ("products", "your products",
+  // "product list", "items available") is a browse even without a "what/which"
+  // or a "have/sell" verb. Without this, a one-word "products" fell through the
+  // relevance gate and was refused as off-topic.
+  const BARE_CATALOG =
+    /^\s*(please\s+)?(show|list|see|give|view)?\s*(me\s+)?(all\s+|any\s+|your\s+|our\s+|the\s+|available\s+)?(products?|items?)[\s?.!,]*$/;
+  const CATALOG_PHRASE =
+    /^\s*(products?|items?)\s+(list|available|in stock|inventory)[\s?.!,]*$|^\s*list\s+of\s+(products?|items?)[\s?.!,]*$/;
+  if (BARE_CATALOG.test(lower) || CATALOG_PHRASE.test(lower)) return true;
+
   const asksAboutACategory =
     /\b(what|which|list|show|tell)\b/.test(lower) && /\b(products?|items?)\b/.test(lower);
   const asksAboutStock =

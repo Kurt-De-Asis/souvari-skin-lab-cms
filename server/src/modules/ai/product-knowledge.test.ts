@@ -492,6 +492,18 @@ describe('catalog browsing', () => {
     expect(isCatalogBrowseQuery(normalizeQuery('do you sell products'))).toBe(true);
   });
 
+  it('recognises a bare or lightly-qualified catalog request', () => {
+    expect(isCatalogBrowseQuery(normalizeQuery('products'))).toBe(true);
+    expect(isCatalogBrowseQuery(normalizeQuery('products?'))).toBe(true);
+    expect(isCatalogBrowseQuery(normalizeQuery('product'))).toBe(true);
+    expect(isCatalogBrowseQuery(normalizeQuery('items'))).toBe(true);
+    expect(isCatalogBrowseQuery(normalizeQuery('your products'))).toBe(true);
+    expect(isCatalogBrowseQuery(normalizeQuery('product list'))).toBe(true);
+    expect(isCatalogBrowseQuery(normalizeQuery('items available'))).toBe(true);
+    expect(isCatalogBrowseQuery(normalizeQuery('list of products'))).toBe(true);
+    expect(isCatalogBrowseQuery(normalizeQuery('show me the products'))).toBe(true);
+  });
+
   it('does not treat a specific product question as a browse', () => {
     expect(isCatalogBrowseQuery(normalizeQuery('how much is zephyr breeze gel'))).toBe(false);
     expect(isCatalogBrowseQuery(normalizeQuery('is zephyr breeze gel in stock'))).toBe(false);

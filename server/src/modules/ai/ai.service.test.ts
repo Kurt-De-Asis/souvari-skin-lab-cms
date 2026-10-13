@@ -432,3 +432,46 @@ describe('AiService honest handling of questions it cannot answer', () => {
     expect(result.response).not.toContain('outside what I can help with');
   });
 });
+
+describe('AiService product catalog browsing', () => {
+  beforeEach(() => {
+    findUnique.mockReset();
+    createSession.mockReset();
+    createMessage.mockReset();
+    servicesFindMany.mockReset();
+    productsFindMany.mockReset();
+
+    findUnique.mockResolvedValue(null);
+    createSession.mockResolvedValue({ id: 1, session_token: 'sess' });
+    createMessage.mockResolvedValue({});
+    servicesFindMany.mockResolvedValue(CATALOG);
+    productsFindMany.mockResolvedValue([
+      {
+        id: 1,
+        name: 'Nimbus Cloud Lotion',
+        description: null,
+        purpose: null,
+        benefits: null,
+        sku: 'SKU-1',
+        unit: 'pc',
+        unit_price: 750,
+        current_stock: 12,
+        category: { name: 'Retail Items' },
+        service_inventory_items: [],
+      },
+    ]);
+  });
+
+  // Regression: a bare "products" was refused as off-topic because the catalog
+  // browse check required a "what/which" or a "have/sell" verb.
+  it.each(['products', 'products?', 'product', 'items', 'your products', 'product list', 'items available'])(
+    'lists the catalog for "%s" instead of refusing it',
+    async (message) => {
+      const result = await aiService.processMessage({ message });
+
+      expect(result.response).toContain('We currently carry these');
+      expect(result.response).toContain('Nimbus Cloud Lotion');
+      expect(result.response).not.toContain('outside what I can help with');
+    },
+  );
+});
