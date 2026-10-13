@@ -18,6 +18,7 @@ invent information.
 | `server/src/modules/ai/product-knowledge.ts` | Retail product matching, intents, replies |
 | `server/src/modules/ai/clinic-safety.ts` | Emergency and medical-advice detection + referral copy |
 | `server/src/modules/ai/aftercare-knowledge.ts` | Preparation/aftercare intent + confirmed knowledge base |
+| `server/src/modules/ai/clinic-faq.ts` | Administrative-policy and treatment-logistics intent detection + honest gap replies |
 | `server/src/modules/ai/fallback-responses.ts` | Technical/AI-unavailable/retrieval/unrecognized fallback copy |
 | `server/src/modules/ai/ai.controller.ts` | HTTP controller |
 | `server/src/modules/ai/ai.routes.ts` | Route registration |
@@ -40,19 +41,33 @@ engine answers on its own.
    professionals (and the free consultation). Never a diagnosis or a guarantee.
 3. **Clinic info** — "tell me about your clinic", "who are you?". → grounded
    overview built only from stored settings.
-4. **Thanks / greeting** — pleasantries.
-5. **Help** — "help", "what can you do?".
-6. **Preparation / aftercare** — "how do I prepare", "what should I do after".
+4. **Administrative policy / FAQ** — payments, deposits, cancellation,
+   rescheduling, refunds, warranty, parking, walk-ins, HMO/insurance, branches,
+   age limits, practitioners, who we treat, dress code/guests, packages,
+   membership, promos, vouchers, discounts. → honest "not on file" reply that
+   points to the clinic; never a guessed policy.
+5. **Thanks / greeting** — pleasantries.
+6. **Help** — "help", "what can you do?".
+7. **Preparation / aftercare** — "how do I prepare", "what should I do after".
    → confirmed knowledge base if present, otherwise an honest "not on file" reply.
-7. **Retail products** — database lookup; answers only from stored fields, never
-   invents.
-8. **Relevance gate** — anything not about the clinic is refused with the
-   off-topic reply.
-9. **Recommendations / hours / pricing / contact / service details** — deterministic
-   rule engine.
-10. **LLM** — only for on-topic questions the deterministic engine did not already
+8. **Treatment logistics** — duration, number of sessions, discomfort, side
+   effects, downtime. → honest reply that avoids guessing and offers the free
+   consultation.
+9. **Retail products** — database lookup; answers only from stored fields, never
+   invents. Context-anchored follow-ups resolve before a fresh lookup.
+10. **Relevance gate** — anything not about the clinic is refused with the
+    off-topic reply.
+11. **Recommendations / hours / pricing / contact / service details** — deterministic
+    rule engine.
+12. **LLM** — only for on-topic questions the deterministic engine did not already
     answer. Falls back to the rule engine on any provider error; returns
     `AI_UNAVAILABLE_REPLY` only if both fail.
+
+Ambiguous bare words are resolved **service/concern first**: a word that names a
+service or a concern (e.g. `collagen`, `acne`, `facial`) is treated as that, not as
+a product, unless the user clearly asks about a product (`buy`, `price`, `stock`,
+`ingredients`, a product name, ...). This prevents a concern question from being
+answered with a product's description.
 
 ## Safety rules
 
@@ -62,6 +77,11 @@ engine answers on its own.
 - Medical and suitability questions are referred to clinic professionals.
 - Only services that exist in the database are ever recommended.
 - Every recommendation ends with the consultation disclaimer.
+- Administrative policies (cancellation, refund, payment, parking, ...) and
+  treatment logistics are never invented — if they are not stored, the assistant
+  says so and points to the clinic.
+- The assistant never claims a service or product is unavailable just because it
+  is not found; it stays honest about what it does not know.
 - Responses are English-only; never Tagalog.
 - The model never sees off-topic or medical/safety messages, and product/service
   facts always come from the database, not the model.
@@ -111,6 +131,14 @@ by the clinic:
 - Aftercare, preparation, and contraindication text per service (knowledge base
   above is currently empty).
 - Booking, cancellation, rescheduling, refund, warranty, and shipping policies.
+- Payment/deposit methods (cash, card, GCash, installments), no-show charges,
+  parking, walk-in availability, HMO/insurance, branches, age limits,
+  practitioners/doctors, who they treat, dress code and guest policy, packages,
+  membership, promos, vouchers, and discounts. The assistant answers these
+  honestly as "not on file yet" until values are stored.
+- Treatment logistics per service — duration, number of sessions, discomfort,
+  side effects, and downtime. `clinic-faq.ts` routes these to an honest reply
+  instead of guessing.
 - Confirmed clinic address, phone, and hours (the assistant composes hours from
   `business_hours_start`, `business_hours_end`, and `business_days`).
 - Per-service descriptions/durations and per-product descriptions/purpose where

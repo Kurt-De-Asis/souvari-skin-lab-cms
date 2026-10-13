@@ -172,8 +172,9 @@ const NON_PRODUCT_TOPICS = [
   'service', 'services', 'treatment', 'treatments', 'package', 'packages',
   'hour', 'hours', 'open', 'close', 'closed', 'location', 'address', 'direction',
   'parking', 'contact', 'phone', 'email', 'call', 'number', 'payment', 'pay',
-  'refund', 'cancel', 'cancellation', 'reschedule', 'appointment', 'book',
-  'booking', 'booked', 'reserve', 'schedule', 'membership', 'voucher', 'promo',
+  'pricing', 'refund', 'cancel', 'cancellation', 'reschedule', 'appointment', 'book',
+  'booking', 'booked', 'reserve', 'reservation', 'reservations', 'schedule',
+  'membership', 'voucher', 'promo',
   'promotion', 'discount', 'warranty', 'return', 'shipping', 'delivery', 'branch',
   'therapist', 'staff', 'doctor', 'nurse', 'age', 'pregnant',
   'pregnancy', 'breastfeeding', 'allergic', 'allergy', 'diabetes', 'surgery',
@@ -193,6 +194,11 @@ const NON_PRODUCT_TOPICS = [
   'infusion', 'drip', 'scalp', 'hair loss', 'hairfall', 'tattoo removal',
   'skin tag', 'skincare', 'skin care', 'scrub', 'gua sha', 'massage',
   'offer', 'offers', 'offering', 'offerings',
+  // Everyday skincare-routine words. These are answered as clinic topics
+  // (service/concern side), not looked up as retail products.
+  'cleanser', 'toner', 'moisturizer', 'moisturiser',
+  // Treatment names that are services, never retail products.
+  'dermaplaning', 'dermabrasion', 'lymphatic', 'micropigmentation', 'liposuction',
   // Eye-area concerns. Include spelling variants (eye bags / eyebags / the
   // common "eyeabags" typo) so a concern question is never reported as a missing
   // product.

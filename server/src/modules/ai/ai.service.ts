@@ -40,6 +40,12 @@ import {
   lookupAftercare,
   type AftercarePhase,
 } from './aftercare-knowledge';
+import {
+  detectPolicyArea,
+  detectTreatmentInfo,
+  POLICY_GAP_REPLY,
+  TREATMENT_INFO_REPLY,
+} from './clinic-faq';
 import crypto from 'crypto';
 
 class AiService {
@@ -95,6 +101,9 @@ class AiService {
     'acrylic', 'cuticle', 'ingrown', 'nail fungus', 'nail art', 'nail polish', 'keratin',
     // Bumps and growths.
     'milia',
+    // Additional treatment names and everyday skincare-routine words.
+    'dermaplaning', 'dermabrasion', 'lymphatic', 'micropigmentation', 'liposuction',
+    'cleanser', 'toner', 'moisturizer', 'moisturiser', 'holiday',
   ];
 
   /**
@@ -226,14 +235,24 @@ class AiService {
       needles: ['chemical peel', 'diamond peel'],
     },
     {
-      tokens: ['package', 'packages'],
-      blurb: 'We offer session packages that bundle popular treatments at a better rate.',
-      needles: [],
+      tokens: ['consultation', 'consult'],
+      blurb: 'Our FREE "Free Skin Consultation" is the best place to start — our professionals assess your skin and build a personalized treatment plan before you commit to anything.',
+      needles: ['consultation', 'free'],
     },
     {
-      tokens: ['membership', 'member', 'vip'],
-      blurb: 'We offer VIP memberships with exclusive discounts and perks.',
-      needles: [],
+      tokens: ['injection', 'injections', 'injectable', 'injectables'],
+      blurb: 'We offer injectable treatments such as Botox and dermal fillers to relax fine lines and restore lost volume.',
+      needles: ['botox', 'dermal filler', 'mesobotox', 'rejuran'],
+    },
+    {
+      tokens: ['dandruff'],
+      blurb: 'Scalp concerns such as dandruff and flaking can be managed with scalp-focused treatments and gentle home care.',
+      needles: ['scalp'],
+    },
+    {
+      tokens: ['cleanser', 'toner', 'moisturizer', 'moisturiser'],
+      blurb: 'A simple daily routine — a gentle cleanser, a toner, and a moisturizer — supports healthy skin. Our clinic can advise on the right products and facials for your skin.',
+      needles: ['facial'],
     },
     {
       tokens: ['waxing', 'wax', 'hot wax', 'bikini wax', 'brazilian wax'],
@@ -441,7 +460,7 @@ class AiService {
   private static readonly SKIN_CONCERNS = [
     {
       label: 'acne and blemishes',
-      tokens: ['acne', 'blemish', 'blemishes', 'pimple', 'pimples', 'breakout', 'breakouts', 'sebum', 'cystic', 'zit', 'zits', 'blackhead', 'blackheads', 'whitehead', 'whiteheads', 'comedone', 'comedones', 'congested', 'congestion', 'clogged'],
+      tokens: ['acne', 'blemish', 'blemishes', 'pimple', 'pimples', 'breakout', 'breakouts', 'sebum', 'cystic', 'zit', 'zits', 'blackhead', 'blackheads', 'whitehead', 'whiteheads', 'comedone', 'comedones', 'congested', 'congestion', 'clogged', 'extraction', 'extractions'],
       phrases: ['acne scar', 'acne scars', 'clogged pores'],
       targets: ['acne treatment', 'acne clear', 'dermapen', 'carbon laser', 'pico laser', 'dermaclear', 'extraction'],
     },
@@ -554,6 +573,17 @@ class AiService {
    */
   private static readonly BARE_AREA_QUERIES = new Set(['face', 'body']);
 
+  /**
+   * Vague umbrella topics that name the whole field rather than one service
+   * ("skincare", "beauty", "aesthetics"). They are on-topic but too broad to
+   * answer directly, so they get the service overview plus a clarifying
+   * question instead of an "I don't understand" reply.
+   */
+  private static readonly UMBRELLA_TOPICS = [
+    'skincare', 'skin care', 'skin', 'derma', 'dermal', 'aesthetic', 'aesthetician',
+    'aesthetics', 'beauty', 'clinic', 'souvari',
+  ];
+
   private static readonly CATEGORY_STOP_TOKENS = new Set([
     'facial', 'facials', 'laser', 'injection', 'body', 'package', 'other',
     'consultation', 'peel', 'peels', 'hair', 'removal', 'skin', 'rejuvenation',
@@ -654,6 +684,35 @@ class AiService {
   private mentionsTopicToken(lower: string, token: string): boolean {
     const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return new RegExp(`\\b${escaped}\\b`).test(lower);
+  }
+
+  /**
+   * True when a single word names a clinic topic (a service, category, concern,
+   * short topic, or operational word) rather than a retail product. Used to
+   * decide which side of the assistant owns a one-word message.
+   */
+  private isClinicTopicWord(word: string): boolean {
+    if (isNonProductTopic(word)) return true;
+    if (AiService.OPERATIONAL_KEYWORDS.some((k) => k === word)) return true;
+    if (AiService.STRONG_CLINIC_KEYWORDS.some((k) => k === word)) return true;
+    if (AiService.SHORT_TOPICS.some((t) => t.tokens.some((tok) => tok === word))) return true;
+    return false;
+  }
+
+  /** True when any token (or concern phrase) in the message names a known skin/hair/body concern. */
+  private hasConcernSignal(lower: string, tokens: string[]): boolean {
+    return AiService.SKIN_CONCERNS.some((group) => {
+      if (group.phrases.some((p) => lower.includes(p))) return true;
+      return group.tokens.some((t) => {
+        if (AiService.GENERIC_CONCERN_TOKENS.has(t)) return false;
+        return tokens.some((mt) => this.concernTokenMatch(mt, t));
+      });
+    });
+  }
+
+  /** True for a vague umbrella word ("skincare", "beauty") that deserves the service overview. */
+  private isUmbrellaTopic(lower: string): boolean {
+    return AiService.UMBRELLA_TOPICS.some((t) => this.mentionsTopicToken(lower, t));
   }
 
   private static readonly STOPWORDS = new Set([
@@ -1077,6 +1136,51 @@ class AiService {
     );
   }
 
+  /**
+   * Administrative policy questions (payments, cancellations, parking, ...).
+   * Answered from stored settings where the clinic has actually recorded a
+   * value, otherwise with an honest "not on file" reply. Never guesses a policy
+   * and never claims the clinic does not offer something. Returns null when the
+   * message is not a policy question.
+   */
+  private async policyResponse(lower: string): Promise<string | null> {
+    const area = detectPolicyArea(lower);
+    if (!area) return null;
+
+    if (area === 'email') {
+      const rows = await prisma.system_settings.findMany({
+        where: { setting_key: 'clinic_email' },
+      });
+      const email = rows[0]?.setting_value?.replace(/"/g, '');
+      if (email) {
+        return `You can reach us by e-mail at ${email}.\n\nPlease consult with our clinic professionals for personalized advice.`;
+      }
+    }
+
+    return POLICY_GAP_REPLY;
+  }
+
+  /**
+   * Treatment-logistics questions (duration, sessions, discomfort, side effects,
+   * downtime) that depend on the exact treatment and the person. Answered
+   * honestly and referred to staff. Returns null when the message is not one, or
+   * when it asks how long a *specific*, named service takes — the service detail
+   * already carries its duration.
+   */
+  private treatmentInfoResponse(lower: string, services: any[]): string | null {
+    const kind = detectTreatmentInfo(lower);
+    if (!kind) return null;
+
+    if (kind === 'duration') {
+      const namesExactService = services.some(
+        (s) => s.name.length >= 4 && lower.includes(s.name.toLowerCase()),
+      );
+      if (namesExactService) return null;
+    }
+
+    return TREATMENT_INFO_REPLY;
+  }
+
   private isGreeting(lower: string): boolean {
     return /\b(hi|hello|hey|good morning|good afternoon|good evening)\b/.test(lower);
   }
@@ -1301,6 +1405,10 @@ You should be friendly, professional, and helpful while staying within these bou
 
     if (env.AI_API_KEY) {
       const lower = input.message.toLowerCase();
+      // Administrative policy questions (payments, cancellations, parking, ...)
+      // are answered honestly before greetings so "hi, what is your cancellation
+      // policy?" is not greeted.
+      const policyReply = await this.policyResponse(lower);
 
       // Deterministic safety-first pipeline: emergencies, medical-advice
       // referrals, greetings/thanks, and the relevance gate all run BEFORE any
@@ -1313,6 +1421,8 @@ You should be friendly, professional, and helpful while staying within these bou
         botResponse = this.medicalAdviceResponse();
       } else if (this.isClinicInfoRequest(lower)) {
         botResponse = await this.clinicInfoResponse();
+      } else if (policyReply) {
+        botResponse = policyReply;
       } else if (this.isThanks(lower)) {
         botResponse = this.thanksResponse();
       } else if (this.isGreeting(lower)) {
@@ -1333,8 +1443,13 @@ You should be friendly, professional, and helpful while staying within these bou
         // the confirmed knowledge base (or an honest fallback), so the model can
         // never invent treatment-specific medical instructions.
         const aftercarePhase = detectAftercareIntent(lower);
+        // Treatment logistics (duration, sessions, discomfort, side effects,
+        // downtime) are answered honestly rather than sent to the model.
+        const treatmentReply = this.treatmentInfoResponse(lower, services);
         if (aftercarePhase) {
           botResponse = this.aftercareResponse(aftercarePhase, lower, services);
+        } else if (treatmentReply) {
+          botResponse = treatmentReply;
         } else {
           // Context-anchored follow-ups are resolved BEFORE a fresh lookup, so
           // "tell me about this product" continues the previous product instead of
@@ -1704,6 +1819,37 @@ You should be friendly, professional, and helpful while staying within these bou
       if (!namesExactProduct) return null;
     }
 
+    // Product vs. service/concern precedence. The catalog is matched before the
+    // service/concern engine, so a product whose name shares a word with a
+    // clinic topic could steal a question that is really about a service or
+    // concern (for example "collagen" -> "Collagen Face Mask", "acne" -> "Acne
+    // Treatment Cream"). Unless the customer clearly refers to a product, treat
+    // a named service, clinic topic, or concern as belonging to the service
+    // side of the assistant.
+    if (match.kind !== 'none') {
+      const namesProductFully =
+        match.kind === 'single' && query.lower.includes(match.product.name.toLowerCase());
+      const namesProductFragment =
+        match.kind === 'single' &&
+        query.tokens.length >= 2 &&
+        match.product.name.toLowerCase().includes(query.lower);
+      const hasExplicitProductWord =
+        /\b(products?|items?|stock|buy|sell|selling|sold|purchase|order|ingredient(s)?|sku)\b/.test(lowerMessage);
+
+      if (!namesProductFully && !namesProductFragment && !hasExplicitProductWord) {
+        const namesService =
+          services.length > 0 &&
+          services.some((s) => s.name.length >= 4 && lowerMessage.includes(s.name.toLowerCase()));
+        if (namesService) return null;
+        if (query.tokens.length === 1 && this.isClinicTopicWord(query.tokens[0])) return null;
+        if (query.tokens.length >= 2 && this.hasConcernSignal(lowerMessage, query.tokens)) return null;
+        // A short phrase that is a known clinic topic ("tattoo removal", "hot
+        // wax", "gel nails") belongs to the service side, not the product that
+        // happens to share a word with it.
+        if (query.tokens.length <= 3 && isNonProductTopic(lowerMessage)) return null;
+      }
+    }
+
     if (match.kind === 'none') {
       // A message can ask the other way round: name a service and ask which
       // product goes with it. Answer from the stored service/product links.
@@ -1883,6 +2029,17 @@ You should be friendly, professional, and helpful while staying within these bou
       return await this.clinicInfoResponse();
     }
 
+    // Administrative policy questions (payments, deposits, cancellations,
+    // parking, walk-ins, ...). Checked before greetings so "hi, what is your
+    // cancellation policy?" is answered, not greeted.
+    const policyReply = await this.policyResponse(lowerMessage);
+    if (policyReply) return policyReply;
+
+    // Treatment-logistics questions (duration, sessions, discomfort, side
+    // effects, downtime) that we cannot answer per-treatment.
+    const treatmentReply = this.treatmentInfoResponse(lowerMessage, services);
+    if (treatmentReply) return treatmentReply;
+
     // Greetings / pleasantries next (always on-topic-safe)
     if (this.isGreeting(lowerMessage)) {
       return this.greetingResponse();
@@ -1920,6 +2077,18 @@ You should be friendly, professional, and helpful while staying within these bou
     if (this.tokenize(lowerMessage).length <= 2) {
       const short = this.shortTopicResponse(lowerMessage, services);
       if (short) return short;
+    }
+
+    // Vague umbrella topics ("skincare", "beauty", "aesthetics") get the service
+    // overview plus a clarifying question instead of an "I don't understand".
+    // A named service or category is a real answer, not an umbrella.
+    if (this.isUmbrellaTopic(lowerMessage)) {
+      const namesService =
+        services.some((s) => s.name.length >= 4 && lowerMessage.includes(s.name.toLowerCase())) ||
+        !!this.mentionedCategory(lowerMessage, services);
+      if (!namesService) {
+        return this.clarifyResponse('services');
+      }
     }
 
     // --- Best-selling services ---
@@ -1981,7 +2150,13 @@ You should be friendly, professional, and helpful while staying within these bou
     }
 
     // --- Clinic hours ---
-    if (lowerMessage.includes('hour') || lowerMessage.includes('open') || lowerMessage.includes('close') || lowerMessage.includes('time')) {
+    if (
+      lowerMessage.includes('hour') ||
+      lowerMessage.includes('open') ||
+      lowerMessage.includes('close') ||
+      lowerMessage.includes('holiday') ||
+      /\btimes?\b/.test(lowerMessage)
+    ) {
       const hourSettings = await prisma.system_settings.findMany({
         where: {
           setting_key: {
@@ -1996,7 +2171,12 @@ You should be friendly, professional, and helpful while staying within these bou
     }
 
     // --- Booking / appointments: informational only, no booking walkthrough ---
-    if (lowerMessage.includes('book') || lowerMessage.includes('appointment') || lowerMessage.includes('schedule') || lowerMessage.includes('reserve')) {
+    if (
+      /\bbook(ing|ed|s)?\b/.test(lowerMessage) ||
+      lowerMessage.includes('appointment') ||
+      lowerMessage.includes('schedule') ||
+      /\breserv(e|ation|ing|ed)?\b/.test(lowerMessage)
+    ) {
       return `Appointments are made through the website's booking page or by contacting the clinic directly. I can help with questions about our services, pricing, hours, and recommendations — what would you like to know?\n\nPlease consult with our clinic professionals for personalized advice.`;
     }
 
@@ -2040,7 +2220,7 @@ You should be friendly, professional, and helpful while staying within these bou
     }
 
     // --- Prices ---
-    if (lowerMessage.includes('price') || lowerMessage.includes('cost') || lowerMessage.includes('how much') || lowerMessage.includes('fee') || lowerMessage.includes('rate')) {
+    if (lowerMessage.includes('price') || lowerMessage.includes('pricing') || lowerMessage.includes('cost') || lowerMessage.includes('how much') || lowerMessage.includes('fee') || lowerMessage.includes('rate')) {
       if (services.length === 0) {
         return "Please contact the clinic directly for pricing information.\n\nPlease consult with our clinic professionals for personalized advice.";
       }
@@ -2060,7 +2240,7 @@ You should be friendly, professional, and helpful while staying within these bou
     }
 
     // --- Contact / location ---
-    if (lowerMessage.includes('contact') || lowerMessage.includes('phone') || lowerMessage.includes('address') || lowerMessage.includes('location') || lowerMessage.includes('where') || lowerMessage.includes('located') || lowerMessage.includes('reach')) {
+    if (lowerMessage.includes('contact') || lowerMessage.includes('phone') || lowerMessage.includes('number') || lowerMessage.includes('address') || lowerMessage.includes('location') || lowerMessage.includes('where') || lowerMessage.includes('located') || lowerMessage.includes('reach')) {
       const settings = await prisma.system_settings.findMany({
         where: { setting_key: { in: ['clinic_phone', 'clinic_address'] } },
       });

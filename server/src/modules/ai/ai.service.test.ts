@@ -475,3 +475,177 @@ describe('AiService product catalog browsing', () => {
     },
   );
 });
+
+describe('AiService policy and treatment-logistics routing', () => {
+  beforeEach(() => {
+    findUnique.mockReset();
+    createSession.mockReset();
+    createMessage.mockReset();
+    servicesFindMany.mockReset();
+    productsFindMany.mockReset();
+    settingsFindMany.mockReset();
+
+    findUnique.mockResolvedValue(null);
+    createSession.mockResolvedValue({ id: 1, session_token: 'sess' });
+    createMessage.mockResolvedValue({});
+    servicesFindMany.mockResolvedValue(CATALOG);
+    productsFindMany.mockResolvedValue([]);
+    settingsFindMany.mockResolvedValue([]);
+  });
+
+  it.each([
+    'do you offer packages?',
+    'do you have a membership?',
+    'do you have gift cards?',
+    'do you have parking?',
+    'do you accept walk-ins?',
+    'can i reschedule my appointment?',
+  ])('answers the policy question "%s" honestly instead of guessing', async (message) => {
+    const result = await aiService.processMessage({ message });
+
+    expect(result.response).toContain("I don't have that specific information");
+    expect(result.response).not.toContain('outside what I can help with');
+  });
+
+  it('no longer claims session packages or VIP memberships exist', async () => {
+    const result = await aiService.processMessage({ message: 'do you offer packages?' });
+
+    expect(result.response).not.toContain('session packages');
+    expect(result.response).not.toContain('VIP memberships');
+    expect(result.response).not.toContain("don't offer");
+  });
+
+  it.each([
+    ['is there any downtime?', 'downtime'],
+    ['does it hurt?', 'pain'],
+    ['what are the side effects?', 'side effects'],
+  ])('answers the treatment-logistics question "%s" honestly', async (message) => {
+    const result = await aiService.processMessage({ message });
+
+    expect(result.response).toContain("don't want to guess");
+    expect(result.response).not.toContain('outside what I can help with');
+    expect(result.response).not.toContain('Our clinic hours');
+  });
+
+  it('still answers how long a specific service takes from its stored duration', async () => {
+    const result = await aiService.processMessage({ message: 'how long does 10 in 1 HydraFacial take?' });
+
+    expect(result.response).toContain('10 in 1 HydraFacial');
+    expect(result.response).toContain('Duration: 60 minutes');
+  });
+});
+
+describe('AiService product vs. service/concern precedence', () => {
+  beforeEach(() => {
+    findUnique.mockReset();
+    createSession.mockReset();
+    createMessage.mockReset();
+    servicesFindMany.mockReset();
+    productsFindMany.mockReset();
+
+    findUnique.mockResolvedValue(null);
+    createSession.mockResolvedValue({ id: 1, session_token: 'sess' });
+    createMessage.mockResolvedValue({});
+    servicesFindMany.mockResolvedValue(CATALOG);
+    productsFindMany.mockResolvedValue([
+      {
+        id: 1,
+        name: 'Acne Treatment Cream',
+        description: 'For breakouts.',
+        purpose: null,
+        benefits: null,
+        sku: 'SKU-1',
+        unit: 'tube',
+        unit_price: 450,
+        current_stock: 10,
+        category: { name: 'Retail Items' },
+        service_inventory_items: [],
+      },
+      {
+        id: 2,
+        name: 'Collagen Face Mask',
+        description: 'Hydrating face masks.',
+        purpose: null,
+        benefits: null,
+        sku: 'SKU-2',
+        unit: 'box',
+        unit_price: 2000,
+        current_stock: 5,
+        category: { name: 'Retail Items' },
+        service_inventory_items: [],
+      },
+    ]);
+  });
+
+  it.each(['acne', 'collagen'])(
+    'treats the bare concern "%s" as a clinic topic, not a product',
+    async (message) => {
+      const result = await aiService.processMessage({ message });
+
+      expect(result.response).not.toContain('Acne Treatment Cream');
+      expect(result.response).not.toContain('Collagen Face Mask');
+      expect(result.response).not.toContain('outside what I can help with');
+    },
+  );
+
+  it('still returns the product when the user clearly asks about a product', async () => {
+    const result = await aiService.processMessage({ message: 'do you sell the collagen face mask?' });
+
+    expect(result.response).toContain('Collagen Face Mask');
+  });
+});
+
+describe('AiService alias and umbrella routing', () => {
+  beforeEach(() => {
+    findUnique.mockReset();
+    createSession.mockReset();
+    createMessage.mockReset();
+    servicesFindMany.mockReset();
+    productsFindMany.mockReset();
+    settingsFindMany.mockReset();
+
+    findUnique.mockResolvedValue(null);
+    createSession.mockResolvedValue({ id: 1, session_token: 'sess' });
+    createMessage.mockResolvedValue({});
+    servicesFindMany.mockResolvedValue(CATALOG);
+    productsFindMany.mockResolvedValue([]);
+    settingsFindMany.mockResolvedValue([]);
+  });
+
+  it.each(['skincare', 'skin care', 'beauty', 'aesthetics'])(
+    'answers the umbrella topic "%s" with the service overview, not a refusal',
+    async (message) => {
+      const result = await aiService.processMessage({ message });
+
+      expect(result.response).not.toContain('outside what I can help with');
+      expect(result.response).toContain('facials');
+    },
+  );
+
+  it('routes "pricing" to the pricing clarification instead of a product miss', async () => {
+    const result = await aiService.processMessage({ message: 'do you have a pricing list?' });
+
+    expect(result.response).not.toContain('could not find a product');
+    expect(result.response).not.toContain('outside what I can help with');
+    expect(result.response).toContain('pricing for');
+  });
+
+  it('routes a reservation question to the booking information', async () => {
+    const result = await aiService.processMessage({ message: 'how do i make a reservation?' });
+
+    expect(result.response).not.toContain('outside what I can help with');
+    expect(result.response).toContain('booking page');
+  });
+
+  it('routes "what is your number?" to the contact information', async () => {
+    settingsFindMany.mockResolvedValue([
+      { setting_key: 'clinic_phone', setting_value: '"+63 981 689 9909"' },
+      { setting_key: 'clinic_address', setting_value: '"2nd Floor, The District"' },
+    ]);
+
+    const result = await aiService.processMessage({ message: 'what is your number?' });
+
+    expect(result.response).toContain('Contact Information');
+    expect(result.response).not.toContain('outside what I can help with');
+  });
+});
