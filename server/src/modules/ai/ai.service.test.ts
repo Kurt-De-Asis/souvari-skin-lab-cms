@@ -474,6 +474,40 @@ describe('AiService product catalog browsing', () => {
       expect(result.response).not.toContain('outside what I can help with');
     },
   );
+
+  // Regression: a deployment whose database is a migration behind (so the
+  // purpose/benefits columns are absent) must still answer product questions
+  // rather than reporting that it has nothing on file. The loader retries with
+  // fewer columns instead of throwing.
+  it('lists the catalog even when the product content columns are missing', async () => {
+    productsFindMany
+      .mockRejectedValueOnce(
+        Object.assign(
+          new Error('Unknown column \'products.purpose\' in \'field list\''),
+          { code: 'P2022' },
+        ),
+      )
+      .mockResolvedValueOnce([
+        {
+          id: 2,
+          name: 'Nimbus Cloud Lotion',
+          description: null,
+          sku: 'SKU-2',
+          unit: 'pc',
+          unit_price: 750,
+          current_stock: 12,
+          category: { name: 'Retail Items' },
+          service_inventory_items: [],
+        },
+      ]);
+
+    const result = await aiService.processMessage({ message: 'what are available products?' });
+
+    expect(result.response).toContain('We currently carry these');
+    expect(result.response).toContain('Nimbus Cloud Lotion');
+    expect(result.response).not.toContain("don't have that specific information");
+    expect(productsFindMany).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('AiService policy and treatment-logistics routing', () => {

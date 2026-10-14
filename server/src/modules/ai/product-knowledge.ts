@@ -664,40 +664,93 @@ export function renderRelatedProductsReply(serviceName: string, products: Produc
 }
 
 /**
+ * The columns every deployment of the schema is expected to have. Selecting
+ * them explicitly rather than selecting all scalar columns means a database
+ * that is running behind the code still answers product questions, and a column
+ * added in some future migration can never silently break this read.
+ */
+const PRODUCT_CATALOG_SELECT = {
+  id: true,
+  name: true,
+  description: true,
+  sku: true,
+  unit: true,
+  unit_price: true,
+  current_stock: true,
+  category: { select: { name: true } },
+  service_inventory_items: {
+    select: { service: { select: { id: true, name: true, status: true, deleted_at: true } } },
+  },
+} as const;
+
+/**
+ * True when an error means an optional product content column is absent from the
+ * database (for example because migration 20261004120000 has not run), as
+ * opposed to the database being unreachable. Only the former is recoverable by
+ * asking for fewer columns.
+ */
+function isMissingProductContentColumn(error: unknown): boolean {
+  const err = error as { code?: string; message?: string } | null;
+  if (err?.code === 'P2022') return true;
+  const message = String(err?.message ?? '').toLowerCase();
+  return (
+    message.includes('unknown column') &&
+    (message.includes('purpose') ||
+      message.includes('benefits') ||
+      message.includes('research_sources'))
+  );
+}
+
+/**
  * Load the customer-visible catalog. The visibility rules live here and nowhere
  * else, so every consumer of product knowledge agrees on what is answerable.
+ *
+ * The optional content columns (`purpose`, `benefits`) are read best-effort. If
+ * they are missing the catalog is still returned without them, so a database
+ * that is a migration behind keeps answering product questions instead of
+ * reporting that it has nothing on file.
  */
 export async function loadRetailProducts(): Promise<ProductRecord[]> {
-  const rows = await prisma.products.findMany({
-    where: {
-      deleted_at: null,
-      status: 'active',
-      is_retail: true,
-      unit_price: { gt: 0 },
-    },
-    include: {
-      category: { select: { name: true } },
-      service_inventory_items: {
-        select: { service: { select: { id: true, name: true, status: true, deleted_at: true } } },
-      },
-    },
-    orderBy: { name: 'asc' },
-  });
+  const where = {
+    deleted_at: null,
+    status: 'active' as const,
+    is_retail: true,
+    unit_price: { gt: 0 },
+  };
+
+  let rows: any[];
+  try {
+    rows = await prisma.products.findMany({
+      where,
+      select: { ...PRODUCT_CATALOG_SELECT, purpose: true, benefits: true },
+      orderBy: { name: 'asc' },
+    });
+  } catch (error) {
+    if (!isMissingProductContentColumn(error)) throw error;
+    console.warn(
+      '[chat] products table is missing purpose/benefits columns; serving the catalog without them until migrations run',
+    );
+    rows = await prisma.products.findMany({
+      where,
+      select: PRODUCT_CATALOG_SELECT,
+      orderBy: { name: 'asc' },
+    });
+  }
 
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
     description: row.description,
-    purpose: row.purpose,
-    benefits: row.benefits,
+    purpose: row.purpose ?? null,
+    benefits: row.benefits ?? null,
     sku: row.sku,
     unit: row.unit,
     unit_price: roundPeso(Number(row.unit_price)),
     current_stock: Number(row.current_stock),
     category: row.category?.name ?? null,
     related_services: row.service_inventory_items
-      .map((si) => si.service)
-      .filter((s) => !s.deleted_at && s.status === 'active')
-      .map((s) => s.name),
+      .map((si: any) => si.service)
+      .filter((s: any) => !s.deleted_at && s.status === 'active')
+      .map((s: any) => s.name),
   }));
 }

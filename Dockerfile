@@ -39,12 +39,17 @@ COPY --from=build /app/client/dist ./client/dist
 WORKDIR /app/server
 EXPOSE 3000
 
-# Before starting:
-# 1. predeploy.sql clears duplicate phones and any half-applied migration marker
-#    that a snapshot import can leave behind (see the file for details).
-# 2. `migrate resolve --applied drop_preferred_staff` unblocks databases where
-#    that migration cannot run (a fresh database never had the column it drops).
-#    It is a no-op on databases where it is already applied.
-# 3. `migrate deploy` then applies everything, including the product-content
-#    columns the chatbot reads.
-CMD ["/bin/sh", "-c", "npx prisma db execute --file prisma/predeploy.sql --schema prisma/schema.prisma >/dev/null 2>&1 || true; npx prisma migrate resolve --applied 20260929120000_drop_preferred_staff >/dev/null 2>&1 || true; for i in 1 2 3 4 5; do npx prisma migrate deploy && break || { echo 'prisma migrate deploy failed, retrying in 10s...'; sleep 10; }; done && node dist/server.js"]
+# Startup order, all logged so Railway shows what actually happened:
+#  1. predeploy.sql            clears duplicate phone numbers a snapshot import
+#                              can leave behind (blocks the unique-phone index).
+#  2. predeploy-migrations.sql clears a half-applied migration marker so a
+#                              previous failure cannot block every later one.
+#  3. two `migrate resolve` calls unblock legacy/failed migrations: the obsolete
+#     drop_preferred_staff migration cannot run on a fresh database, and the
+#     unique-phone migration may be sitting failed from an earlier boot.
+#  4. `migrate deploy` then applies everything, including the product-content
+#     columns the chatbot reads, with retries.
+#  5. `migrate status` is printed for diagnostics, then the server starts.
+# Each preflight step is non-fatal, so a database that cannot run one of them
+# still boots and serves traffic.
+CMD ["/bin/sh", "-c", "echo '[deploy] preflight: clearing duplicate phones (if any)'; npx prisma db execute --file prisma/predeploy.sql --schema prisma/schema.prisma || echo '[deploy] phone preflight reported an error (continuing)'; echo '[deploy] preflight: clearing half-applied migration markers'; npx prisma db execute --file prisma/predeploy-migrations.sql --schema prisma/schema.prisma || echo '[deploy] migration-marker preflight reported an error (continuing)'; npx prisma migrate resolve --rolled-back 20261002120000_add_unique_user_phone || true; npx prisma migrate resolve --applied 20260929120000_drop_preferred_staff || true; for i in 1 2 3 4 5; do echo '[deploy] running prisma migrate deploy'; npx prisma migrate deploy && break || { echo '[deploy] migrate deploy failed, retrying in 10s...'; sleep 10; }; done; echo '[deploy] final migration status:'; npx prisma migrate status || true; exec node dist/server.js"]
