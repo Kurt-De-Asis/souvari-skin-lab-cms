@@ -39,4 +39,12 @@ COPY --from=build /app/client/dist ./client/dist
 WORKDIR /app/server
 EXPOSE 3000
 
-CMD ["/bin/sh", "-c", "for i in 1 2 3 4 5; do npx prisma migrate deploy && break || { echo 'prisma migrate deploy failed, retrying in 10s...'; sleep 10; }; done && node dist/server.js"]
+# Before starting:
+# 1. predeploy.sql clears duplicate phones and any half-applied migration marker
+#    that a snapshot import can leave behind (see the file for details).
+# 2. `migrate resolve --applied drop_preferred_staff` unblocks databases where
+#    that migration cannot run (a fresh database never had the column it drops).
+#    It is a no-op on databases where it is already applied.
+# 3. `migrate deploy` then applies everything, including the product-content
+#    columns the chatbot reads.
+CMD ["/bin/sh", "-c", "npx prisma db execute --file prisma/predeploy.sql --schema prisma/schema.prisma >/dev/null 2>&1 || true; npx prisma migrate resolve --applied 20260929120000_drop_preferred_staff >/dev/null 2>&1 || true; for i in 1 2 3 4 5; do npx prisma migrate deploy && break || { echo 'prisma migrate deploy failed, retrying in 10s...'; sleep 10; }; done && node dist/server.js"]

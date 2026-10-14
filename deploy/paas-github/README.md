@@ -128,8 +128,33 @@ mysqldump -u <user> -p<pass> <database> > /backups/souvari-$(date +%F).sql
 | "tsc: not found" (Cloudflare-style Nixpacks build) | Ensure the builder is **DOCKERFILE** (railway.toml already pins it). Do not use Nixpacks. |
 | Deploy unhealthy / API down | Check the web service **Logs**; most likely `DATABASE_URL` is wrong (must be the internal MySQL host, and DB must be reachable). |
 | `migrate deploy` fails P3005 (schema not empty) | Only happens if you pointed it at a NON-empty DB that wasn't created by these migrations. On the fresh Railway MySQL this does not occur. |
+| Chatbot says it has "no information on file" for products/prices after a snapshot import | The snapshot can carry duplicate phone numbers, which makes the `add_unique_user_phone` migration fail and silently skip every migration after it (including the product-content columns). The container now runs `prisma/predeploy.sql` before migrating to clear the duplicates automatically — just redeploy. To fix an already-running instance by hand, see the MySQL console note below. |
 | 404 on page refresh | Should not happen — the container includes SPA fallback. If you've swapped the builder, verify you're hitting the Docker image. |
 | Reminders not sent at 8 AM | Check `TZ=Asia/Manila`, `REMINDERS_ENABLED=true`, and that the service never sleeps. |
+
+### Fix the stale-schema chatbot without a redeploy
+
+If you can't redeploy immediately, open the **MySQL service → Console** and run the same preflight by hand, then restart the web service so migrations finish:
+
+```sql
+-- Clear a half-applied migration marker, if any.
+UPDATE _prisma_migrations
+SET rolled_back_at = NOW()
+WHERE finished_at IS NULL AND rolled_back_at IS NULL;
+
+-- Clear duplicate phone numbers (lowest id keeps it) so the unique index builds.
+UPDATE users AS u
+JOIN (
+  SELECT phone AS dup_phone, MIN(id) AS keep_id
+  FROM users
+  WHERE phone IS NOT NULL AND phone <> ''
+  GROUP BY phone
+  HAVING COUNT(*) > 1
+) AS d ON u.phone = d.dup_phone AND u.id <> d.keep_id
+SET u.phone = NULL;
+```
+
+Then restart the web service (it runs `migrate deploy` on boot). The product-content columns will be added and the chatbot's product answers will work.
 
 ---
 
