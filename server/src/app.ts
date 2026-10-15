@@ -35,6 +35,14 @@ import reviewsRoutes from './modules/reviews/reviews.routes';
 
 const app = express();
 
+// Trust exactly one proxy hop. In production the app sits behind the
+// Cloudflare Tunnel (cloudflared on loopback) or a reverse proxy, which sets
+// `X-Forwarded-For`. Without this express-rate-limit rejects the header
+// (ERR_ERL_UNEXPECTED_X_FORWARDED_FOR) and `req.ip` logs the proxy instead of
+// the client. One hop is deliberate: trusting `true` would let a caller spoof
+// the header and dodge rate limits.
+app.set('trust proxy', 1);
+
 // Security
 app.use(helmet({
   contentSecurityPolicy: {

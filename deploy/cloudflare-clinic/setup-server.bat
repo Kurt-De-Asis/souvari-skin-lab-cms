@@ -53,8 +53,41 @@ call npm run build
 if errorlevel 1 (echo [ERROR] server build failed. & pause & exit /b 1)
 
 echo [6/7] Applying database migrations...
+REM Preflight steps are idempotent and non-fatal; they clear state a snapshot
+REM import can leave behind (duplicate phone numbers, half-applied migration
+REM markers) that would otherwise abort the whole migration chain.
+echo    [deploy] preflight: clearing duplicate phones (if any)...
+call npx prisma db execute --file prisma/predeploy.sql --schema prisma/schema.prisma || echo    [deploy] phone preflight reported an error (continuing)
+echo    [deploy] preflight: clearing half-applied migration markers...
+call npx prisma db execute --file prisma/predeploy-migrations.sql --schema prisma/schema.prisma || echo    [deploy] migration-marker preflight reported an error (continuing)
+REM Unblock legacy/failed migrations: drop_preferred_staff cannot run on a
+REM fresh database, and the unique-phone migration may be sitting failed.
+call npx prisma migrate resolve --rolled-back 20261002120000_add_unique_user_phone || echo    [deploy] resolve rolled-back skipped
+call npx prisma migrate resolve --applied 20260929120000_drop_preferred_staff || echo    [deploy] resolve applied skipped
+
+set "MIGRATE_TRY=0"
+:MIGRATE_RETRY
+set /a MIGRATE_TRY+=1
+echo    [deploy] prisma migrate deploy (attempt %MIGRATE_TRY%/5)...
 call npx prisma migrate deploy
-if errorlevel 1 (echo [ERROR] prisma migrate deploy failed. Check server\.env DATABASE_URL is correct. & pause & exit /b 1)
+if not errorlevel 1 goto :MIGRATE_OK
+if %MIGRATE_TRY% GEQ 5 goto :MIGRATE_FAIL
+echo    [deploy] migrate deploy failed, retrying in 10s...
+timeout /t 10 /nobreak >nul
+goto :MIGRATE_RETRY
+
+:MIGRATE_OK
+echo    [deploy] migrations applied.
+goto :MIGRATE_END
+
+:MIGRATE_FAIL
+echo    [WARNING] prisma migrate deploy did not complete after 5 attempts.
+echo    [WARNING] Check server\.env DATABASE_URL. Continuing anyway so the server
+echo    [WARNING] can still start; inspect with "npx prisma migrate status".
+
+:MIGRATE_END
+echo    [deploy] final migration status:
+call npx prisma migrate status
 
 echo [7/7] Starting under PM2...
 call npm install -g pm2 >nul 2>&1

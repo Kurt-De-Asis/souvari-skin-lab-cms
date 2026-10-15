@@ -1,8 +1,19 @@
 # Getting Souvari online with Cloudflare (stable URL, own domain)
 
 Goal: expose the app already running on the **clinic Windows PC** as a permanent
-`https://your-domain.com` using a **Cloudflare named tunnel**. Hosting stays $0
-(your own PC + Cloudflare free plan); the only cost is the domain (~$10-16/yr).
+`https://souvari-skin-lab.site` using a **Cloudflare named tunnel**. Hosting stays
+$0 (your own PC + Cloudflare free plan); the only cost is the domain (~$10-16/yr).
+
+> **Do not use Cloudflare Pages for this app.** Pages only serves static files and
+> edge Functions — it has no Node runtime or MySQL, so the API (`/api/*`) and the
+> chatbot cannot run there. A Pages deploy of the frontend will either fail to
+> build (the repo root install does not install `client/` dependencies) or serve a
+> site whose API calls 404. Use the **named tunnel** below, which serves the UI and
+> the API from the same origin with no CORS or API-URL changes.
+>
+> If you already created a Pages project: delete it (or leave it unused) and
+> remove the domain from **Pages → Custom domains** before routing the tunnel, so
+> the tunnel's DNS `CNAME` is not fought over by the Pages project.
 
 ## What changed in the repo (already done)
 
@@ -14,6 +25,14 @@ Goal: expose the app already running on the **clinic Windows PC** as a permanent
 - Fixed the 5 pre-existing TypeScript errors + a declaration-emit error so
   `npm run build` in `server/` exits cleanly (previously it emitted `dist` but
   failed with exit code 1 - a deploy script would have aborted).
+- `server/src/app.ts` sets `app.set('trust proxy', 1)` so that behind the
+  Cloudflare Tunnel the rate limiter accepts `X-Forwarded-For` (without it,
+  `express-rate-limit` errors with `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`) and
+  `req.ip` logs the real client instead of the proxy.
+- `setup-server.bat` runs the same idempotent migration preflights as the
+  Dockerfile (`predeploy.sql`, `predeploy-migrations.sql`, two `migrate resolve`
+  calls) then retries `prisma migrate deploy` up to 5 times. A snapshot import
+  or a half-applied migration can no longer abort setup.
 
 ## Prerequisites (on the clinic PC)
 
@@ -23,11 +42,14 @@ Goal: expose the app already running on the **clinic Windows PC** as a permanent
 - Internet/outbound access (Cloudflare Tunnel works behind NAT; no router
   changes needed).
 
-## Step 1 - Buy the domain (Cloudflare Registrar)
+## Step 1 - The domain (already done)
+
+`souvari-skin-lab.site` is already registered through Cloudflare Registrar, so its
+DNS zone lives on Cloudflare and is ready. Nothing to buy. Confirm in the
+dashboard that the zone shows as **Active**, then continue.
 
 1. Log in at dash.cloudflare.com.
-2. **Register Domain** -> pick a domain (e.g. `souvari-skin-lab.com`), checkout.
-   Registrar DNS is on Cloudflare automatically, so the zone is ready.
+2. Select the `souvari-skin-lab.site` zone; make sure its status is **Active**.
 3. Skip the "changes detected" warnings - we add DNS below via the tunnel.
 
 ## Step 2 - Deploy the code + server (one batch)
@@ -41,7 +63,7 @@ Goal: expose the app already running on the **clinic Windows PC** as a permanent
      - `DATABASE_URL` -> your real MySQL password.
      - `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` -> two random hex strings
        (generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`).
-     - `FRONTEND_URL` / `BACKEND_URL` -> your new domain (https).
+     - `FRONTEND_URL` / `BACKEND_URL` -> `https://souvari-skin-lab.site`.
      - `TZ=Asia/Manila` so the 8 AM reminder batch fires at local time.
      - `SMS_PROVIDER=semaphore` + `SMS_API_KEY` + `SMS_SENDER` when you want
        real texts (leave `mock` for now).
@@ -50,31 +72,45 @@ Goal: expose the app already running on the **clinic Windows PC** as a permanent
 3. Check it locally: on that PC browse `http://localhost:3000` - you should see
    the login page, and `pm2 list` should show `souvari-api` online.
 
-## Step 3 - Cloudflare tunnel
+## Step 3 - Cloudflare tunnel (dashboard-managed)
 
-1. Install `cloudflared` on the clinic PC:
-   - `choco install cloudflared`, or download `cloudflared-windows-amd64.exe`
-     from https://github.com/cloudflare/cloudflared/releases and put it in PATH.
-2. Run **setup-tunnel.bat** (as administrator). It:
-   - `cloudflared tunnel login` (browser OAuth - approve access).
-   - `cloudflared tunnel create souvari`.
-   - `cloudflared tunnel route dns souvari <your-domain.com>` (creates the
-     `CNAME` in Cloudflare DNS automatically).
-   - Prints the tunnel token.
-3. Install it as a Windows service so it auto-starts on boot:
-   ```
-   cloudflared service install <paste_token_here>
-   ```
-4. Verify:
-   ```
-   cloudflared tunnel info souvari
-   ```
-   Service state: `services.msc` -> `Cloudflare Tunnel Agent` = Running.
+> **Status: the tunnel already exists.** `souvari` (ID
+> `893c7198-a3b8-4301-ae71-87af8b9a8596`) was created in the Cloudflare dashboard
+> and its connector is already installed/running on the clinic PC
+> (`cloudflared.exe service install <token>`). The one thing still missing is the
+> **Published application route** below - without it the hostname returns error
+> 1033 and does not resolve. Add it under **Networks -> Tunnels -> souvari ->
+> Routes**.
+
+Install `cloudflared` on the clinic PC first:
+- `choco install cloudflared`, or download `cloudflared-windows-amd64.exe`
+  from https://github.com/cloudflare/cloudflared/releases and put it in PATH.
+
+Then, in the Cloudflare dashboard (this creates both the tunnel **and** its
+DNS record, so no `config.yml` and no `cloudflared tunnel login` are needed):
+
+1. Go to **Zero Trust** (one.dash.cloudflare.com) -> **Networks** -> **Tunnels**.
+2. Select the existing tunnel `souvari` (or **Create a tunnel** ->
+   **Cloudflared** -> name it `souvari` -> **Create**).
+3. Under **Routes**, add a **Published application**:
+   - Hostname: `souvari-skin-lab.site`
+   - Service URL: `http://localhost:3000`
+   - (Add a second route for `www.souvari-skin-lab.site` if you want www too.)
+4. If you are creating a new tunnel, copy the **token** shown on the install
+   screen, then run **setup-tunnel.bat** (as Administrator) and paste it.
+   If the connector is already installed, you can skip this.
+5. Confirm the tunnel shows **HEALTHY** in the dashboard and the service is
+   **Running** (`sc query cloudflared` / `services.msc` -> `Cloudflare Tunnel Agent`).
+
+> Why not `cloudflared tunnel login` + `tunnel create` + `route dns`? That is the
+> locally-managed flow and it also requires a `config.yml` plus a registry edit
+> to serve a hostname from a Windows service. The dashboard-managed flow above
+> does all of that for you and is what Cloudflare recommends.
 
 ## Step 4 - Cut over + checks
 
-1. Open `https://your-domain.com/api/health` -> expect the health JSON.
-2. Log in at `https://your-domain.com` with the admin account.
+1. Open `https://souvari-skin-lab.site/api/health` -> expect the health JSON.
+2. Log in at `https://souvari-skin-lab.site` with the admin account.
 3. Book an appointment end-to-end (or at least browse services + booking page).
 4. Next 8 AM, check the API log shows `[REMINDER] Batch complete:
    ... reminded, ... failed`. (`pm2 logs souvari-api`)
@@ -102,10 +138,13 @@ Goal: expose the app already running on the **clinic Windows PC** as a permanent
 
 | Symptom | Fix |
 |---|---|
-| `your-domain.com` hangs or DNS not resolving | Tunnel service must be **Running**; `cloudflared tunnel info souvari`; DNS `CNAME` present in Cloudflare. |
-| Site shows but API calls fail | `pm2 logs souvari-api`; confirm `server\.env` `FRONTEND_URL`/`BACKEND_URL` = https domain; restart `pm2 restart souvari-api`. |
-| PC rebooted, site down | Server restarts on login (task `SouvariServer`); tunnel is a service. Make sure someone logs into Windows, or use a service account. |
-| `prisma migrate deploy` fails | `DATABASE_URL` wrong; DB user password. |
+| `souvari-skin-lab.site` hangs or DNS not resolving | Tunnel must show **HEALTHY** in the dashboard and the `cloudflared` service must be **Running** (`sc query cloudflared`); the Published application route must exist. If a Cloudflare **Pages** project still owns the domain, remove it from Pages → Custom domains. |
+| Site shows but API calls fail | `pm2 logs souvari-api`; confirm `server\.env` `FRONTEND_URL`/`BACKEND_URL` = `https://souvari-skin-lab.site`; restart `pm2 restart souvari-api`. |
+| PC rebooted, site down | Server restarts on login (task `SouvariServer`); tunnel is a Windows service. Make sure someone logs into Windows, or use a service account. |
+| Error 1033 / "tunnel not found" | The tunnel has no published route. Add the Published application route (`souvari-skin-lab.site` → `http://localhost:3000`) in the dashboard. |
+| Pages build fails with `tsc: not found` / `vite: not found` | Expected — Pages installs only the repo-root deps. Do not use Pages; use the tunnel. |
+| Rate limiter / logs mention `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` | Rebuild the server so `app.set('trust proxy', 1)` is in `dist` (from this repo), then `pm2 restart souvari-api`. |
+| `prisma migrate deploy` fails (P3009/P3018, error 1050/1091) | Update the repo, re-run `setup-server.bat` (it runs the preflights + retries). Inspect with `npx prisma migrate status`. Usually a snapshot import left duplicate phones or a half-applied migration; the preflights clear both. |
 | Reminders never fire | `REMINDERS_ENABLED=false`? `TZ` not Asia/Manila? Server process off? Check `pm2 logs`. |
 
 ## Where this leaves you
