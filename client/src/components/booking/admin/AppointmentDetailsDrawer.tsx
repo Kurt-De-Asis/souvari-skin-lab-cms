@@ -254,8 +254,11 @@ export default function AppointmentDetailsDrawer({
           <div className="flex items-start gap-2.5 rounded-md border border-neutral-200 bg-neutral-50 p-3">
             <Lock size={15} className="text-neutral-400 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-neutral-600">
-              This appointment is completed and is now locked. Services, specialist, and status can no
-              longer be changed.
+              {appointment.status === 'completed'
+                ? 'This appointment is completed and is now locked. Services, specialist, and status can no longer be changed.'
+                : appointment.status === 'cancelled'
+                  ? 'This appointment is cancelled and is now locked. Services, specialist, and status can no longer be changed.'
+                  : 'This appointment is locked. Services, specialist, and status can no longer be changed.'}
             </p>
           </div>
         )}

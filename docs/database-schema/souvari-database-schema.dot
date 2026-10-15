@@ -1,0 +1,274 @@
+// Souvari Skin Lab - simplified Entity-Relationship Diagram (Microsoft Access style)
+// Source of truth for souvari-database-schema.svg / .png.
+// 15 tables, 17 relationships (3 one-to-one, 14 one-to-many).
+// Columns are a readable subset of the real MySQL schema (39 tables in total).
+// Regenerate with: npm install && npm run build   (in docs/database-schema/)
+
+digraph souvari_erd {
+  graph [
+    charset="UTF-8",
+    rankdir=TB,
+    splines=ortho,
+    nodesep=0.4,
+    ranksep=0.55,
+    pad="0.4",
+    bgcolor="#ffffff",
+    fontname="DejaVu Sans",
+    compound=true
+  ];
+
+  node [
+    shape=plaintext,
+    fontname="DejaVu Sans",
+    margin="0"
+  ];
+
+  edge [
+    color="#5a5a70",
+    penwidth=1.0,
+    arrowsize=0.7,
+    arrowhead=none,
+    fontname="DejaVu Sans",
+    fontsize=10,
+    fontcolor="#333333"
+  ];
+
+  // ── USERS / AUTH ─────────────────────────────────────────────
+  users [label=<
+    <TABLE BORDER="1" COLOR="#b23b3b" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#f4f4f4">
+      <TR><TD COLSPAN="2" BGCOLOR="#e9e9e9" ALIGN="CENTER"><FONT POINT-SIZE="11"><B>users</B></FONT></TD></TR>
+      <TR><TD COLSPAN="2" CELLPADDING="0" HEIGHT="1" BGCOLOR="#b23b3b"></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#9e2b2b"><B>PK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">id</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">email</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">password_hash</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">role</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">status</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">phone</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">created_at</FONT></TD></TR>
+    </TABLE>>];
+
+  // ── CUSTOMERS ────────────────────────────────────────────────
+  customers [label=<
+    <TABLE BORDER="1" COLOR="#b23b3b" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#f4f4f4">
+      <TR><TD COLSPAN="2" BGCOLOR="#e9e9e9" ALIGN="CENTER"><FONT POINT-SIZE="11"><B>customers</B></FONT></TD></TR>
+      <TR><TD COLSPAN="2" CELLPADDING="0" HEIGHT="1" BGCOLOR="#b23b3b"></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#9e2b2b"><B>PK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">id</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">user_id</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">first_name</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">last_name</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">date_of_birth</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">gender</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">address</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">notes</FONT></TD></TR>
+    </TABLE>>];
+
+  // ── STAFF ────────────────────────────────────────────────────
+  staff [label=<
+    <TABLE BORDER="1" COLOR="#b23b3b" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#f4f4f4">
+      <TR><TD COLSPAN="2" BGCOLOR="#e9e9e9" ALIGN="CENTER"><FONT POINT-SIZE="11"><B>staff</B></FONT></TD></TR>
+      <TR><TD COLSPAN="2" CELLPADDING="0" HEIGHT="1" BGCOLOR="#b23b3b"></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#9e2b2b"><B>PK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">id</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">user_id</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">first_name</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">last_name</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">position</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">status</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">hire_date</FONT></TD></TR>
+    </TABLE>>];
+
+  // ── ADMINS (specialisation of users where role = 'admin') ────
+  admins [label=<
+    <TABLE BORDER="1" COLOR="#b23b3b" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#f4f4f4">
+      <TR><TD COLSPAN="2" BGCOLOR="#e9e9e9" ALIGN="CENTER"><FONT POINT-SIZE="11"><B>admins</B></FONT></TD></TR>
+      <TR><TD COLSPAN="2" CELLPADDING="0" HEIGHT="1" BGCOLOR="#b23b3b"></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#9e2b2b"><B>PK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">id</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">user_id</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">first_name</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">last_name</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">permission_level</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">status</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">created_at</FONT></TD></TR>
+    </TABLE>>];
+
+  // ── STAFF SCHEDULES ──────────────────────────────────────────
+  staff_schedules [label=<
+    <TABLE BORDER="1" COLOR="#b23b3b" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#f4f4f4">
+      <TR><TD COLSPAN="2" BGCOLOR="#e9e9e9" ALIGN="CENTER"><FONT POINT-SIZE="11"><B>staff_schedules</B></FONT></TD></TR>
+      <TR><TD COLSPAN="2" CELLPADDING="0" HEIGHT="1" BGCOLOR="#b23b3b"></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#9e2b2b"><B>PK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">id</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">staff_id</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">day_of_week</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">start_time</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">end_time</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">is_active</FONT></TD></TR>
+    </TABLE>>];
+
+  // ── SYSTEM SETTINGS (admin) ──────────────────────────────────
+  system_settings [label=<
+    <TABLE BORDER="1" COLOR="#b23b3b" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#f4f4f4">
+      <TR><TD COLSPAN="2" BGCOLOR="#e9e9e9" ALIGN="CENTER"><FONT POINT-SIZE="11"><B>system_settings</B></FONT></TD></TR>
+      <TR><TD COLSPAN="2" CELLPADDING="0" HEIGHT="1" BGCOLOR="#b23b3b"></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#9e2b2b"><B>PK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">id</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">setting_key</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">setting_value</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">description</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">managed_by</FONT></TD></TR>
+    </TABLE>>];
+
+  // ── SERVICES ─────────────────────────────────────────────────
+  services [label=<
+    <TABLE BORDER="1" COLOR="#b23b3b" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#f4f4f4">
+      <TR><TD COLSPAN="2" BGCOLOR="#e9e9e9" ALIGN="CENTER"><FONT POINT-SIZE="11"><B>services</B></FONT></TD></TR>
+      <TR><TD COLSPAN="2" CELLPADDING="0" HEIGHT="1" BGCOLOR="#b23b3b"></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#9e2b2b"><B>PK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">id</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">name</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">category</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">price</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">duration_minutes</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">status</FONT></TD></TR>
+    </TABLE>>];
+
+  // ── APPOINTMENTS ─────────────────────────────────────────────
+  appointments [label=<
+    <TABLE BORDER="1" COLOR="#b23b3b" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#f4f4f4">
+      <TR><TD COLSPAN="2" BGCOLOR="#e9e9e9" ALIGN="CENTER"><FONT POINT-SIZE="11"><B>appointments</B></FONT></TD></TR>
+      <TR><TD COLSPAN="2" CELLPADDING="0" HEIGHT="1" BGCOLOR="#b23b3b"></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#9e2b2b"><B>PK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">id</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">customer_id</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">staff_id</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">service_id</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">appointment_date</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">start_time</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">end_time</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">status</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">quoted_price</FONT></TD></TR>
+    </TABLE>>];
+
+  // ── TREATMENT RECORDS ────────────────────────────────────────
+  treatment_records [label=<
+    <TABLE BORDER="1" COLOR="#b23b3b" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#f4f4f4">
+      <TR><TD COLSPAN="2" BGCOLOR="#e9e9e9" ALIGN="CENTER"><FONT POINT-SIZE="11"><B>treatment_records</B></FONT></TD></TR>
+      <TR><TD COLSPAN="2" CELLPADDING="0" HEIGHT="1" BGCOLOR="#b23b3b"></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#9e2b2b"><B>PK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">id</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">appointment_id</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">customer_id</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">staff_id</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">service_id</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">treatment_date</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">notes</FONT></TD></TR>
+    </TABLE>>];
+
+  // ── PRODUCT CATEGORIES ───────────────────────────────────────
+  product_categories [label=<
+    <TABLE BORDER="1" COLOR="#b23b3b" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#f4f4f4">
+      <TR><TD COLSPAN="2" BGCOLOR="#e9e9e9" ALIGN="CENTER"><FONT POINT-SIZE="11"><B>product_categories</B></FONT></TD></TR>
+      <TR><TD COLSPAN="2" CELLPADDING="0" HEIGHT="1" BGCOLOR="#b23b3b"></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#9e2b2b"><B>PK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">id</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">name</FONT></TD></TR>
+    </TABLE>>];
+
+  // ── PRODUCTS ─────────────────────────────────────────────────
+  products [label=<
+    <TABLE BORDER="1" COLOR="#b23b3b" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#f4f4f4">
+      <TR><TD COLSPAN="2" BGCOLOR="#e9e9e9" ALIGN="CENTER"><FONT POINT-SIZE="11"><B>products</B></FONT></TD></TR>
+      <TR><TD COLSPAN="2" CELLPADDING="0" HEIGHT="1" BGCOLOR="#b23b3b"></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#9e2b2b"><B>PK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">id</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">product_category_id</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">name</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">sku</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">unit_price</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">current_stock</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">is_retail</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">status</FONT></TD></TR>
+    </TABLE>>];
+
+  // ── INVENTORY MOVEMENTS ──────────────────────────────────────
+  inventory_movements [label=<
+    <TABLE BORDER="1" COLOR="#b23b3b" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#f4f4f4">
+      <TR><TD COLSPAN="2" BGCOLOR="#e9e9e9" ALIGN="CENTER"><FONT POINT-SIZE="11"><B>inventory_movements</B></FONT></TD></TR>
+      <TR><TD COLSPAN="2" CELLPADDING="0" HEIGHT="1" BGCOLOR="#b23b3b"></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#9e2b2b"><B>PK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">id</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">product_id</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">performed_by</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">type</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">quantity</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">running_stock_after</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">created_at</FONT></TD></TR>
+    </TABLE>>];
+
+  // ── NOTIFICATIONS ────────────────────────────────────────────
+  notifications [label=<
+    <TABLE BORDER="1" COLOR="#b23b3b" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#f4f4f4">
+      <TR><TD COLSPAN="2" BGCOLOR="#e9e9e9" ALIGN="CENTER"><FONT POINT-SIZE="11"><B>notifications</B></FONT></TD></TR>
+      <TR><TD COLSPAN="2" CELLPADDING="0" HEIGHT="1" BGCOLOR="#b23b3b"></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#9e2b2b"><B>PK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">id</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">user_id</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">type</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">title</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">message</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">status</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">read_at</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">created_at</FONT></TD></TR>
+    </TABLE>>];
+
+  // ── SMS LOGS ─────────────────────────────────────────────────
+  sms_logs [label=<
+    <TABLE BORDER="1" COLOR="#b23b3b" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#f4f4f4">
+      <TR><TD COLSPAN="2" BGCOLOR="#e9e9e9" ALIGN="CENTER"><FONT POINT-SIZE="11"><B>sms_logs</B></FONT></TD></TR>
+      <TR><TD COLSPAN="2" CELLPADDING="0" HEIGHT="1" BGCOLOR="#b23b3b"></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#9e2b2b"><B>PK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">id</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">user_id</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">recipient_phone</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">message</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">status</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">sent_at</FONT></TD></TR>
+    </TABLE>>];
+
+  // ── CHAT SESSIONS ────────────────────────────────────────────
+  chat_sessions [label=<
+    <TABLE BORDER="1" COLOR="#b23b3b" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#f4f4f4">
+      <TR><TD COLSPAN="2" BGCOLOR="#e9e9e9" ALIGN="CENTER"><FONT POINT-SIZE="11"><B>chat_sessions</B></FONT></TD></TR>
+      <TR><TD COLSPAN="2" CELLPADDING="0" HEIGHT="1" BGCOLOR="#b23b3b"></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#9e2b2b"><B>PK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">id</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">user_id</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">session_token</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">status</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">started_at</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">ended_at</FONT></TD></TR>
+    </TABLE>>];
+
+  // ── CHAT MESSAGES ────────────────────────────────────────────
+  chat_messages [label=<
+    <TABLE BORDER="1" COLOR="#b23b3b" CELLBORDER="0" CELLSPACING="0" CELLPADDING="4" BGCOLOR="#f4f4f4">
+      <TR><TD COLSPAN="2" BGCOLOR="#e9e9e9" ALIGN="CENTER"><FONT POINT-SIZE="11"><B>chat_messages</B></FONT></TD></TR>
+      <TR><TD COLSPAN="2" CELLPADDING="0" HEIGHT="1" BGCOLOR="#b23b3b"></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#9e2b2b"><B>PK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">id</FONT></TD></TR>
+      <TR><TD ALIGN="LEFT"><FONT POINT-SIZE="9" COLOR="#2b5c9e"><B>FK</B></FONT></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">session_id</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">sender_type</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">content</FONT></TD></TR>
+      <TR><TD></TD><TD ALIGN="LEFT"><FONT POINT-SIZE="10">created_at</FONT></TD></TR>
+    </TABLE>>];
+
+  // ── RELATIONSHIPS (tail = "1" side, head = child side) ───────
+  // One-to-one
+  users -> customers            [taillabel="1", headlabel="1", labeldistance=2.2, labelangle=35];
+  users -> staff                [taillabel="1", headlabel="1", labeldistance=2.2, labelangle=35];
+  users -> admins               [taillabel="1", headlabel="1", labeldistance=2.2, labelangle=35];
+  appointments -> treatment_records [taillabel="1", headlabel="1", labeldistance=2.2, labelangle=35];
+  // One-to-many
+  users -> notifications        [taillabel="1", headlabel="&#8734;", labeldistance=2.2, labelangle=35];
+  users -> sms_logs             [taillabel="1", headlabel="&#8734;", labeldistance=2.2, labelangle=35];
+  users -> chat_sessions        [taillabel="1", headlabel="&#8734;", labeldistance=2.2, labelangle=35];
+  users -> inventory_movements  [taillabel="1", headlabel="&#8734;", labeldistance=2.2, labelangle=35];
+  admins -> system_settings     [taillabel="1", headlabel="&#8734;", labeldistance=2.2, labelangle=35];
+  staff -> staff_schedules      [taillabel="1", headlabel="&#8734;", labeldistance=2.2, labelangle=35];
+  customers -> appointments     [taillabel="1", headlabel="&#8734;", labeldistance=2.2, labelangle=35];
+  staff -> appointments         [taillabel="1", headlabel="&#8734;", labeldistance=2.2, labelangle=35];
+  services -> appointments      [taillabel="1", headlabel="&#8734;", labeldistance=2.2, labelangle=35];
+  customers -> treatment_records [taillabel="1", headlabel="&#8734;", labeldistance=2.2, labelangle=35];
+  staff -> treatment_records    [taillabel="1", headlabel="&#8734;", labeldistance=2.2, labelangle=35];
+  services -> treatment_records [taillabel="1", headlabel="&#8734;", labeldistance=2.2, labelangle=35];
+  product_categories -> products [taillabel="1", headlabel="&#8734;", labeldistance=2.2, labelangle=35];
+  products -> inventory_movements [taillabel="1", headlabel="&#8734;", labeldistance=2.2, labelangle=35];
+  chat_sessions -> chat_messages [taillabel="1", headlabel="&#8734;", labeldistance=2.2, labelangle=35];
+}

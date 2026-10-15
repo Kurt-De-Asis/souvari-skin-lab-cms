@@ -404,7 +404,7 @@ export default function BookingGrid({
                                   <ChevronDown size={13} />
                                 </button>
                               ) : (
-                                <span className="flex-shrink-0"><CompletedLockBadge /></span>
+                                <span className="flex-shrink-0"><CompletedLockBadge status={a.status} /></span>
                               )}
                             </div>
                             <p className="truncate text-[10px] leading-tight opacity-90">{a.start_time} – {a.end_time}</p>

@@ -698,12 +698,11 @@ export class AppointmentService {
       );
     }
 
-    // Cancelled is terminal for completion: an appointment that never went
-    // ahead must not be marked completed (and must not receive a completion
-    // message). Other re-openings (e.g. back to confirmed) remain allowed.
-    if (data.status === 'completed' && existing.status === 'cancelled') {
+    // Cancelled appointments are terminal and immutable — no field edits or
+    // status transitions.
+    if (existing.status === 'cancelled') {
       throw new AppError(
-        'A cancelled appointment cannot be marked completed.',
+        'Cancelled appointments can no longer be edited or have their status changed.',
         422
       );
     }

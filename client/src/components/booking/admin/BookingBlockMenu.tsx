@@ -142,11 +142,13 @@ export default function BookingBlockMenu({
           <PanelHeader title="Set status" onBack={() => setPanel('main')} />
           {BOOKING_MENU_STATUSES.map((status) => {
             const isCurrent = status === appointment.status;
+            const isCancelled = appointment.status === 'cancelled';
+            const disabled = pending || isCurrent || isCancelled;
             return (
               <button
                 key={status}
                 type="button"
-                disabled={pending || isCurrent}
+                disabled={disabled}
                 onClick={() => (status === 'cancelled' ? setPanel('cancel') : runStatus(status))}
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs transition hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed"
               >
@@ -269,14 +271,22 @@ function MenuRow({
   );
 }
 
-/** Rendered in place of the menu trigger once a booking is completed. */
-export function CompletedLockBadge() {
+/** Rendered in place of the menu trigger once a booking is locked (completed or cancelled). */
+export function CompletedLockBadge({ status }: { status?: string }) {
+  const label =
+    status === 'cancelled' ? 'Cancelled' : status === 'completed' ? 'Completed' : 'Locked';
+  const title =
+    status === 'cancelled'
+      ? 'Cancelled appointments are locked and can no longer be edited'
+      : status === 'completed'
+        ? 'Completed appointments are locked and can no longer be edited'
+        : 'This appointment is locked and can no longer be edited';
   return (
     <span
       className="inline-flex items-center gap-1 rounded bg-white/25 px-1 py-0.5 text-[9px] font-semibold text-white"
-      title="Completed appointments are locked and can no longer be edited"
+      title={title}
     >
-      <Lock size={9} /> Locked
+      <Lock size={9} /> {label}
     </span>
   );
 }

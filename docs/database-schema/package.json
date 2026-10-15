@@ -1,0 +1,14 @@
+{
+  "name": "souvari-database-schema",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Isolated Graphviz + resvg renderer for the Souvari Skin Lab ERD (does not affect app dependencies).",
+  "scripts": {
+    "build": "node build-erd.mjs"
+  },
+  "devDependencies": {
+    "@hpcc-js/wasm": "^2.23.0",
+    "@resvg/resvg-js": "^2.6.2"
+  }
+}

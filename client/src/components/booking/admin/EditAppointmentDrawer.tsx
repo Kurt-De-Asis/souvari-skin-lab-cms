@@ -225,17 +225,19 @@ export default function EditAppointmentDrawer({
           <div className="flex items-start gap-3 rounded-md border border-neutral-200 bg-neutral-50 p-4">
             <Lock size={16} className="text-neutral-400 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-sm font-semibold text-neutral-900">This appointment is completed</p>
+              <p className="text-sm font-semibold text-neutral-900">
+                {appointment.status === 'completed' ? 'This appointment is completed' : appointment.status === 'cancelled' ? 'This appointment is cancelled' : 'This appointment is locked'}
+              </p>
               <p className="text-xs text-neutral-500 mt-1">
-                Completed bookings are locked and can no longer be edited, rescheduled, or have their
-                services or specialist changed.
+                {appointment.status === 'completed'
+                  ? 'Completed bookings are locked and can no longer be edited, rescheduled, or have their services or specialist changed.'
+                  : appointment.status === 'cancelled'
+                    ? 'Cancelled bookings are locked and can no longer be edited, rescheduled, or have their services or specialist changed.'
+                    : 'This booking is locked and can no longer be edited, rescheduled, or have their services or specialist changed.'}
               </p>
             </div>
           </div>
           <ReadOnlySummary appointment={appointment} />
-          <div className="flex justify-end">
-            <button onClick={onClose} className="btn-secondary">Close</button>
-          </div>
         </div>
       ) : (
         <div className="space-y-4">

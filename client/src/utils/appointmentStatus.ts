@@ -28,7 +28,7 @@ export const APPOINTMENT_STATUS_META: Record<string, AppointmentStatusMeta> = {
   checked_in: { label: 'Arrived', block: 'bg-sky-500', dot: '#0ea5e9', badge: 'badge-info', editable: true },
   in_progress: { label: 'Started', block: 'bg-violet-500', dot: '#8b5cf6', badge: 'badge-info', editable: true },
   completed: { label: 'Completed', block: 'bg-teal-700', dot: '#0f766e', badge: 'badge-success', editable: false },
-  cancelled: { label: 'Cancelled', block: 'bg-red-500', dot: '#ef4444', badge: 'badge-danger', editable: true },
+  cancelled: { label: 'Cancelled', block: 'bg-red-500', dot: '#ef4444', badge: 'badge-danger', editable: false },
   no_show: { label: 'No Show', block: 'bg-neutral-500', dot: '#737373', badge: 'badge-neutral', editable: true },
 };
 
